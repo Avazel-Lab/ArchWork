@@ -14,7 +14,8 @@ milestones:
       commit: 4a387fa4e2b7d1dc4f5f3b77ef4b456684b3516d
       date: 2026-08-27
   M1:
-    status: in-progress
+    status: blocked
+    blocked_by: [D-015]
   M2:
     status: not-started
   M3:
@@ -37,15 +38,16 @@ milestones:
 
 # A rebuild claim without a commit SHA is rejected by the checker.
 last_rebuild:
-  status: never-run
-  commit: null
-  date: null
+  status: failed
+  commit: fc70e8a434de48790b7fbd7ee56821f8ecf89d10
+  date: 2026-08-27
 
 next_actions:
-  - Run make vm-rebuild on a machine with KVM, both profiles, repeat 2
-  - Fix whatever the first real run finds, then record the SHA here
+  - Decide D-015, the recovery UKI reaches rescue mode but sulogin refuses
+  - Run make vm-rebuild for the laptop profile, repeat 2, and record the SHA
   - Confirm the NAS runs btrfs, needed by D-009 before M8
 
 blockers:
   - D-012 names no Secret Service implementation, and D-004 depends on one. Blocks M3.
-  - M1 code is written and linted but has never run. No machine in reach has KVM.
+  - D-015 is open. The recovery UKI reaches rescue mode and sulogin then refuses,
+    because root is locked, so M1 cannot show a rescue shell. Blocks M1 and M5.

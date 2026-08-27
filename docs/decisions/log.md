@@ -256,3 +256,62 @@ Consequences:
 - M1 delivers the script and proves the recovery UKI reaches a shell. M5 exercises the rollback itself.
 - The recovery UKI carries every module rather than an autodetected set, so it can reach the disk on hardware the primary image was tuned for.
 - Accepted limitation: a root filesystem too corrupt to read needs the Arch ISO. Document that in the rescue workflow rather than leaving it implied.
+
+## D-015 Reaching a shell on the recovery UKI
+
+**Status:** open
+**Date:** 2026-08-27
+**Affects:** `storage-boot.md`, M1, M5, D-011, D-014
+
+The recovery UKI boots and reaches rescue mode, then refuses to open a shell.
+
+Observed on a clean desktop VM at commit fc70e8a, on the serial console:
+
+    [  OK  ] Reached target Rescue Mode.
+    You are in rescue mode. After logging in, type "journalctl -xb" ...
+    Cannot open access to console, the root account is locked
+
+`rescue.target` hands over to `sulogin`, and `sulogin` refuses when the root
+account is locked. A fresh Arch installation leaves it locked, and
+`archwork-install.sh` never sets a root password, so this is the state every
+machine this repository builds will be in.
+
+This matters beyond M1. D-014 says M1 "proves the recovery UKI reaches a
+shell", and it does not. D-011 kept systemd-boot over GRUB partly because "the
+recovery UKI already covers the same need", and at present it covers nothing:
+the operator gets a banner and a dead console.
+
+Options:
+
+1. Install a `rescue.service` drop-in setting `SYSTEMD_SULOGIN_FORCE=1`, so
+   sulogin opens a root shell without a password.
+2. Set a root password during installation, from the age-encrypted secret set
+   or by prompting.
+3. Give the recovery entry its own cmdline that bypasses `sulogin`, for
+   example `init=/bin/bash`.
+
+Recommendation: option 1.
+
+Root is unreachable behind LUKS2 already. Anyone who can boot the recovery UKI
+has typed the passphrase, and D-008 confirms there is no TPM auto-unlock
+before M10, so the passphrase is always a real prompt. A password on top of a
+passphrase protects nothing and is one more secret to hold at the exact moment
+the machine is broken. Option 2 also puts a second long-lived credential in
+the secret set, which the `CLAUDE.md` guidance on keeping that set small
+argues against. Option 3 skips the systemd rescue environment entirely, which
+means no mounted filesystems and no journal, and D-014 wants the Btrfs top
+level mounted from that shell.
+
+The cost of option 1 is that `rescue.service` lives on the root filesystem and
+is shared with the primary UKI, so forcing sulogin applies to both. Reaching
+`rescue.target` from the primary entry still requires editing the kernel
+command line at the boot menu, which is itself behind the LUKS prompt.
+
+This is a change to the security posture, so it is the repository owner's
+call, not an agent's.
+
+Consequences once decided:
+
+- M1 exit criteria stay as they are. The test that found this stays.
+- M5 exercises the rollback from that shell, so M5 depends on this too.
+- The M10 Secure Boot work retests rescue, per D-008.
