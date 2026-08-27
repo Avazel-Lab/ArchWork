@@ -36,12 +36,13 @@ milestones:
 
 # A rebuild claim without a commit SHA is rejected by the checker.
 last_rebuild:
-  status: failed
-  commit: fc70e8a434de48790b7fbd7ee56821f8ecf89d10
+  status: passed
+  commit: f4bd326fa3311d5efa93522ab2dab2e0a92a3b1e
   date: 2026-08-27
 
 next_actions:
-  - Run make vm-rebuild for both profiles, repeat 2, and record the SHA here
+  - Owner to review M1 against plan.md and mark it complete if satisfied
+  - Start M2, the Ansible inventory, profiles and package manifests
   - Confirm the NAS runs btrfs, needed by D-009 before M8
 
 blockers: []
