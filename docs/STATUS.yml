@@ -1,0 +1,51 @@
+# Current state only. No history: git holds that.
+# Milestone definitions live in docs/plan.md. Decisions live in docs/decisions/.
+# Validated by scripts/check-plan-status.py.
+---
+schema: 1
+updated: 2026-08-27
+
+phase: M0
+
+milestones:
+  M0:
+    status: in-progress
+  M1:
+    status: blocked
+    blocked_by: [D-002, D-006, D-008]
+  M2:
+    status: blocked
+    blocked_by: [D-005, D-010]
+  M3:
+    status: blocked
+    blocked_by: [D-002, D-003, D-004]
+  M4:
+    status: not-started
+  M5:
+    status: blocked
+    blocked_by: [D-005, D-007]
+  M6:
+    status: not-started
+  M7:
+    status: not-started
+  M8:
+    status: blocked
+    blocked_by: [D-009]
+  M9:
+    status: not-started
+  M10:
+    status: not-started
+
+# A rebuild claim without a commit SHA is rejected by the checker.
+last_rebuild:
+  status: never-run
+  commit: null
+  date: null
+
+next_actions:
+  - Work through the open decisions D-002 to D-010
+  - Land M0 and get CI green
+  - Start M1 once D-002, D-006 and D-008 close
+
+blockers:
+  - Nine decisions remain open. M1, M2, M3, M5 and M8 cannot start until the ones they name close.

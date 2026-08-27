@@ -1,3 +1,9 @@
+---
+status: accepted
+decided: 2026-08-27
+review: 2027-02-27
+---
+
 # Security and power decisions
 
 ## Passwords and secrets

@@ -10,22 +10,22 @@ A fresh Arch Linux installation should eventually be able to clone this reposito
 
 The platform will support two related but distinct builds:
 
-- **Desktop** — primary workstation, including development tooling, gaming and local AI workloads.
-- **Laptop** — portable workstation using the same core platform, but without gaming or local AI components.
+- **Desktop.** Primary workstation, including development tooling, gaming and local AI workloads.
+- **Laptop.** Portable workstation using the same core platform, but without gaming or local AI components.
 
 Differences between the two should be explicit and managed by the automation rather than maintained as separate, divergent configurations.
 
 ## Principles
 
-- **Arch underneath** — remain close to standard Arch Linux rather than creating a separate distribution.
-- **Configuration as code** — packages, system configuration, services and user configuration should be captured in the repository.
-- **Reproducible builds** — rebuilding a workstation should be a normal, tested operation rather than a recovery of last resort.
-- **Minimal manual configuration** — changes made interactively during development should ultimately be captured in code.
-- **Safe updates** — system updates should be preceded by appropriate snapshots and followed by automated health checks.
-- **Recoverable** — provide documented and tested mechanisms for snapshot rollback, configuration restoration and system repair.
-- **Testable** — bootstrap and rebuild processes should be tested against clean Arch installations before relying on them on physical machines.
-- **Shared core, explicit differences** — desktop and laptop builds should share the same foundation while hardware and workload differences remain clearly defined.
-- **Own the integration** — understand and control how the desktop is assembled rather than depending on an opaque collection of scripts or configuration.
+- **Arch underneath.** Remain close to standard Arch Linux rather than creating a separate distribution.
+- **Configuration as code.** Packages, system configuration, services and user configuration should be captured in the repository.
+- **Reproducible builds.** Rebuilding a workstation should be a normal, tested operation rather than a recovery of last resort.
+- **Minimal manual configuration.** Changes made interactively during development should ultimately be captured in code.
+- **Safe updates.** System updates should be preceded by appropriate snapshots and followed by automated health checks.
+- **Recoverable.** Provide documented and tested mechanisms for snapshot rollback, configuration restoration and system repair.
+- **Testable.** Bootstrap and rebuild processes should be tested against clean Arch installations before relying on them on physical machines.
+- **Shared core, explicit differences.** Desktop and laptop builds should share the same foundation while hardware and workload differences remain clearly defined.
+- **Own the integration.** Understand and control how the desktop is assembled rather than depending on an opaque collection of scripts or configuration.
 
 ## Target Platform
 
@@ -79,3 +79,12 @@ Architecture and platform decisions are recorded under:
     docs/decisions/
 
 These decision documents describe the intended state of the platform and should guide its eventual implementation.
+
+## Tracking
+
+- [`docs/plan.md`](docs/plan.md) defines the milestones and what proves each one, plus the test ladder.
+- [`docs/STATUS.yml`](docs/STATUS.yml) records where the project has got to. It is the only file that does.
+- [`docs/decisions/log.md`](docs/decisions/log.md) records dated decisions and the open questions that block milestones.
+- [`CLAUDE.md`](CLAUDE.md) holds the rules for AI-assisted changes.
+
+Run `make check` to lint and to prove the status file still agrees with the plan.

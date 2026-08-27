@@ -1,3 +1,9 @@
+---
+status: accepted
+decided: 2026-08-27
+review: 2027-02-27
+---
+
 # Desktop shell decisions
 
 ## Core desktop
@@ -6,7 +12,7 @@
 |---|---|---|
 | Window manager / compositor | Hyprland | Core desktop platform. |
 | Desktop shell | Quickshell | Primary shell framework for integrated desktop UI. |
-| Launcher | Quicksilver | Selected launcher. |
+| Launcher | Quickshell | Launcher is a Quickshell module (D-001). Until Quickshell lands at M6, use fuzzel, and keep it in the fallback set afterwards. |
 | Lock screen | Hyprlock | Longer-term goal is to replace/integrate with Quickshell. |
 | Wallpaper | Hyprpaper | Use initially; review later. |
 | Notifications | Quickshell | Notification UI handled by Quickshell. |
