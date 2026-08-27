@@ -28,7 +28,7 @@ Where code and a decision document disagree, change one of them on purpose and s
 bootstrap.sh      entry point for a fresh installation
 ansible/          roles, inventory, package manifests
 dotfiles/         user configuration
-scripts/          update, snapshot, rollback, health check, repository checks
+scripts/          installer, update, snapshot, rollback, health check, repository checks
 tests/            bats unit tests and VM test harness
 docs/             plan, status, decisions
 ```
@@ -57,6 +57,7 @@ Rules:
 - Keep no history. Git holds history.
 - Update `updated` to the current date whenever you change the file.
 - Never mark a milestone `complete`. That is the repository owner's call.
+- A milestone marked `complete` carries an `evidence` block with a commit SHA and a date. The checker rejects one without.
 
 `scripts/check-plan-status.py` enforces the mechanical parts. Run it before you present work as finished.
 

@@ -28,6 +28,10 @@ Track these differences explicitly in code and documentation rather than allowin
 | Session entry | greetd with tuigreet (D-004) | greetd with tuigreet (D-004) |
 | Host name | `hmlxdesktop01` (D-010) | `hmlxlaptop01` (D-010) |
 | Inventory group | `desktop` | `laptop` |
+| Swap | zram only (D-013) | zram plus a RAM-sized swapfile on `@swap` (D-013) |
+| `@swap` Btrfs subvolume | Absent | Present, `NODATACOW`, compression off, outside the rollback boundary |
+| Hibernation | Never | `suspend-then-hibernate`, so an overnight sleep does not flatten the battery |
+| Kernel `resume=` | Absent | `resume=` and `resume_offset=` set at install time |
 
 ## Implementation principle
 

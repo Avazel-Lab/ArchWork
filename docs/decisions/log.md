@@ -216,3 +216,43 @@ Candidates are `gnome-keyring`, KWallet, or `keepassxc` acting as the Secret Ser
 `gnome-keyring` has the mature PAM module and is what most Wayland desktops assume. It also drags in a GNOME dependency on a Hyprland system. KWallet fits the Kvantum and Qt theming already chosen but expects more of Plasma than is present here. `keepassxc` would consolidate with the password managers in `security-power.md`, but its PAM story is weaker, which undercuts D-004.
 
 Recommendation: `gnome-keyring`. The PAM integration is the thing being bought, and it is the only one of the three that does it well.
+
+## D-013 Swap and hibernation
+
+**Status:** accepted
+**Date:** 2026-08-27
+**Affects:** `storage-boot.md`, `security-power.md`, `desktop-laptop-differences.md`, M1
+
+zram for swap on both profiles, through `zram-generator`. The laptop additionally gets a swapfile sized to RAM, and hibernates.
+
+`security-power.md` specifies sleep after 30 minutes and says nothing beyond it, so a laptop left asleep overnight goes flat. The laptop therefore uses `suspend-then-hibernate`, sleeping first and hibernating after a delay. The desktop never hibernates and needs no swapfile.
+
+This has to be settled before M1 rather than after, because `resume=` and `resume_offset=` belong in the kernel command line at install time. Adding them later means regenerating UKIs and re-enrolling TPM2 against changed PCR values at M10, which is the retrofit `storage-boot.md` says the boot design should avoid.
+
+**This amends the subvolume layout.** Btrfs will not host a swapfile on a compressed copy-on-write subvolume, so the laptop needs a seventh subvolume, `@swap`, with `NODATACOW` set and compression off. `storage-boot.md` fixed the layout at six, so that document changes here rather than the installer quietly creating a subvolume no decision lists.
+
+Consequences:
+
+- `@swap` exists on the laptop only. The desktop layout stays at six subvolumes.
+- `@swap` sits outside the rollback boundary. Rolling back a swapfile achieves nothing and would change `resume_offset`, which is baked into the laptop command line.
+- The laptop command line carries `resume=` and `resume_offset=`. The desktop command line carries neither.
+- M1 asserts that hibernate and resume work on the laptop profile before M9 depends on it.
+- Hibernating from a LUKS2 volume needs the resume device available in the initramfs. The `systemd` hooks handle this, which is another reason not to use the busybox set.
+
+## D-014 Rollback script delivery
+
+**Status:** accepted
+**Date:** 2026-08-27
+**Affects:** `storage-boot.md`, M1, M5
+
+The rollback script lives on the root filesystem at `/usr/local/bin/archwork-rollback`. The recovery UKI boots to a rescue shell, from which the Btrfs top level gets mounted and the script run.
+
+D-011 said the script ships on the recovery UKI rather than as a documented procedure. This is the practical reading of that. Rollback means the filesystem is intact and `@` is merely bad, which is the case this covers.
+
+Baking the script into the recovery initramfs through a custom mkinitcpio install hook would also survive an unreadable root filesystem. It was rejected as machinery out of proportion to the gain: a custom hook is one more thing that can silently stop being included when mkinitcpio changes, and a filesystem too broken to read is a job for the Arch ISO regardless.
+
+Consequences:
+
+- M1 delivers the script and proves the recovery UKI reaches a shell. M5 exercises the rollback itself.
+- The recovery UKI carries every module rather than an autodetected set, so it can reach the disk on hardware the primary image was tuned for.
+- Accepted limitation: a root filesystem too corrupt to read needs the Arch ISO. Document that in the rescue workflow rather than leaving it implied.

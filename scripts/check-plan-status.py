@@ -83,6 +83,28 @@ def check_milestones(status: dict, planned: list[str]) -> None:
             fail(f"{milestone} is blocked but names no blocking decision")
         if value != "blocked" and state.get("blocked_by"):
             fail(f"{milestone} is not blocked but lists blocked_by")
+        check_evidence(milestone, state)
+
+
+def check_evidence(milestone: str, state: dict) -> None:
+    """A milestone marked complete must carry a commit SHA and a date.
+
+    CLAUDE.md applies this rule to rebuild claims. It applies just as much to
+    a milestone: complete with nothing behind it is the claim this repository
+    exists to make impossible.
+    """
+    evidence = state.get("evidence")
+    if state.get("status") != "complete":
+        if evidence:
+            fail(f"{milestone} is not complete but carries evidence")
+        return
+    if not isinstance(evidence, dict):
+        fail(f"{milestone} is complete but records no evidence. Without a SHA it did not happen.")
+        return
+    if not evidence.get("commit"):
+        fail(f"{milestone} is complete but records no commit SHA")
+    if not evidence.get("date"):
+        fail(f"{milestone} is complete but records no date")
 
 
 def check_blockers(status: dict, decisions: list[str]) -> None:

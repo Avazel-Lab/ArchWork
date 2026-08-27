@@ -5,13 +5,16 @@
 schema: 1
 updated: 2026-08-27
 
-phase: M0
+phase: M1
 
 milestones:
   M0:
-    status: in-progress
+    status: complete
+    evidence:
+      commit: 4a387fa4e2b7d1dc4f5f3b77ef4b456684b3516d
+      date: 2026-08-27
   M1:
-    status: not-started
+    status: in-progress
   M2:
     status: not-started
   M3:
@@ -39,9 +42,9 @@ last_rebuild:
   date: null
 
 next_actions:
-  - Land M0 and get CI green
-  - Start M1: scripted install, LUKS2, Btrfs layout, UKI and recovery UKI
-  - Confirm the NAS runs btrfs, needed by D-009 before M8
+  - M1 step 2: installer with guards, dry-run and bats tests
+  - M1 step 3: VM harness, unattended install with the passphrase driven over serial
+  - M1 step 4: assertions, two consecutive runs, evidence recorded
 
 blockers:
   - D-012 names no Secret Service implementation, and D-004 depends on one.

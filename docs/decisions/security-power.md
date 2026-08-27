@@ -42,6 +42,8 @@ Apply to both desktop and laptop:
 - Turn display off after 15 minutes.
 - Sleep after 30 minutes.
 
+The laptop then hibernates through `suspend-then-hibernate` (D-013), because sleep alone flattens a battery overnight. The desktop never hibernates.
+
 ## Temporary sleep inhibition
 
 Provide an explicit desktop control to suppress sleep while leaving display dim/off behaviour intact.

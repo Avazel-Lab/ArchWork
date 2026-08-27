@@ -33,13 +33,14 @@ Covers LUKS2, the Btrfs layout from `decisions/storage-boot.md`, systemd-boot an
 Exit criteria:
 
 - The script produces a VM that boots to a login prompt, unattended, twice in a row.
-- `lsblk` shows LUKS2. `btrfs subvolume list` shows `@`, `@home`, `@var_log`, `@var_cache`, `@ai_models` and `@snapshots`.
+- `lsblk` shows LUKS2. `btrfs subvolume list` shows `@`, `@home`, `@var_log`, `@var_cache`, `@ai_models` and `@snapshots`, plus `@swap` on the laptop profile (D-013).
 - Mount options carry `compress=zstd`.
 - `/var/lib` sits inside `@`.
 - A primary UKI and a recovery UKI both exist and both boot.
-- Kernel parameters come from a profile file, not from accumulated edits.
-- A rollback script ships on the recovery UKI, not just a documented procedure (D-011).
-- The script refuses to run against a device it cannot confirm, and refuses outside a VM without an explicit override flag.
+- Kernel parameters come from a profile file, not from accumulated edits. The laptop file carries `resume=` and `resume_offset=`, the desktop file carries neither (D-013).
+- zram is active on both profiles. On the laptop, hibernate and resume both work (D-013).
+- The recovery UKI reaches a rescue shell, and `/usr/local/bin/archwork-rollback` is installed (D-011, D-014).
+- The script refuses to run against a device it cannot confirm, and refuses outside a VM without an explicit override flag. Each guard is proven by making it refuse, not by reading it.
 
 ### M2 Ansible reconciliation
 
@@ -186,4 +187,6 @@ L2 through L5 need nested virtualisation or a local runner. Do not add a CI job 
 - `not-started`
 - `blocked`, with `blocked_by` listing decision IDs
 - `in-progress`
-- `complete`, set only by the repository owner
+- `complete`, set only by the repository owner, and carrying an `evidence` block with a commit SHA and a date
+
+`scripts/check-plan-status.py` rejects a milestone marked `complete` with no evidence behind it. That is the `CLAUDE.md` evidence rule applied to milestones rather than only to rebuild claims.

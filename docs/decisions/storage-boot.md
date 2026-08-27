@@ -23,6 +23,9 @@ Use Btrfs on both systems.
 - `@var_cache`
 - `@ai_models`
 - `@snapshots`
+- `@swap` on the laptop only (D-013)
+
+`/var/lib` stays inside `@` and rolls back with it. The pacman database lives at `/var/lib/pacman`, and if it survives a rollback of `@` then pacman reports package versions that are not on disk. Do not carve `@var` or `@var_lib` out of this layout.
 
 ### Compression
 
@@ -34,13 +37,27 @@ Use Btrfs on both systems.
 - Logs survive rollback.
 - Caches are excluded from rollback.
 - AI model storage is excluded from rollback.
+- `@swap` is excluded from rollback. Rolling back a swapfile achieves nothing, and it would change `resume_offset`, which is baked into the laptop kernel command line.
+
+## Swap and hibernation
+
+Decided at D-013.
+
+- zram on both profiles, through `zram-generator`.
+- The laptop additionally gets a swapfile sized to RAM on `@swap`, with `NODATACOW` set and compression off. Btrfs will not host a swapfile on a compressed copy-on-write subvolume.
+- The laptop hibernates, using `suspend-then-hibernate` so that a machine left asleep overnight does not go flat.
+- The desktop never hibernates and has no swapfile.
+- `resume=` and `resume_offset=` go in the laptop kernel command line at install time, never retrofitted. Adding them later would regenerate the UKIs and change the PCR values that D-008 enrols against at M10.
 
 ## Boot architecture
 
 - Use systemd-based boot tooling rather than GRUB. GRUB was reconsidered and rejected at D-011.
 - Use Unified Kernel Images (UKIs).
 - Maintain a recovery UKI.
-- Document a rescue/recovery workflow, and ship a rollback script on the recovery UKI rather than a manual procedure (D-011).
+- Document a rescue/recovery workflow, and ship a rollback script rather than a manual procedure (D-011).
+- The rollback script lives at `/usr/local/bin/archwork-rollback` on the root filesystem, and the recovery UKI boots to a rescue shell (D-014). A root filesystem too corrupt to read needs the Arch ISO; say so in the rescue workflow rather than leaving it implied.
+- The recovery UKI carries every module rather than an autodetected set.
+- Use the `systemd` mkinitcpio hooks including `sd-encrypt`, not the busybox set. TPM2 enrolment at M10 needs them, and hibernating from a LUKS2 volume needs the resume device available in the initramfs.
 - Kernel parameters should be deliberately defined up front rather than accumulated ad hoc.
 - Maintain separate desktop and laptop kernel-parameter profiles where hardware requires it.
 
