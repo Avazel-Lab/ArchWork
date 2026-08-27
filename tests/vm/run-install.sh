@@ -274,14 +274,17 @@ phase_boot() {
 phase_assert() {
 	log "Phase 3: asserting the M1 criteria"
 
-	local ssh_opts=(
+	# ssh takes the port as -p, scp takes it as -P. Sharing one array between
+	# them made scp read the port number as a local filename.
+	local common_opts=(
 		-i "$WORK_DIR/id_test"
-		-p "$SSH_PORT"
 		-o StrictHostKeyChecking=no
 		-o UserKnownHostsFile=/dev/null
 		-o LogLevel=ERROR
 		-o ConnectTimeout=5
 	)
+	local ssh_opts=(-p "$SSH_PORT" "${common_opts[@]}")
+	local scp_opts=(-P "$SSH_PORT" "${common_opts[@]}")
 
 	local attempt
 	for attempt in $(seq 1 30); do
@@ -294,12 +297,12 @@ phase_assert() {
 
 	# Push the assertion library and script, then run them as root.
 	ssh "${ssh_opts[@]}" gary@127.0.0.1 "mkdir -p /tmp/checks/lib"
-	scp "${ssh_opts[@]}" -q "$SCRIPT_DIR/assert-m1.sh" gary@127.0.0.1:/tmp/checks/
-	scp "${ssh_opts[@]}" -q "$SCRIPT_DIR/lib/checks.sh" gary@127.0.0.1:/tmp/checks/lib/
+	scp "${scp_opts[@]}" -q "$SCRIPT_DIR/assert-m1.sh" gary@127.0.0.1:/tmp/checks/
+	scp "${scp_opts[@]}" -q "$SCRIPT_DIR/lib/checks.sh" gary@127.0.0.1:/tmp/checks/lib/
 
 	# The profile goes over as a file so that it expands on the guest rather
 	# than here, which keeps the remote command free of local expansion.
-	scp "${ssh_opts[@]}" -q "$WORK_DIR/profile" gary@127.0.0.1:/tmp/checks/profile
+	scp "${scp_opts[@]}" -q "$WORK_DIR/profile" gary@127.0.0.1:/tmp/checks/profile
 
 	ssh "${ssh_opts[@]}" gary@127.0.0.1 \
 		'chmod +x /tmp/checks/assert-m1.sh && sudo /tmp/checks/assert-m1.sh "$(cat /tmp/checks/profile)"' 
