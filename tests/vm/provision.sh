@@ -36,11 +36,16 @@ log "Installing profile '$PROFILE' onto $DISK"
 # An unattended install has to answer that prompt. Feed the answer in rather
 # than adding a bypass flag to the installer: the guard still runs, and it
 # still refuses anything that is not an exact match for the target device.
+#
+# Send the installer output to /dev/console as well. archiso runs this script
+# with its stdout going to the journal, not the console, so without the tee an
+# installer that stops and waits looks identical to one that is working, and
+# the harness has no way to tell which.
 printf '%s\n' "$DISK" | /tmp/archwork/scripts/archwork-install.sh \
 	--profile "$PROFILE" \
 	--luks-passphrase-file /tmp/passphrase \
 	--authorized-key /tmp/id_test.pub \
-	"$DISK"
+	"$DISK" 2>&1 | tee /dev/console
 
 # The installer leaves the account without a password. The test harness reaches
 # the machine over SSH with a key, so lock the password rather than setting one.
