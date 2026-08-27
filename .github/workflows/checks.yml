@@ -33,7 +33,12 @@ jobs:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8  # v5.0.0
       - name: Install bats
         run: sudo apt-get update -qq && sudo apt-get install -y -qq bats
-      - run: bats tests/unit
+      # The guard tests create block device nodes, which needs CAP_MKNOD. As
+      # the runner user they skip, and a skipped guard test reports green
+      # without proving anything. Run them with the capability, and set
+      # ARCHWORK_REQUIRE_GUARD_TESTS so the job fails rather than skips if
+      # that ever stops working.
+      - run: sudo ARCHWORK_REQUIRE_GUARD_TESTS=1 bats tests/unit
 
   shell:
     name: shellcheck

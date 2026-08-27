@@ -14,8 +14,19 @@ setup() {
 	export ARCHWORK_PROC_MOUNTS="$FIXTURE/mounts"
 	: >"$ARCHWORK_PROC_MOUNTS"
 
-	# A block device we can point guards at without owning a disk.
-	mknod "$FIXTURE/dev/vda" b 254 0 2>/dev/null || skip "cannot create block device nodes here"
+	# A block device we can point guards at without owning a disk. Creating it
+	# needs CAP_MKNOD, which an unprivileged local shell does not have.
+	#
+	# Skipping is fine on a developer machine. It is not fine in CI, where a
+	# silent skip means every guard below reports green without running. Set
+	# ARCHWORK_REQUIRE_GUARD_TESTS to turn that skip into a failure.
+	if ! mknod "$FIXTURE/dev/vda" b 254 0 2>/dev/null; then
+		if [ -n "${ARCHWORK_REQUIRE_GUARD_TESTS:-}" ]; then
+			printf 'cannot create block device nodes, and ARCHWORK_REQUIRE_GUARD_TESTS is set\n' >&2
+			return 1
+		fi
+		skip "cannot create block device nodes here"
+	fi
 	mknod "$FIXTURE/dev/vda1" b 254 1 2>/dev/null || true
 
 	# shellcheck source=/dev/null
