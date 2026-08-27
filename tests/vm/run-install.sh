@@ -27,6 +27,9 @@ REPEAT=1
 KEEP=false
 WORK_DIR=""
 HTTP_PORT="8000"
+# Long enough for a slow mirror, short enough that a wedged install fails the
+# run rather than holding it open indefinitely.
+INSTALL_TIMEOUT="1800"
 SSH_PORT="2222"
 GUEST_DISK="/dev/vda"
 PASSPHRASE="archwork-test-passphrase"
@@ -34,6 +37,11 @@ PASSPHRASE="archwork-test-passphrase"
 HTTP_PID=""
 QEMU_PID=""
 REPO_SHA=""
+
+# ssh spells the port -p and scp spells it -P, where -p means preserve times.
+# Sharing one array between them made scp read the port number as a filename.
+SSH_OPTS=()
+SCP_OPTS=()
 
 usage() {
 	cat <<'USAGE'
@@ -170,6 +178,16 @@ prepare_work_dir() {
 	printf '%s' "$GUEST_DISK" >"$WORK_DIR/disk"
 
 	ssh-keygen -q -t ed25519 -N "" -f "$WORK_DIR/id_test" -C archwork-m1-test
+
+	local common_opts=(
+		-i "$WORK_DIR/id_test"
+		-o StrictHostKeyChecking=no
+		-o UserKnownHostsFile=/dev/null
+		-o LogLevel=ERROR
+		-o ConnectTimeout=5
+	)
+	SSH_OPTS=(-p "$SSH_PORT" "${common_opts[@]}")
+	SCP_OPTS=(-P "$SSH_PORT" "${common_opts[@]}")
 	cp "$WORK_DIR/id_test.pub" "$WORK_DIR/id_test.pub.served"
 	mv "$WORK_DIR/id_test.pub.served" "$WORK_DIR/id_test.pub"
 
@@ -231,7 +249,7 @@ phase_install() {
 	local args=()
 	mapfile -t args < <(qemu_base_args)
 
-	qemu-system-x86_64 \
+	timeout "$INSTALL_TIMEOUT" qemu-system-x86_64 \
 		"${args[@]}" \
 		-netdev "user,id=net0" \
 		-device virtio-net-pci,netdev=net0 \
@@ -242,15 +260,21 @@ phase_install() {
 		-append "archisobasedir=arch archisolabel=$ISO_LABEL console=ttyS0 script=http://10.0.2.2:$HTTP_PORT/provision.sh" \
 		2>&1 | tee "$WORK_DIR/install-console.log"
 
+	if grep -q "Install FAILED" "$WORK_DIR/install-console.log"; then
+		die "the installer reported failure, see $WORK_DIR/install-console.log"
+	fi
+
 	grep -q "Install finished" "$WORK_DIR/install-console.log" ||
-		die "the installer did not finish, see $WORK_DIR/install-console.log"
+		die "the installer did not finish within ${INSTALL_TIMEOUT}s, see $WORK_DIR/install-console.log"
 }
 
-phase_boot() {
-	log "Phase 2: booting the installed system"
-
+# Boot the installed disk. Both the normal boot and the recovery boot need
+# this, so it takes no view on which entry the firmware will pick.
+start_installed_vm() {
 	local args=()
 	mapfile -t args < <(qemu_base_args)
+
+	rm -f "$WORK_DIR/serial.sock"
 
 	qemu-system-x86_64 \
 		"${args[@]}" \
@@ -259,9 +283,15 @@ phase_boot() {
 		-display none \
 		-serial "unix:$WORK_DIR/serial.sock,server,nowait" \
 		-daemonize -pidfile "$WORK_DIR/qemu.pid" ||
-		die "QEMU failed to start for the boot phase"
+		die "QEMU failed to start"
 
 	QEMU_PID="$(cat "$WORK_DIR/qemu.pid")"
+}
+
+phase_boot() {
+	log "Phase 2: booting the installed system"
+
+	start_installed_vm
 
 	log "Answering the LUKS passphrase prompt over serial"
 	python3 "$SCRIPT_DIR/serial-unlock.py" \
@@ -274,21 +304,9 @@ phase_boot() {
 phase_assert() {
 	log "Phase 3: asserting the M1 criteria"
 
-	# ssh takes the port as -p, scp takes it as -P. Sharing one array between
-	# them made scp read the port number as a local filename.
-	local common_opts=(
-		-i "$WORK_DIR/id_test"
-		-o StrictHostKeyChecking=no
-		-o UserKnownHostsFile=/dev/null
-		-o LogLevel=ERROR
-		-o ConnectTimeout=5
-	)
-	local ssh_opts=(-p "$SSH_PORT" "${common_opts[@]}")
-	local scp_opts=(-P "$SSH_PORT" "${common_opts[@]}")
-
 	local attempt
 	for attempt in $(seq 1 30); do
-		if ssh "${ssh_opts[@]}" gary@127.0.0.1 true 2>/dev/null; then
+		if ssh "${SSH_OPTS[@]}" gary@127.0.0.1 true 2>/dev/null; then
 			break
 		fi
 		[ "$attempt" -eq 30 ] && die "could not reach the VM over SSH"
@@ -296,16 +314,55 @@ phase_assert() {
 	done
 
 	# Push the assertion library and script, then run them as root.
-	ssh "${ssh_opts[@]}" gary@127.0.0.1 "mkdir -p /tmp/checks/lib"
-	scp "${scp_opts[@]}" -q "$SCRIPT_DIR/assert-m1.sh" gary@127.0.0.1:/tmp/checks/
-	scp "${scp_opts[@]}" -q "$SCRIPT_DIR/lib/checks.sh" gary@127.0.0.1:/tmp/checks/lib/
+	ssh "${SSH_OPTS[@]}" gary@127.0.0.1 "mkdir -p /tmp/checks/lib"
+	scp "${SCP_OPTS[@]}" -q "$SCRIPT_DIR/assert-m1.sh" gary@127.0.0.1:/tmp/checks/
+	scp "${SCP_OPTS[@]}" -q "$SCRIPT_DIR/lib/checks.sh" gary@127.0.0.1:/tmp/checks/lib/
 
 	# The profile goes over as a file so that it expands on the guest rather
 	# than here, which keeps the remote command free of local expansion.
-	scp "${scp_opts[@]}" -q "$WORK_DIR/profile" gary@127.0.0.1:/tmp/checks/profile
+	scp "${SCP_OPTS[@]}" -q "$WORK_DIR/profile" gary@127.0.0.1:/tmp/checks/profile
 
-	ssh "${ssh_opts[@]}" gary@127.0.0.1 \
+	ssh "${SSH_OPTS[@]}" gary@127.0.0.1 \
 		'chmod +x /tmp/checks/assert-m1.sh && sudo /tmp/checks/assert-m1.sh "$(cat /tmp/checks/profile)"' 
+}
+
+# plan.md M1 requires the recovery UKI to boot, not merely to exist. Assert it
+# by booting it: anything less proves the file is present and nothing else.
+phase_recovery() {
+	log "Phase 4: booting the recovery UKI"
+
+	# bootctl writes LoaderEntryOneShot into the UEFI variable store, which
+	# lives in OVMF_VARS.fd and survives the restart below.
+	ssh "${SSH_OPTS[@]}" gary@127.0.0.1 \
+		'sudo bootctl set-oneshot archwork-recovery.efi' ||
+		die "could not select the recovery entry, see bootctl list on the guest"
+
+	# -no-reboot means the guest reboot stops QEMU rather than looping.
+	ssh "${SSH_OPTS[@]}" gary@127.0.0.1 'sudo systemctl reboot' || true
+
+	local waited=0
+	while kill -0 "$QEMU_PID" 2>/dev/null; do
+		sleep 2
+		waited=$((waited + 2))
+		[ "$waited" -ge 120 ] && die "the guest did not shut down for the recovery boot"
+	done
+	QEMU_PID=""
+
+	start_installed_vm
+
+	log "Waiting for the recovery UKI to reach a rescue shell"
+
+	# sulogin refuses to open a shell when the root account is locked, which
+	# is the state a fresh Arch install leaves it in. That is a recovery path
+	# that boots and then hands the operator nothing, so treat it as a
+	# failure rather than waiting for the timeout.
+	python3 "$SCRIPT_DIR/serial-unlock.py" \
+		--socket "$WORK_DIR/serial.sock" \
+		--passphrase-file "$WORK_DIR/passphrase" \
+		--expect "(rescue|maintenance|Control-D|root@)" \
+		--fail-on "(account is locked|Cannot open access to console)" \
+		--log "$WORK_DIR/recovery-console.log" ||
+		die "the recovery UKI did not reach a rescue shell, see $WORK_DIR/recovery-console.log"
 }
 
 main() {
@@ -321,6 +378,7 @@ main() {
 		phase_install
 		phase_boot
 		phase_assert
+		phase_recovery
 
 		kill_if_running "$QEMU_PID"
 		QEMU_PID=""

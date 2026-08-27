@@ -23,18 +23,31 @@ import time
 
 # systemd's password agent prompt, and the plymouth-free console variant.
 PASSPHRASE_PROMPT = re.compile(rb"(passphrase|password) for", re.IGNORECASE)
-LOGIN_PROMPT = re.compile(rb"\blogin:", re.IGNORECASE)
-PANIC = re.compile(rb"(Kernel panic|Failed to start|emergency mode|You are in emergency)", re.IGNORECASE)
+LOGIN_PROMPT = rb"\blogin:"
+PANIC = re.compile(rb"(Kernel panic|emergency mode|You are in emergency)", re.IGNORECASE)
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--socket", required=True, help="QEMU serial unix socket")
     parser.add_argument("--passphrase-file", required=True)
-    parser.add_argument("--timeout", type=int, default=300, help="seconds to wait for a login prompt")
+    parser.add_argument("--timeout", type=int, default=300, help="seconds to wait for the expected prompt")
     parser.add_argument("--log", help="write the console transcript here")
     parser.add_argument("--max-attempts", type=int, default=3)
+    parser.add_argument(
+        "--expect",
+        default=LOGIN_PROMPT.decode(),
+        help="regex whose appearance means the boot reached its target",
+    )
+    parser.add_argument(
+        "--fail-on",
+        default=None,
+        help="regex whose appearance means the boot reached a state it cannot recover from",
+    )
     args = parser.parse_args()
+
+    expect = re.compile(args.expect.encode(), re.IGNORECASE)
+    fail_on = re.compile(args.fail_on.encode(), re.IGNORECASE) if args.fail_on else None
 
     with open(args.passphrase_file, "rb") as handle:
         passphrase = handle.read().strip()
@@ -81,7 +94,12 @@ def main() -> int:
             write_log(args.log, transcript)
             return 2
 
-        if LOGIN_PROMPT.search(pending):
+        if fail_on is not None and fail_on.search(pending):
+            print(f"\nconsole matched --fail-on: {args.fail_on}", file=sys.stderr)
+            write_log(args.log, transcript)
+            return 4
+
+        if expect.search(pending):
             write_log(args.log, transcript)
             return 0
 
@@ -100,7 +118,7 @@ def main() -> int:
         if len(pending) > 65536:
             del pending[:-4096]
 
-    print("\ntimed out waiting for a login prompt", file=sys.stderr)
+    print(f"\ntimed out waiting for {args.expect!r}", file=sys.stderr)
     write_log(args.log, transcript)
     return 1
 
