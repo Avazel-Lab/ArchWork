@@ -220,7 +220,6 @@ qemu_base_args() {
 		-drive "if=pflash,format=raw,readonly=on,file=$OVMF_CODE" \
 		-drive "if=pflash,format=raw,file=$WORK_DIR/OVMF_VARS.fd" \
 		-drive "if=virtio,format=qcow2,file=$WORK_DIR/disk.qcow2" \
-		-nographic \
 		-no-reboot
 }
 
@@ -236,6 +235,7 @@ phase_install() {
 		"${args[@]}" \
 		-netdev "user,id=net0" \
 		-device virtio-net-pci,netdev=net0 \
+		-nographic \
 		-cdrom "$ISO" \
 		-kernel "$WORK_DIR/arch/boot/x86_64/vmlinuz-linux" \
 		-initrd "$WORK_DIR/arch/boot/x86_64/initramfs-linux.img" \
@@ -256,6 +256,7 @@ phase_boot() {
 		"${args[@]}" \
 		-netdev "user,id=net0,hostfwd=tcp::$SSH_PORT-:22" \
 		-device virtio-net-pci,netdev=net0 \
+		-display none \
 		-serial "unix:$WORK_DIR/serial.sock,server,nowait" \
 		-daemonize -pidfile "$WORK_DIR/qemu.pid" ||
 		die "QEMU failed to start for the boot phase"
