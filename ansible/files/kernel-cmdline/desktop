@@ -1,0 +1,20 @@
+# Desktop kernel command line.
+#
+# Defined up front rather than accumulated, per docs/decisions/storage-boot.md.
+# Comments and blank lines are stripped before this reaches /etc/kernel/cmdline.
+#
+# @LUKS_UUID@ is substituted by scripts/archwork-install.sh at install time.
+# It is the only token in this file. The desktop carries no resume= because it
+# never hibernates (D-013).
+
+rd.luks.name=@LUKS_UUID@=cryptroot
+rd.luks.options=@LUKS_UUID@=discard
+root=/dev/mapper/cryptroot
+rootflags=subvol=@
+rw
+
+# AMD. amd_pstate=active gives the scheduler real frequency control.
+amd_pstate=active
+
+# Quiet boot. Drop this line when debugging an install.
+quiet loglevel=3

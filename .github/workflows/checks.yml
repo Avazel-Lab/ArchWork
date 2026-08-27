@@ -1,0 +1,58 @@
+# L0 lint and the plan/status cross-check.
+#
+# L2 to L5 need nested virtualisation and do not run here. Do not add a job
+# that skips itself and reports green: see docs/plan.md.
+---
+name: checks
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  tracking:
+    name: plan and status cross-check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8  # v5.0.0
+      - uses: actions/setup-python@e797f83bcb11b83ae66e0230d6156d7c80228e7c  # v6.0.0
+        with:
+          python-version: '3.13'
+      - run: pip install pyyaml yamllint
+      - run: python3 scripts/check-plan-status.py
+      - run: yamllint docs/STATUS.yml
+
+  unit:
+    name: bats unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8  # v5.0.0
+      - name: Install bats
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq bats
+      # The guard tests create block device nodes, which needs CAP_MKNOD. As
+      # the runner user they skip, and a skipped guard test reports green
+      # without proving anything. Run them with the capability, and set
+      # ARCHWORK_REQUIRE_GUARD_TESTS so the job fails rather than skips if
+      # that ever stops working.
+      - run: sudo ARCHWORK_REQUIRE_GUARD_TESTS=1 bats tests/unit
+
+  shell:
+    name: shellcheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8  # v5.0.0
+      - name: Run ShellCheck on every shell script
+        run: |
+          mapfile -t scripts < <(find . -name '*.sh' -not -path './.git/*')
+          if [ ${#scripts[@]} -eq 0 ]; then
+            echo "No shell scripts yet."
+            exit 0
+          fi
+          mapfile -t commands < <(grep -rl '^#!/usr/bin/env bash' scripts tests 2>/dev/null | grep -v '\.sh$')
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq shellcheck
+          shellcheck -x "${scripts[@]}" "${commands[@]}"

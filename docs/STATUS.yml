@@ -1,0 +1,48 @@
+# Current state only. No history: git holds that.
+# Milestone definitions live in docs/plan.md. Decisions live in docs/decisions/.
+# Validated by scripts/check-plan-status.py.
+---
+schema: 1
+updated: 2026-08-27
+
+phase: M1
+
+milestones:
+  M0:
+    status: complete
+    evidence:
+      commit: 4a387fa4e2b7d1dc4f5f3b77ef4b456684b3516d
+      date: 2026-08-27
+  M1:
+    status: in-progress
+  M2:
+    status: not-started
+  M3:
+    status: not-started
+  M4:
+    status: not-started
+  M5:
+    status: not-started
+  M6:
+    status: not-started
+  M7:
+    status: not-started
+  M8:
+    status: not-started
+  M9:
+    status: not-started
+  M10:
+    status: not-started
+
+# A rebuild claim without a commit SHA is rejected by the checker.
+last_rebuild:
+  status: passed
+  commit: f4bd326fa3311d5efa93522ab2dab2e0a92a3b1e
+  date: 2026-08-27
+
+next_actions:
+  - Owner to review M1 against plan.md and mark it complete if satisfied
+  - Start M2, the Ansible inventory, profiles and package manifests
+  - Confirm the NAS runs btrfs, needed by D-009 before M8
+
+blockers: []

@@ -1,0 +1,178 @@
+#!/usr/bin/env bash
+#
+# Roll the root subvolume back to a snapshot.
+#
+# Installed to /usr/local/bin/archwork-rollback on the target system (D-014).
+# Run it from a normal session or from the rescue shell the recovery UKI boots
+# into. It is deliberately self-contained: nothing here may depend on the
+# repository being present, because a machine that needs rolling back may not
+# have it.
+#
+# It touches @ and nothing else. /home, logs, caches, AI models and swap sit
+# outside the rollback boundary by design, per docs/decisions/storage-boot.md.
+
+set -euo pipefail
+
+DEVICE="/dev/mapper/cryptroot"
+WORK_DIR=""
+DRY_RUN=false
+
+usage() {
+	cat <<'USAGE'
+archwork-rollback list
+archwork-rollback to SNAPSHOT [--dry-run]
+
+Rolls the root subvolume @ back to a snapshot under @snapshots.
+
+  list              show available snapshots, newest last
+  to SNAPSHOT       replace @ with a writable copy of SNAPSHOT
+  --dry-run         print what would happen, change nothing
+  --device PATH     unlocked LUKS device, default /dev/mapper/cryptroot
+
+The previous @ is kept as @.broken-TIMESTAMP rather than deleted, so a bad
+rollback can itself be undone. Delete it by hand once you are satisfied.
+
+Only @ is touched. /home, @var_log, @var_cache, @ai_models and @swap are
+outside the rollback boundary and are left alone.
+USAGE
+}
+
+die() {
+	printf 'error: %s\n' "$1" >&2
+	exit 1
+}
+
+run_cmd() {
+	if [ "$DRY_RUN" = true ]; then
+		printf '  would run:'
+		printf ' %q' "$@"
+		printf '\n'
+		return 0
+	fi
+	"$@"
+}
+
+cleanup() {
+	if [ -n "$WORK_DIR" ] && mountpoint -q "$WORK_DIR" 2>/dev/null; then
+		umount "$WORK_DIR" || true
+	fi
+	if [ -n "$WORK_DIR" ] && [ -d "$WORK_DIR" ]; then
+		rmdir "$WORK_DIR" || true
+	fi
+}
+
+# Mount the Btrfs top level, where the subvolumes live as directories.
+mount_top_level() {
+	[ -b "$DEVICE" ] || die "'$DEVICE' is not a block device. Unlock it first with cryptsetup open."
+
+	WORK_DIR="$(mktemp -d /tmp/archwork-rollback.XXXXXX)"
+	trap cleanup EXIT
+
+	mount -o subvolid=5 "$DEVICE" "$WORK_DIR" ||
+		die "could not mount the Btrfs top level of '$DEVICE'"
+}
+
+cmd_list() {
+	mount_top_level
+
+	if [ ! -d "$WORK_DIR/@snapshots" ]; then
+		die "no @snapshots subvolume on '$DEVICE'"
+	fi
+
+	local found=false
+	local entry
+	for entry in "$WORK_DIR"/@snapshots/*; do
+		[ -e "$entry" ] || continue
+		found=true
+		printf '%s\n' "${entry##*/}"
+	done
+
+	if [ "$found" = false ]; then
+		printf 'no snapshots yet\n'
+	fi
+}
+
+cmd_to() {
+	local snapshot="$1"
+
+	mount_top_level
+
+	local source="$WORK_DIR/@snapshots/$snapshot"
+	[ -d "$source" ] || die "no snapshot named '$snapshot'. Run 'archwork-rollback list'."
+
+	local stamp
+	stamp="$(date +%Y%m%d-%H%M%S)"
+	local retired="@.broken-$stamp"
+
+	printf '\nRolling back:\n'
+	printf '  device    %s\n' "$DEVICE"
+	printf '  snapshot  %s\n' "$snapshot"
+	printf '  current @ becomes %s\n\n' "$retired"
+
+	if [ "$DRY_RUN" != true ]; then
+		printf "Type 'rollback' to confirm, anything else to abort: "
+		local answer=""
+		read -r answer
+		[ "$answer" = "rollback" ] || die "confirmation did not match. Nothing was changed."
+	fi
+
+	# Move the current root aside rather than deleting it. A rollback onto a
+	# snapshot that turns out to be worse is not an unrecoverable position.
+	run_cmd mv "$WORK_DIR/@" "$WORK_DIR/$retired"
+
+	# A read-only snapshot cannot be a root subvolume, so take a writable one.
+	run_cmd btrfs subvolume snapshot "$source" "$WORK_DIR/@"
+
+	printf '\nDone. Reboot to use the rolled-back system.\n'
+	printf 'The previous root is kept at %s. Delete it once you are satisfied:\n' "$retired"
+	printf '  btrfs subvolume delete /path/to/top-level/%s\n' "$retired"
+}
+
+main() {
+	local command="${1:-}"
+	[ $# -gt 0 ] && shift
+
+	local snapshot=""
+
+	while [ $# -gt 0 ]; do
+		case "$1" in
+		--dry-run)
+			DRY_RUN=true
+			shift
+			;;
+		--device)
+			DEVICE="${2:-}"
+			shift 2
+			;;
+		-*)
+			die "unknown option '$1'"
+			;;
+		*)
+			snapshot="$1"
+			shift
+			;;
+		esac
+	done
+
+	case "$command" in
+	list)
+		cmd_list
+		;;
+	to)
+		[ -n "$snapshot" ] || die "'to' needs a snapshot name. Run 'archwork-rollback list'."
+		cmd_to "$snapshot"
+		;;
+	-h | --help | help)
+		usage
+		;;
+	"")
+		usage
+		exit 1
+		;;
+	*)
+		die "unknown command '$command'. Run --help."
+		;;
+	esac
+}
+
+main "$@"
