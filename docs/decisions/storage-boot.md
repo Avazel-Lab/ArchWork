@@ -37,12 +37,18 @@ Use Btrfs on both systems.
 
 ## Boot architecture
 
-- Use systemd-based boot tooling rather than GRUB.
+- Use systemd-based boot tooling rather than GRUB. GRUB was reconsidered and rejected at D-011.
 - Use Unified Kernel Images (UKIs).
 - Maintain a recovery UKI.
-- Document a rescue/recovery workflow.
+- Document a rescue/recovery workflow, and ship a rollback script on the recovery UKI rather than a manual procedure (D-011).
 - Kernel parameters should be deliberately defined up front rather than accumulated ad hoc.
 - Maintain separate desktop and laptop kernel-parameter profiles where hardware requires it.
+
+## Disk unlock
+
+- LUKS2 passphrase at every boot until Secure Boot is enabled (D-008).
+- TPM2 enrolment happens at M10, against PCR 7 and PCR 11, never before.
+- Print a recovery key and store it offline before enrolling the TPM.
 
 ## Secure Boot
 
@@ -50,6 +56,19 @@ Use Btrfs on both systems.
 - Build and prove the desktop/laptop first.
 - Use each system for approximately one month before enabling Secure Boot.
 - UKIs and the surrounding boot design should be stable enough that enabling Secure Boot later does not require redesigning the installation.
+
+## Snapshot tooling
+
+- btrbk (D-007). One tool for snapshots, retention and off-machine send/receive.
+- A pacman pre-transaction hook triggers the pre-update snapshot.
+- Retention policy lives in the btrbk config in this repository.
+
+## Backup
+
+- btrbk send and receive to the NAS (D-009). Scope: `@home` and `@ai_models`.
+- Snapshots are not backups. They share a device with the data.
+- Verify the NAS runs btrfs before relying on this.
+- Residual risk accepted: the NAS is in the same building, so fire and theft are not covered.
 
 ## Update and recovery intent
 

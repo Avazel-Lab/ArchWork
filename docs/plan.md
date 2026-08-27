@@ -38,9 +38,8 @@ Exit criteria:
 - `/var/lib` sits inside `@`.
 - A primary UKI and a recovery UKI both exist and both boot.
 - Kernel parameters come from a profile file, not from accumulated edits.
+- A rollback script ships on the recovery UKI, not just a documented procedure (D-011).
 - The script refuses to run against a device it cannot confirm, and refuses outside a VM without an explicit override flag.
-
-Blocked by: D-002, D-006, D-008.
 
 ### M2 Ansible reconciliation
 
@@ -54,8 +53,7 @@ Exit criteria:
 - `ansible-playbook --check` runs clean against a fresh VM.
 - A real run followed by a second run reports zero changed tasks.
 - `ansible-lint` passes.
-
-Blocked by: D-005, D-010.
+- `host_vars/` is empty, or every entry in it is a genuine per-machine fact (D-010).
 
 ### M3 Minimal Hyprland desktop
 
@@ -69,8 +67,6 @@ Exit criteria:
 - Portals work. A file picker opens from a GTK application and from a Qt application.
 - Kvantum and the matching GTK theme apply.
 - No step in the above requires manual configuration after the rebuild.
-
-Blocked by: D-002, D-003, D-004.
 
 ### M4 Power and sleep behaviour
 
@@ -93,9 +89,8 @@ Exit criteria:
 - Health checks assert subvolume mounts, encryption state, UKI presence, required services and the M4 timings.
 - Break a VM on purpose, roll back, and health checks pass afterwards.
 - After rollback, `pacman -Qi` agrees with what is on disk. This is the check that catches a broken subvolume boundary.
-- The recovery UKI boots and the documented rescue workflow works from it.
-
-Blocked by: D-005, D-007.
+- The recovery UKI boots and the rollback script on it works.
+- The NAS is confirmed to run btrfs, so that `btrfs receive` will work at M8 (D-009).
 
 ### M6 Quickshell integration
 
@@ -131,8 +126,7 @@ Exit criteria:
 - Local AI models live on `@ai_models` and survive a system rollback.
 - Thirty days of daily use with health checks green.
 - LUKS2 performance validated in real use, per `decisions/storage-boot.md`.
-
-Blocked by: D-009.
+- A restore from the NAS backup tested, not just a backup taken (D-009).
 
 ### M9 Physical laptop
 
@@ -150,7 +144,9 @@ Per machine, after thirty days of proven use.
 Exit criteria:
 
 - Custom keys enrolled, UKIs signed, both the primary and the recovery UKI boot with Secure Boot enabled.
-- TPM2 LUKS2 enrolment done, if D-008 chose that route.
+- A LUKS2 recovery key printed and stored offline before TPM2 enrolment (D-008).
+- TPM2 enrolled with `systemd-cryptenroll` against PCR 7 and PCR 11.
+- Unlock retested after a deliberate firmware setting change.
 - The M5 rollback path retested with Secure Boot on.
 - The rescue workflow retested with Secure Boot on.
 

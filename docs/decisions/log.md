@@ -110,46 +110,96 @@ Consequences:
 
 ## D-007 Snapshot tooling
 
-**Status:** open
-**Blocks:** M5
+**Status:** accepted
+**Date:** 2026-08-27
+**Affects:** `storage-boot.md`, M5, M8
 
-Choose snapper, btrbk, or a purpose-written script.
+Use btrbk.
 
-`storage-boot.md` requires a pre-update snapshot and rollback to a known-good system snapshot and config state. snapper has the widest ecosystem and a boot menu integration that does not apply here, because this platform uses UKIs rather than GRUB. btrbk handles send and receive to another host, which matters for D-009.
+One declarative config covers snapshots, retention and `btrfs send`/`receive` to another host, so D-009 reuses this tool instead of adding a second one. snapper's headline feature is its GRUB menu integration, and D-011 keeps systemd-boot, so that is dead weight here. Running snapper for snapshots and btrbk for backup would mean two tools with overlapping models of the same subvolumes and two retention policies that can disagree, which is the same objection that removed `git-crypt` at D-006.
 
-Recommendation: btrbk. Its send and receive support means the snapshot decision and the backup decision share one tool rather than two.
+The cost is writing the pacman pre-transaction hook that `snap-pac` would have given free. That is roughly ten lines and it goes through ShellCheck like everything else.
+
+Consequences:
+
+- M5 writes a `/etc/pacman.d/hooks/` pre-transaction hook that calls btrbk before any package transaction.
+- Retention policy lives in the btrbk config, in the repository, like all other configuration.
+- Snapshots land on `@snapshots`, which `storage-boot.md` already provides.
+- `@home`, `@var_log`, `@var_cache` and `@ai_models` stay outside the rollback set. btrbk still snapshots `@home` for backup purposes at D-009, but a system rollback must not touch it.
 
 ## D-008 Disk unlock during the Secure Boot deferral
 
-**Status:** open
-**Blocks:** M1
+**Status:** accepted
+**Date:** 2026-08-27
+**Affects:** `storage-boot.md`, `security-power.md`, M1, M10
 
-`storage-boot.md` defers Secure Boot for about a month per machine. `security-power.md` prefers controls that stay transparent during normal use. Those pull in opposite directions.
+Type the LUKS2 passphrase at every boot until Secure Boot is enabled. Enrol TPM2 as part of M10, not before.
 
-TPM2 auto-unlock of LUKS2 only means anything with Secure Boot enabled. Without it, an attacker who boots a modified UKI is handed the key. So during the deferral month, either type a passphrase at every boot, or enrol the TPM and accept an unlock that does not hold up.
+TPM2 auto-unlock only means anything with Secure Boot on. Without it, an attacker boots a modified UKI and the TPM hands over the key, so the unlock is transparent to the user and to the attacker alike. `security-power.md` prefers controls that stay transparent during normal use, but a control that pretends to work is worse than a prompt.
 
-Recommendation: passphrase during the deferral, TPM2 enrolment as part of M10. Thirty days of typing a passphrase beats shipping a control that pretends to work.
+Enrolling now and re-enrolling at M10 was rejected because the re-enrolment is easy to forget, and forgetting it means unlock silently keeps working against the weak policy with nothing to indicate it.
+
+Consequences:
+
+- Two prompts at boot during the deferral: LUKS, then greetd from D-004. One after M10.
+- M10 enrols with `systemd-cryptenroll` against PCR 7 and PCR 11. PCR 11 is the UKI measurement that `systemd-stub` provides, which D-011 preserved by keeping UKIs.
+- Keep a recovery key printed and stored offline before enrolling the TPM. A firmware update changes PCR values and locks you out otherwise. Add this to the M10 exit criteria.
+- The M10 exit criteria already require retesting rollback and rescue with Secure Boot on. Retest TPM2 unlock after a deliberate firmware setting change too.
 
 ## D-009 Off-machine backup
 
-**Status:** open
-**Blocks:** M8
+**Status:** accepted
+**Date:** 2026-08-27
+**Affects:** `storage-boot.md`, M8
 
-Nothing in the decision documents covers backup. Btrfs snapshots are not backups. They live on the same device as the data, so one dead SSD takes the data and every snapshot with it.
+Back up to the NAS using btrbk send and receive. Scope is `@home` and `@ai_models`.
 
-`applications-tooling.md` mentions a NAS in passing, for FSearch indexing. Decide whether that NAS is also the backup target, what gets backed up, how often, and how a restore gets tested.
+This reuses the D-007 tool, so one config covers snapshots, retention and backup. Incremental sends are cheap because btrfs already knows what changed between snapshots.
 
-This does not block VM work. It blocks putting real data on a physical machine at M8.
+Everything else on the machine is reproducible from this repository, which is the point of the platform. `@home` and `@ai_models` are the only subvolumes holding data that a rebuild cannot recreate.
 
-Recommendation: btrbk send and receive to the NAS, matching D-007, with `/home` and `@ai_models` in scope. Add a restore test to the M8 exit criteria once this closes.
+Consequences:
+
+- **Verify the NAS runs btrfs before relying on this.** `btrfs receive` needs a btrfs target. A ZFS or ext4 NAS means either a btrfs-formatted dataset on it, or a different backup tool, and finding that out at M8 is late. Check during M5, when btrbk goes in.
+- Residual risk accepted: the NAS is in the same building. This covers drive failure, accidental deletion and a bad update. It does not cover fire or theft. Revisit if the data on `@home` becomes worth more than that.
+- Add a restore test to the M8 exit criteria. A backup nobody has restored from is a hypothesis.
+- `@ai_models` is desktop-only per `desktop-laptop-differences.md`, so the laptop backs up `@home` alone.
 
 ## D-010 Hostname and inventory naming
 
-**Status:** open
-**Blocks:** M2
+**Status:** accepted
+**Date:** 2026-08-27
+**Affects:** `desktop-laptop-differences.md`, M2
 
-Fix the naming convention for machines before the inventory exists, because renaming later touches every group variable file.
+Host names follow the existing convention: `hmlxdesktop01`, `hmlxlaptop01`. Ansible inventory groups stay `desktop` and `laptop`, exactly as `desktop-laptop-differences.md` writes them.
 
-Other repositories in this account use names such as `hmlxdesktop01`. Decide whether ArchWork follows that convention, and decide whether inventory group names stay as the plain `desktop` and `laptop` that `desktop-laptop-differences.md` uses.
+Groups express the profile. Host names identify the box. Keeping the two jobs separate is what lets a second laptop join the `laptop` group without any variable file changing, and it keeps ArchWork consistent with the other repositories in this account.
 
-Recommendation: keep the group names `desktop` and `laptop` exactly as the decision document writes them, and let host names follow the existing convention. Groups express the profile. Host names identify the box.
+Consequences:
+
+- `ansible/inventory/` defines `desktop` and `laptop` groups. `group_vars/desktop.yml`, `group_vars/laptop.yml` and `group_vars/all.yml` hold the differences from `desktop-laptop-differences.md`.
+- `host_vars/` stays empty unless a genuine per-machine fact appears. A value that belongs to the profile goes in `group_vars`, not `host_vars`.
+- No role, task or template reads the host name to decide behaviour. `CLAUDE.md` already forbids this.
+- A rebuild being tested alongside the machine it replaces gets the next number, not a special-case name.
+
+## D-011 Bootloader, reopened
+
+**Status:** accepted
+**Date:** 2026-08-27
+**Affects:** `storage-boot.md`, M1, M5, M10
+
+Keep systemd-boot with Unified Kernel Images. Do not switch to GRUB.
+
+GRUB was reconsidered because `grub-btrfs` with snapper puts snapshots in the boot menu, making rollback a menu entry rather than a command. That is the only serious argument for it, and it is a real one.
+
+It loses to the costs. GRUB means abandoning UKIs and returning to `grub-mkconfig`, which is exactly the ad hoc kernel parameter accumulation `storage-boot.md` warns against. Secure Boot at M10 goes from a single `sbctl` signature over one EFI binary to a standalone GRUB image with modules baked in, on a bootloader with a history of Secure Boot CVEs and DBX revocations. TPM2 measured boot loses the predictable PCR 11 measurement that `systemd-stub` provides, which D-008 depends on at M10.
+
+The recovery UKI already covers the same need. Boot it, swap the subvolume, reboot.
+
+One point in GRUB's favour is commonly overstated and does not apply here: GRUB cannot unlock a LUKS2 volume that uses Argon2id, but only an encrypted `/boot` needs that. This design leaves the ESP unencrypted and unlocks root from the initramfs, so the limitation is irrelevant.
+
+Consequences:
+
+- M1 ships a rollback script on the recovery UKI, not just a documented procedure. The gap against GRUB is keystrokes, and a script closes most of it.
+- M5 exercises that script rather than a documented manual sequence.
+- Revisit only if the recovery UKI path proves painful in real use, and record the evidence if so.

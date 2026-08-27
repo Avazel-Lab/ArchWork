@@ -25,6 +25,8 @@ Track these differences explicitly in code and documentation rather than allowin
 
 ## Implementation principle
 
+Host names follow the existing estate convention (`hmlxdesktop01`, `hmlxlaptop01`). Inventory group names are `desktop` and `laptop` (D-010). Groups express the profile, host names identify the box.
+
 Prefer explicit inventory/profile data such as:
 
 - `desktop`
