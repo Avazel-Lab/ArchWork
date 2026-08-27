@@ -365,7 +365,7 @@ phase_recovery() {
 	python3 "$SCRIPT_DIR/serial-unlock.py" \
 		--socket "$WORK_DIR/serial.sock" \
 		--passphrase-file "$WORK_DIR/passphrase" \
-		--expect "(Give root password|Press Enter for maintenance|root@|:~#)" \
+		--expect "(Give root password|Press Enter for|Control-D to continue|root@|:~#)" \
 		--fail-on "(account is locked|Cannot open access to console)" \
 		--log "$WORK_DIR/recovery-console.log" ||
 		die "the recovery UKI did not reach a rescue shell, see $WORK_DIR/recovery-console.log"
