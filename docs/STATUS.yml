@@ -5,7 +5,7 @@
 schema: 1
 updated: 2026-08-27
 
-phase: M1
+phase: M2
 
 milestones:
   M0:
@@ -14,7 +14,10 @@ milestones:
       commit: 4a387fa4e2b7d1dc4f5f3b77ef4b456684b3516d
       date: 2026-08-27
   M1:
-    status: in-progress
+    status: complete
+    evidence:
+      commit: f4bd326fa3311d5efa93522ab2dab2e0a92a3b1e
+      date: 2026-08-27
   M2:
     status: not-started
   M3:
@@ -41,8 +44,8 @@ last_rebuild:
   date: 2026-08-27
 
 next_actions:
-  - Owner to review M1 against plan.md and mark it complete if satisfied
-  - Start M2, the Ansible inventory, profiles and package manifests
+  - Build the M2 inventory, group_vars and package manifests
+  - Make ansible-lint and the idempotence check real, both are no-ops today
   - Confirm the NAS runs btrfs, needed by D-009 before M8
 
 blockers: []
