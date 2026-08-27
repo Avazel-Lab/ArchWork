@@ -33,6 +33,7 @@ PASSPHRASE="archwork-test-passphrase"
 
 HTTP_PID=""
 QEMU_PID=""
+REPO_SHA=""
 
 usage() {
 	cat <<'USAGE'
@@ -176,6 +177,11 @@ prepare_work_dir() {
 	# dirty tree cannot quietly change what the test installs.
 	git -C "$REPO_ROOT" archive --format=tar --prefix="" HEAD >"$WORK_DIR/repo.tar"
 
+	# Record the commit that went into that archive, not whatever HEAD points at
+	# when the run ends. A commit landing mid-run would otherwise be reported as
+	# the tested SHA, and docs/STATUS.yml treats that SHA as proof.
+	REPO_SHA="$(git -C "$REPO_ROOT" rev-parse HEAD)"
+
 	cp "$SCRIPT_DIR/provision.sh" "$WORK_DIR/provision.sh"
 
 	cp "$OVMF_VARS" "$WORK_DIR/OVMF_VARS.fd"
@@ -315,11 +321,17 @@ main() {
 		kill_if_running "$QEMU_PID"
 		QEMU_PID=""
 		rm -f "$WORK_DIR/disk.qcow2" "$WORK_DIR/serial.sock"
+
+		# The UEFI variable store outlives the disk, so run 2 would otherwise
+		# boot with run 1 boot entries pointing at a disk that no longer
+		# exists. Each run gets a fresh firmware environment.
+		cp "$OVMF_VARS" "$WORK_DIR/OVMF_VARS.fd"
+		chmod u+w "$WORK_DIR/OVMF_VARS.fd"
 	done
 
 	log "All $REPEAT run(s) passed"
 	printf '\nRecord this in docs/STATUS.yml with the commit SHA:\n'
-	printf '  %s\n\n' "$(git -C "$REPO_ROOT" rev-parse HEAD)"
+	printf '  %s\n\n' "$REPO_SHA"
 }
 
 main "$@"
