@@ -1,0 +1,7 @@
+# Python bytecode from the VM harness helpers
+__pycache__/
+*.pyc
+
+# Local VM harness artefacts
+*.qcow2
+*.iso
