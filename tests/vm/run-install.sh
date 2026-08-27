@@ -353,8 +353,10 @@ phase_recovery() {
 
 	log "Waiting for the recovery UKI to reach a rescue shell"
 
-	# Wait for a shell prompt rather than for "Started Rescue Shell". The unit
-	# starting proves systemd tried, not that anyone can type into the result.
+	# Wait for a prompt someone could type into. Neither "Started Rescue Shell"
+	# nor the "You are in rescue mode" banner qualifies: systemd prints both
+	# before it hands over to sulogin, so both appear even when sulogin then
+	# refuses to open a shell at all.
 	#
 	# sulogin refuses to open a shell when the root account is locked, which is
 	# the state a fresh Arch install leaves it in. That would be a recovery path
@@ -363,7 +365,7 @@ phase_recovery() {
 	python3 "$SCRIPT_DIR/serial-unlock.py" \
 		--socket "$WORK_DIR/serial.sock" \
 		--passphrase-file "$WORK_DIR/passphrase" \
-		--expect "(Give root password|Press Enter for maintenance|You are in rescue mode|root@)" \
+		--expect "(Give root password|Press Enter for maintenance|root@|:~#)" \
 		--fail-on "(account is locked|Cannot open access to console)" \
 		--log "$WORK_DIR/recovery-console.log" ||
 		die "the recovery UKI did not reach a rescue shell, see $WORK_DIR/recovery-console.log"
