@@ -116,7 +116,11 @@ Both:
 
 Never commit a plaintext secret, key or password. Not in a variable file, not in a comment, not in a test fixture.
 
-`git-crypt` and `age` both appear in the tooling decisions with no division of labour between them, and neither answers how a key reaches a fresh machine before the repository can be decrypted. That is an open decision in `docs/decisions/log.md`. Until it closes, do not build anything that depends on encrypted repository content.
+Repository secrets use `age` and nothing else (D-006). `git-crypt` is not used.
+
+The age private key is committed, wrapped with a diceware passphrase through `age -p`. Bootstrap prompts for that passphrase, unwraps the key in memory, and never writes the unwrapped key to the new system's disk outside its final destination.
+
+Keep the encrypted set small. WiFi PSKs, the Tailscale auth key and service tokens belong there. SSH private keys and anything a password manager already holds do not, because putting them in the repository widens what one passphrase protects for no gain.
 
 ## Writing style
 

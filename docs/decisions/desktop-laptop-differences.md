@@ -22,6 +22,12 @@ Track these differences explicitly in code and documentation rather than allowin
 | Power management | 5 min dim / 15 min display off / 30 min sleep | 5 min dim / 15 min display off / 30 min sleep |
 | Sleep inhibition | 1h / 2h / 4h / manual re-enable | 1h / 2h / 4h / manual re-enable |
 | Secure Boot | Enable only after roughly one month of proven use | Enable only after roughly one month of proven use |
+| Disk unlock | Passphrase until Secure Boot, then TPM2 (D-008) | Passphrase until Secure Boot, then TPM2 (D-008) |
+| Backup scope | `@home` and `@ai_models` to the NAS (D-009) | `@home` only, since no models are deployed |
+| Networking | NetworkManager (D-002) | NetworkManager (D-002). Roaming and captive portals are the reason both profiles use it |
+| Session entry | greetd with tuigreet (D-004) | greetd with tuigreet (D-004) |
+| Host name | `hmlxdesktop01` (D-010) | `hmlxlaptop01` (D-010) |
+| Inventory group | `desktop` | `laptop` |
 
 ## Implementation principle
 
@@ -37,3 +43,7 @@ Prefer explicit inventory/profile data such as:
 - profile-specific services/configuration
 
 Avoid scattering hostname checks throughout roles and scripts where a higher-level machine profile can express the distinction cleanly.
+
+Concretely, `ansible/inventory/` defines the two groups, and `group_vars/all.yml`, `group_vars/desktop.yml` and `group_vars/laptop.yml` hold every row of the table above. `host_vars/` stays empty unless a genuine per-machine fact appears; a value that belongs to the profile goes in `group_vars`.
+
+Most rows in this table are identical across profiles. That is the point. The platform is shared, and the table exists so that the few genuine differences stay visible rather than emerging as conditionals.

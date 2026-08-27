@@ -203,3 +203,16 @@ Consequences:
 - M1 ships a rollback script on the recovery UKI, not just a documented procedure. The gap against GRUB is keystrokes, and a script closes most of it.
 - M5 exercises that script rather than a documented manual sequence.
 - Revisit only if the recovery UKI path proves painful in real use, and record the evidence if so.
+
+## D-012 Secret Service implementation
+
+**Status:** open
+**Blocks:** M3
+
+`security-power.md` requires a Secret Service implementation for keyring integration but does not name one. D-004 depends on it, because the whole reason for choosing greetd over autologin was that PAM unlocks the keyring from the login password.
+
+Candidates are `gnome-keyring`, KWallet, or `keepassxc` acting as the Secret Service provider.
+
+`gnome-keyring` has the mature PAM module and is what most Wayland desktops assume. It also drags in a GNOME dependency on a Hyprland system. KWallet fits the Kvantum and Qt theming already chosen but expects more of Plasma than is present here. `keepassxc` would consolidate with the password managers in `security-power.md`, but its PAM story is weaker, which undercuts D-004.
+
+Recommendation: `gnome-keyring`. The PAM integration is the thing being bought, and it is the only one of the three that does it well.

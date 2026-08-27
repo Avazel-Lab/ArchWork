@@ -20,7 +20,7 @@ Exit criteria:
 
 - `CLAUDE.md` binds agent work to the decision documents.
 - `docs/plan.md` and `docs/STATUS.yml` exist and cross-check clean.
-- `docs/decisions/log.md` records the open decisions that block later milestones.
+- `docs/decisions/log.md` records dated decisions with IDs, and any that remain open.
 - The `unslop` skill sits at `.claude/skills/unslop/SKILL.md`.
 - CI runs L0 lint and the plan/status cross-check, and passes.
 
@@ -59,12 +59,16 @@ Exit criteria:
 
 A usable desktop with no Quickshell in it. This milestone deliberately uses conventional tools so that the platform works before any custom shell code exists.
 
+Blocked by: D-012.
+
 Includes Hyprland, `xdg-desktop-portal`, `xdg-desktop-portal-hyprland`, `xdg-desktop-portal-gtk`, `hyprpolkitagent`, Kitty, Hyprpaper, Hyprlock, an audio stack, networking, and fuzzel as the interim launcher. The launcher in `decisions/desktop-shell.md` is a Quickshell module, which does not exist until M6, so M3 needs its own.
 
 Exit criteria:
 
 - On a VM rebuilt from scratch: log in, open a terminal, launch an application from the launcher, lock the session, unlock it, take a screenshot.
 - Portals work. A file picker opens from a GTK application and from a Qt application.
+- The greetd login password unlocks the Secret Service keyring through PAM, with no second prompt (D-004, D-012).
+- Tailscale comes up and coexists with NetworkManager (D-002).
 - Kvantum and the matching GTK theme apply.
 - No step in the above requires manual configuration after the rebuild.
 

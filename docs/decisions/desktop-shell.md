@@ -50,3 +50,14 @@ These provide desktop portal integration and graphical PolicyKit authentication 
   - indefinitely until manually re-enabled
 - Prefer a minimal shell initially, but retain the ability to expand the Quickshell UI later.
 - Desktop shell choices marked for review should remain replaceable rather than deeply coupled into bootstrap logic.
+
+## Fallback set
+
+Quickshell carries the bar, notifications, clipboard UI, screenshot UI, recorder UI, the sleep inhibit control and the launcher (D-001). That is most of the custom code in this platform, in a young QML framework with a moving API.
+
+The requirement above that shell choices stay replaceable is what makes that survivable, so it is load-bearing rather than aspirational:
+
+- M3 builds a working desktop with no Quickshell in it: fuzzel, mako and a conventional bar.
+- That fallback set stays installed and configured after M6. A broken Quickshell must leave an ugly desktop, not an unusable machine.
+- Nothing in `bootstrap.sh` or in a base role may depend on Quickshell.
+- M6 tests the fallback rather than assuming it.

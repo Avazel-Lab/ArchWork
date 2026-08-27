@@ -15,7 +15,8 @@ milestones:
   M2:
     status: not-started
   M3:
-    status: not-started
+    status: blocked
+    blocked_by: [D-012]
   M4:
     status: not-started
   M5:
@@ -42,4 +43,5 @@ next_actions:
   - Start M1: scripted install, LUKS2, Btrfs layout, UKI and recovery UKI
   - Confirm the NAS runs btrfs, needed by D-009 before M8
 
-blockers: []
+blockers:
+  - D-012 names no Secret Service implementation, and D-004 depends on one.

@@ -15,6 +15,8 @@ review: 2027-02-27
 - Python 3.13 + pip
 - Ansible
   - `community.general >= 8.0.0`
+- devtools
+  - Provides the clean chroot that AUR builds run in (D-005).
 - Node.js + npm
 - age
 - jq
@@ -74,6 +76,20 @@ review: 2027-02-27
 ### Epson M28-series wireless scanner/printer
 
 - Treat the wireless model as M28W unless later hardware verification shows otherwise.
+
+## Desktop platform packages
+
+Recorded here so that manifests have one source. Detail and reasoning live in the decision log.
+
+| Area | Package | Decision |
+|---|---|---|
+| Session entry | `greetd`, `greetd-tuigreet` | D-004 |
+| Networking | `networkmanager` | D-002 |
+| Audio | `pipewire`, `wireplumber`, `pipewire-pulse`, `pipewire-alsa`, `pipewire-jack` | D-003 |
+| AUR | `paru`, `devtools` | D-005 |
+| Secrets | `age` | D-006 |
+| Snapshots and backup | `btrbk` | D-007, D-009 |
+| Interim launcher and fallback | `fuzzel` | D-001 |
 
 ## General principles
 
