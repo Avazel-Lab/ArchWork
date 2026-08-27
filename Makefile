@@ -44,9 +44,10 @@ unit:
 	@if [ -n "$$(ls tests/unit/*.bats 2>/dev/null)" ]; then bats tests/unit; \
 	else echo "unit: no bats tests yet"; fi
 
-## vm-rebuild: L3, needs QEMU and nested virtualisation
+## vm-rebuild: L3, needs QEMU and nested virtualisation. Pass ISO=/path/to.iso
 vm-rebuild:
-	tests/vm/run-install.sh
+	@test -n "$(ISO)" || { echo "vm-rebuild needs ISO=/path/to/archlinux.iso"; exit 1; }
+	tests/vm/run-install.sh --iso "$(ISO)" $(VM_ARGS)
 
 # L2, L4 and L5 arrive with M2 and M5. CI cannot run these, and no CI job
 # should pretend to.
