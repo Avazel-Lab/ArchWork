@@ -7,12 +7,15 @@ SHELL := /usr/bin/env bash
 .SHELLFLAGS := -eu -o pipefail -c
 .DEFAULT_GOAL := check
 
-SHELL_SCRIPTS := $(shell find . -name '*.sh' -not -path './.git/*' 2>/dev/null)
+# Shell scripts by extension, plus extensionless ones carrying a bash shebang
+# (archwork-rollback is installed as a command, so it has no .sh suffix).
+SHELL_SCRIPTS := $(shell find . -name '*.sh' -not -path './.git/*' 2>/dev/null) \
+                 $(shell grep -rl '^#!/usr/bin/env bash' scripts tests 2>/dev/null | grep -v '\.sh$$')
 
 .PHONY: check lint tracking shellcheck yamllint ansible-lint unit vm-idempotence vm-rebuild vm-health vm-recovery help
 
 ## check: L0 lint plus the plan/status cross-check
-check: tracking lint
+check: tracking lint unit
 
 ## tracking: prove STATUS.yml agrees with plan.md and the decision log
 tracking:
@@ -23,20 +26,31 @@ lint: shellcheck yamllint ansible-lint
 
 shellcheck:
 	@if [ -z "$(SHELL_SCRIPTS)" ]; then echo "shellcheck: no shell scripts yet"; \
-	else shellcheck $(SHELL_SCRIPTS); fi
+	else shellcheck -x $(SHELL_SCRIPTS); fi
 
 yamllint:
 	yamllint docs/STATUS.yml $(wildcard ansible)
 
+
+# Gated on a playbook, not on the directory: ansible/ holds package manifests
+# and kernel command line profiles before any playbook exists.
 ansible-lint:
-	@if [ -d ansible ]; then ansible-lint; else echo "ansible-lint: no ansible/ yet"; fi
+	@if [ -n "$$(find ansible -name '*.yml' -path '*play*' 2>/dev/null)" ] || [ -d ansible/roles ]; then \
+		ansible-lint; \
+	else echo "ansible-lint: no playbooks yet"; fi
 
 ## unit: L1
 unit:
-	@if [ -d tests/unit ]; then bats tests/unit; else echo "unit: no tests/unit yet"; fi
+	@if [ -n "$$(ls tests/unit/*.bats 2>/dev/null)" ]; then bats tests/unit; \
+	else echo "unit: no bats tests yet"; fi
 
-# L2 to L5 need a VM. CI cannot run these, and no CI job should pretend to.
-vm-idempotence vm-rebuild vm-health vm-recovery:
+## vm-rebuild: L3, needs QEMU and nested virtualisation
+vm-rebuild:
+	tests/vm/run-install.sh
+
+# L2, L4 and L5 arrive with M2 and M5. CI cannot run these, and no CI job
+# should pretend to.
+vm-idempotence vm-health vm-recovery:
 	@echo "$@ is not implemented yet. See docs/plan.md for which milestone delivers it."
 	@exit 1
 

@@ -1,0 +1,26 @@
+# Laptop kernel command line.
+#
+# Defined up front rather than accumulated, per docs/decisions/storage-boot.md.
+# Comments and blank lines are stripped before this reaches /etc/kernel/cmdline.
+#
+# scripts/archwork-install.sh substitutes @LUKS_UUID@ and @RESUME_OFFSET@ at
+# install time. The laptop hibernates (D-013), so it needs both, and they must
+# be correct at install time: retrofitting them regenerates the UKIs and
+# changes the PCR values D-008 enrols against at M10.
+
+rd.luks.name=@LUKS_UUID@=cryptroot
+rd.luks.options=@LUKS_UUID@=discard
+root=/dev/mapper/cryptroot
+rootflags=subvol=@
+rw
+
+# Hibernation. resume_offset is the physical offset of the swapfile on @swap,
+# which is why it cannot be written by hand.
+resume=/dev/mapper/cryptroot
+resume_offset=@RESUME_OFFSET@
+
+# Intel.
+i915.enable_psr=1
+
+# Quiet boot. Drop this line when debugging an install.
+quiet loglevel=3
