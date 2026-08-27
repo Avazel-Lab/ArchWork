@@ -361,6 +361,16 @@ phase_reconcile() {
 		            -o UserKnownHostsFile=/dev/null
 	INVENTORY
 
+	# M2 also asks that --check runs clean against a fresh machine. It runs
+	# first, while there is genuinely something for it to report, because a
+	# check run against an already-reconciled machine proves much less.
+	log "Reconciliation check run"
+	ansible-playbook --check \
+		-i "$WORK_DIR/inventory.yml" \
+		"$REPO_ROOT/ansible/site.yml" \
+		2>&1 | tee "$WORK_DIR/reconcile-check.log" ||
+		die "the --check run failed, see $WORK_DIR/reconcile-check.log"
+
 	local run_number
 	for run_number in 1 2; do
 		log "Reconciliation run $run_number of 2"
