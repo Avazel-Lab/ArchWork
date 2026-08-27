@@ -9,7 +9,6 @@ review: 2027-02-27
 ## Development and platform tooling
 
 - Git
-- git-crypt
 - Bash + coreutils
 - awk
 - findmnt
@@ -31,6 +30,31 @@ review: 2027-02-27
 - Pandoc
 - Mermaid
 - xorriso
+
+## Secrets
+
+- `age` only (D-006). `git-crypt` is not used.
+- The age private key is committed, wrapped with a diceware passphrase through `age -p`.
+- Bootstrap prompts for that passphrase and unwraps the key in memory.
+- Keep the encrypted set small: WiFi PSKs, Tailscale auth key, service tokens. Not SSH private keys.
+
+## Package management
+
+- paru as the AUR helper (D-005).
+- AUR packages build in a clean chroot through `devtools`, never on the workstation.
+- The update workflow uses the same chroot.
+
+## Audio
+
+- PipeWire with WirePlumber on both profiles (D-003).
+- Include `pipewire-pulse`, `pipewire-alsa` and `pipewire-jack`.
+- Shared package group. Not desktop-only.
+
+## Networking
+
+- NetworkManager on both profiles (D-002).
+- `nmtui` covers the terminal case until the Quickshell applet lands at M6.
+- Must coexist with Tailscale. Verify this rather than assuming it.
 
 ## Desktop applications
 

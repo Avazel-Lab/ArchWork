@@ -20,58 +20,93 @@ Second consequence: Quickshell now carries the bar, notifications, clipboard UI,
 
 ## D-002 Networking stack
 
-**Status:** open
-**Blocks:** M1, M3
+**Status:** accepted
+**Date:** 2026-08-27
+**Affects:** `applications-tooling.md`, M1, M3
 
-No decision document covers networking. Choose NetworkManager, or systemd-networkd with iwd.
+Use NetworkManager on both profiles.
 
-NetworkManager integrates with desktop applets and handles roaming well, which matters on the laptop. systemd-networkd is lighter and fits the systemd-everywhere posture in `storage-boot.md`. `security-power.md` requires that whatever is chosen coexists cleanly with Tailscale.
+The laptop roams between networks and hits captive portals. NetworkManager handles both without custom logic, and systemd-networkd with iwd does not. Running one stack on the desktop and another on the laptop would break the shared-core principle for a daemon that gets touched twice a year, and would double the surface where Tailscale integration can go wrong.
 
-Recommendation: NetworkManager on both profiles. The laptop needs roaming, and running two different stacks across profiles adds difference for no gain.
+Consequences:
+
+- M1 configures NetworkManager, not `systemd-networkd`. Mask `systemd-networkd` and `systemd-resolved` conflicts explicitly rather than leaving both installed and racing.
+- The Quickshell bar at M6 gets a NetworkManager applet. Until then M3 uses `nmtui`.
+- Verify Tailscale coexistence as part of the M3 exit criteria, per `security-power.md`.
 
 ## D-003 Audio stack
 
-**Status:** open
-**Blocks:** M3
+**Status:** accepted
+**Date:** 2026-08-27
+**Affects:** `applications-tooling.md`, M3
 
-PipeWire is assumed everywhere and stated nowhere. Confirm PipeWire with WirePlumber and the PulseAudio and JACK compatibility layers, and record it in `applications-tooling.md`.
+Use PipeWire with WirePlumber and the full compatibility set on both profiles: `pipewire`, `wireplumber`, `pipewire-pulse`, `pipewire-alsa`, `pipewire-jack`.
 
-Recommendation: accept PipeWire. There is no serious alternative under Hyprland in 2026, and gaming on the desktop needs the PulseAudio compatibility layer.
+There is no serious alternative under Hyprland. Gaming on the desktop needs the PulseAudio layer. The JACK and ALSA layers cost nothing to install and save an afternoon the first time something wants them.
+
+Consequences:
+
+- Audio is a shared package group, not a desktop-only one. A laptop without working sound is broken, not minimal.
+- Health checks at M5 assert that `wireplumber` is running and that a sink exists.
 
 ## D-004 Session entry
 
-**Status:** open
-**Blocks:** M3
+**Status:** accepted
+**Date:** 2026-08-27
+**Affects:** `desktop-shell.md`, `security-power.md`, M3
 
-How the user reaches Hyprland after boot. Choose greetd with tuigreet, or TTY autologin into Hyprland from a shell profile.
+Use greetd with tuigreet on both profiles.
 
-This interacts with disk unlock, keyring unlock and Secret Service integration in `security-power.md`. Autologin plus full disk encryption gives one password prompt at boot, which is the transparent behaviour that document prefers, at the cost of leaving the session unlocked to anyone who boots the machine. greetd adds a second prompt and gives PAM a clean place to unlock the keyring.
+`security-power.md` requires a Secret Service implementation for keyring integration, and PAM can only unlock the keyring if it sees a password at login. Autologin gives one password at boot but leaves PAM nothing to unlock with, so the keyring prompt reappears at first use and anyone who boots the machine lands in an unlocked session. The second prompt is what buys the keyring integration, so it is the price rather than the flaw.
 
-Recommendation: greetd with tuigreet. The keyring integration is cleaner and the second prompt is the honest trade for it.
+SDDM would give the same keyring benefit and would pick up the Kvantum theming, but it pulls a Qt stack into the boot path for a screen that is on screen for two seconds.
+
+Consequences:
+
+- The login password unlocks the keyring through `pam_gnome_keyring` or the equivalent for whichever Secret Service implementation gets chosen. That implementation is still unnamed in `security-power.md` and needs picking during M3.
+- Hyprland launches from a greetd session command, not from a shell profile.
+- Two password prompts at boot: LUKS, then greetd. D-008 decides whether the LUKS one stays.
 
 ## D-005 AUR helper and build isolation
 
-**Status:** open
-**Blocks:** M2, M5
+**Status:** accepted
+**Date:** 2026-08-27
+**Affects:** `applications-tooling.md`, M2, M5
 
-Choose an AUR helper, and choose whether AUR packages build on the target machine or in a clean chroot.
+Use paru, building in a clean chroot through `devtools`.
 
-`storage-boot.md` puts AUR updates in the update workflow, so this affects the update path as well as bootstrap. Building on the target machine is simpler and pulls build dependencies onto the workstation. Building in a chroot keeps the machine clean and takes longer to set up.
+Building on the target machine leaves `base-devel` and every AUR package's make dependencies on a workstation that is meant to be reproducible, and lets two machines drift apart in ways an M7 rebuild test cannot detect. The chroot costs setup time at M2 and slower builds, and buys a machine whose installed set matches its manifest.
 
-Recommendation: paru, building in a clean chroot. The chroot costs a day at M2 and stops build dependencies accumulating on a machine that is meant to be reproducible.
+aurutils with a local repository would be cleaner still for two machines, but it means maintaining a package repository, which is a subproject this platform does not need yet.
+
+Consequences:
+
+- M2 sets up `devtools` and the chroot before installing any AUR package.
+- The update script at M5 runs AUR updates through the same chroot. Never build outside it.
+- AUR packages get pinned by name in a manifest like everything else. `applications-tooling.md` already requires declarative package selection.
+- Revisit aurutils if chroot build times become the reason updates get skipped.
 
 ## D-006 Secrets and key bootstrap
 
-**Status:** open
-**Blocks:** M1
+**Status:** accepted
+**Date:** 2026-08-27
+**Affects:** `applications-tooling.md`, `security-power.md`, M1
 
-`applications-tooling.md` lists both `git-crypt` and `age` with no division of labour between them, and neither answers the bootstrap problem: a fresh machine needs the decryption key before it can read the encrypted repository, and the key cannot live in the repository.
+Use `age` for everything. Drop `git-crypt`.
 
-Decide what each tool guards, and decide how the key reaches a fresh machine. Options include a passphrase typed during bootstrap, a key on removable media, or fetching from a password manager that `security-power.md` already names.
+The age private key lives in the repository, itself encrypted with a long diceware passphrase through `age -p`. Bootstrap prompts for the passphrase, unwraps the key, then decrypts everything else with it.
 
-Until this closes, do not build anything that depends on encrypted repository content.
+This depends on nothing external. No network, no removable media, no reachable Vaultwarden. Recovery is the point of this platform, and a rebuild path that needs a VPS to be up is a rebuild path that fails on the day it matters. Pulling the key from Vaultwarden would add the network, the VPS, the master password and a TOTP device to the list of things that must work during a rebuild.
 
-Recommendation: `age` for everything, one key, delivered by typing a passphrase during bootstrap and derived to the key. Drop `git-crypt`. Two encryption tools with overlapping jobs means two sets of failure modes.
+Two encryption tools with overlapping jobs means two sets of failure modes, so `git-crypt` comes out of `applications-tooling.md`.
+
+Consequences:
+
+- Store the passphrase in NordPass as well. It protects everything, and forgetting it means the encrypted content is gone.
+- Keep the encrypted set small. WiFi PSKs, a Tailscale auth key and service tokens belong there. SSH private keys and anything a password manager already holds do not: putting them in the repository widens what one passphrase protects for no gain.
+- Bootstrap must prompt for the passphrase once and hold the unwrapped key in memory, never writing it to the new system's disk outside its final destination.
+- Rotating the passphrase means re-wrapping one key, not re-encrypting every secret. That is the main practical reason for the wrapped-key layer rather than encrypting each secret with a passphrase directly.
+- Add an M1 exit check: on a machine with the wrong passphrase, bootstrap fails cleanly and leaves no partial state.
 
 ## D-007 Snapshot tooling
 

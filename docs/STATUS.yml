@@ -12,18 +12,17 @@ milestones:
     status: in-progress
   M1:
     status: blocked
-    blocked_by: [D-002, D-006, D-008]
+    blocked_by: [D-008]
   M2:
     status: blocked
-    blocked_by: [D-005, D-010]
+    blocked_by: [D-010]
   M3:
-    status: blocked
-    blocked_by: [D-002, D-003, D-004]
+    status: not-started
   M4:
     status: not-started
   M5:
     status: blocked
-    blocked_by: [D-005, D-007]
+    blocked_by: [D-007]
   M6:
     status: not-started
   M7:

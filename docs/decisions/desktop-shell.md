@@ -23,6 +23,12 @@ review: 2027-02-27
 | Qt theming | Kvantum | Use with a matching GTK theme. |
 | Desktop UI integration | Quickshell | Prefer Quickshell for integrated controls and desktop functions. |
 
+## Session entry
+
+- greetd with tuigreet on both profiles (D-004).
+- Hyprland launches from the greetd session command, not from a shell profile.
+- The login password unlocks the Secret Service keyring through PAM.
+
 ## Portals and privilege UI
 
 Install:
