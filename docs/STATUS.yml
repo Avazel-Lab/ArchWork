@@ -14,13 +14,11 @@ milestones:
       commit: 4a387fa4e2b7d1dc4f5f3b77ef4b456684b3516d
       date: 2026-08-27
   M1:
-    status: blocked
-    blocked_by: [D-015]
+    status: in-progress
   M2:
     status: not-started
   M3:
-    status: blocked
-    blocked_by: [D-012]
+    status: not-started
   M4:
     status: not-started
   M5:
@@ -43,11 +41,7 @@ last_rebuild:
   date: 2026-08-27
 
 next_actions:
-  - Decide D-015, the recovery UKI reaches rescue mode but sulogin refuses
-  - Run make vm-rebuild for the laptop profile, repeat 2, and record the SHA
+  - Run make vm-rebuild for both profiles, repeat 2, and record the SHA here
   - Confirm the NAS runs btrfs, needed by D-009 before M8
 
-blockers:
-  - D-012 names no Secret Service implementation, and D-004 depends on one. Blocks M3.
-  - D-015 is open. The recovery UKI reaches rescue mode and sulogin then refuses,
-    because root is locked, so M1 cannot show a rescue shell. Blocks M1 and M5.
+blockers: []

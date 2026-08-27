@@ -206,8 +206,9 @@ Consequences:
 
 ## D-012 Secret Service implementation
 
-**Status:** open
-**Blocks:** M3
+**Status:** accepted
+**Date:** 2026-08-27
+**Affects:** `security-power.md`, `applications-tooling.md`, M3, D-004
 
 `security-power.md` requires a Secret Service implementation for keyring integration but does not name one. D-004 depends on it, because the whole reason for choosing greetd over autologin was that PAM unlocks the keyring from the login password.
 
@@ -215,7 +216,15 @@ Candidates are `gnome-keyring`, KWallet, or `keepassxc` acting as the Secret Ser
 
 `gnome-keyring` has the mature PAM module and is what most Wayland desktops assume. It also drags in a GNOME dependency on a Hyprland system. KWallet fits the Kvantum and Qt theming already chosen but expects more of Plasma than is present here. `keepassxc` would consolidate with the password managers in `security-power.md`, but its PAM story is weaker, which undercuts D-004.
 
-Recommendation: `gnome-keyring`. The PAM integration is the thing being bought, and it is the only one of the three that does it well.
+Use `gnome-keyring`. The PAM integration is the thing being bought, and it is the only one of the three that does it well.
+
+The GNOME dependency was weighed and accepted. `gnome-keyring` pulls in libraries rather than a session, and nothing in it requires GNOME to be running.
+
+Consequences:
+
+- M3 installs `gnome-keyring` and configures `pam_gnome_keyring` in the greetd PAM stack, so the login password unlocks the keyring with no second prompt (D-004).
+- `security-power.md` names the implementation rather than leaving it open.
+- The M3 exit criteria already test this. Keep that test rather than assuming the PAM module works.
 
 ## D-013 Swap and hibernation
 
@@ -259,7 +268,7 @@ Consequences:
 
 ## D-015 Reaching a shell on the recovery UKI
 
-**Status:** open
+**Status:** accepted
 **Date:** 2026-08-27
 **Affects:** `storage-boot.md`, M1, M5, D-011, D-014
 
@@ -290,7 +299,7 @@ Options:
 3. Give the recovery entry its own cmdline that bypasses `sulogin`, for
    example `init=/bin/bash`.
 
-Recommendation: option 1.
+Accepted: option 1.
 
 Root is unreachable behind LUKS2 already. Anyone who can boot the recovery UKI
 has typed the passphrase, and D-008 confirms there is no TPM auto-unlock
@@ -307,11 +316,14 @@ is shared with the primary UKI, so forcing sulogin applies to both. Reaching
 `rescue.target` from the primary entry still requires editing the kernel
 command line at the boot menu, which is itself behind the LUKS prompt.
 
-This is a change to the security posture, so it is the repository owner's
-call, not an agent's.
+Consequences:
 
-Consequences once decided:
-
-- M1 exit criteria stay as they are. The test that found this stays.
+- `archwork-install.sh` writes `/etc/systemd/system/rescue.service.d/10-archwork-sulogin.conf`
+  setting `SYSTEMD_SULOGIN_FORCE=1`.
+- M1 exit criteria stay as they are. The test that found this stays, and the
+  harness now fails the run on "the root account is locked" rather than timing
+  out with no reason given.
 - M5 exercises the rollback from that shell, so M5 depends on this too.
-- The M10 Secure Boot work retests rescue, per D-008.
+- The M10 Secure Boot work retests rescue, per D-008. Retest this drop-in then:
+  Secure Boot changes what can reach the boot menu, not what sulogin does, but
+  the rescue path is worth re-proving rather than assuming.

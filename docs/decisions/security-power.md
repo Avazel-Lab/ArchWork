@@ -10,7 +10,7 @@ review: 2027-02-27
 
 - NordPass is the primary password manager.
 - Vaultwarden / Bitwarden is also used and should remain compatible with the desktop design.
-- Use a Secret Service implementation for Linux desktop secret/keyring integration. Which one is open at D-012 and blocks M3.
+- Use `gnome-keyring` as the Secret Service implementation for keyring integration (D-012). Its PAM module unlocks the keyring from the greetd login password, which is what D-004 depends on.
 - The greetd login password unlocks the keyring through PAM (D-004). This is why session entry is not autologin.
 - Repository secrets use `age` only (D-006). `git-crypt` is not used.
 - The age private key is committed, wrapped with a diceware passphrase. Bootstrap unwraps it in memory. Store that passphrase in NordPass.

@@ -519,6 +519,24 @@ console-mode keep
 editor no"
 }
 
+# D-015: sulogin refuses to open a shell when the root account is locked, and a
+# fresh Arch installation leaves it locked. Without this the recovery UKI boots
+# to rescue mode and hands the operator a dead console, which makes the whole
+# recovery path from D-011 and D-014 useless.
+#
+# Forcing sulogin is safe here because root already sits behind LUKS2. Anyone
+# who can reach this prompt has typed the passphrase, and D-008 keeps that a
+# real prompt until TPM2 enrolment at M10.
+configure_rescue_shell() {
+	log "Allowing the rescue shell to open without a root password"
+
+	write_file "$MOUNT_ROOT/etc/systemd/system/rescue.service.d/10-archwork-sulogin.conf" \
+		"# D-015. sulogin refuses a locked root account, and a fresh Arch
+# install leaves root locked. LUKS2 already gates access to this shell.
+[Service]
+Environment=SYSTEMD_SULOGIN_FORCE=1"
+}
+
 install_rollback_script() {
 	log "Installing the rollback script"
 
@@ -569,6 +587,7 @@ main() {
 	configure_initramfs
 	build_recovery_uki
 	install_bootloader
+	configure_rescue_shell
 	install_rollback_script
 	finish
 }

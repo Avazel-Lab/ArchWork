@@ -60,8 +60,6 @@ Exit criteria:
 
 A usable desktop with no Quickshell in it. This milestone deliberately uses conventional tools so that the platform works before any custom shell code exists.
 
-Blocked by: D-012.
-
 Includes Hyprland, `xdg-desktop-portal`, `xdg-desktop-portal-hyprland`, `xdg-desktop-portal-gtk`, `hyprpolkitagent`, Kitty, Hyprpaper, Hyprlock, an audio stack, networking, and fuzzel as the interim launcher. The launcher in `decisions/desktop-shell.md` is a Quickshell module, which does not exist until M6, so M3 needs its own.
 
 Exit criteria:

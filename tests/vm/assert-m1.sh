@@ -57,6 +57,7 @@ printf '\nRecovery\n'
 check "rollback script is installed and executable" test -x /usr/local/bin/archwork-rollback
 check "rollback script runs" /usr/local/bin/archwork-rollback --help
 check "recovery command line reaches a rescue shell" file_contains /etc/kernel/cmdline-recovery "rescue.target"
+check "the rescue shell opens without a root password (D-015)" file_contains /etc/systemd/system/rescue.service.d/10-archwork-sulogin.conf "SYSTEMD_SULOGIN_FORCE=1"
 
 printf '\nSystem\n'
 check "NetworkManager is enabled" systemctl is-enabled NetworkManager
