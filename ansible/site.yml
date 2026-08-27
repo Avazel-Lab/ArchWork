@@ -1,0 +1,11 @@
+---
+# M2 reconciliation. Brings a machine the M1 installer produced to the
+# package state the decision documents define.
+#
+# Runs against the desktop and laptop groups alike. The difference is in
+# group_vars, never in this file or in a role.
+- name: Reconcile the ArchWork platform
+  hosts: all
+  gather_facts: true
+  roles:
+    - packages

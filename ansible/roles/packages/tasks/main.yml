@@ -1,0 +1,9 @@
+---
+# Reconcile the package set. The profile difference arrives as a group
+# variable, so this file never asks which machine it is running on.
+- name: Install the shared and profile package sets
+  community.general.pacman:
+    name: "{{ archwork_packages_shared + archwork_packages_profile }}"
+    state: present
+    update_cache: true
+  become: true

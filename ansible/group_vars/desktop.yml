@@ -1,0 +1,6 @@
+---
+archwork_profile: desktop
+
+# Desktop runs an AMD CPU (desktop-laptop-differences.md).
+archwork_packages_profile:
+  - amd-ucode

@@ -307,6 +307,10 @@ base_packages() {
 		sudo
 		git
 		vim
+		# Ansible needs an interpreter on the target before it can do anything,
+		# and every ArchWork machine runs the M2 reconciliation.
+		# applications-tooling.md lists Python as platform tooling.
+		python
 	)
 
 	case "$PROFILE" in

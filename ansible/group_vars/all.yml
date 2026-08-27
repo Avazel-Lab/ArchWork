@@ -1,0 +1,43 @@
+---
+# Packages required on both profiles.
+#
+# Every entry traces to docs/decisions/applications-tooling.md or to a decision
+# in docs/decisions/log.md. Nothing is added here that no decision document
+# lists. Names are as Arch names them, which is not always how the decision
+# document writes the tool:
+#
+#   Pandoc   -> pandoc-cli   (pandoc is not a package name)
+#   xorriso  -> libisoburn   (the xorriso binary ships in libisoburn)
+#
+# Packages the base install already places (base, linux, btrfs-progs,
+# cryptsetup, mkinitcpio, networkmanager, zram-generator, sudo, git, vim,
+# openssh, microcode) are not repeated here. This role reconciles what M1 did
+# not install.
+archwork_packages_shared:
+  # Development and platform tooling
+  - ansible
+  - devtools
+  - age
+  - jq
+  - curl
+  - gawk
+  - nodejs
+  - npm
+  - python
+  - python-pip
+  - shellcheck
+  - pandoc-cli
+  - libisoburn
+  - mermaid-cli
+  # Containers and orchestration
+  - docker
+  - podman
+  - kubectl
+  # Audio, PipeWire with WirePlumber on both profiles (D-003)
+  - pipewire
+  - pipewire-alsa
+  - pipewire-jack
+  - pipewire-pulse
+  - wireplumber
+  # Snapshots and backup (D-007, D-009)
+  - btrbk
