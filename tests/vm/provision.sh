@@ -30,7 +30,13 @@ PROFILE="$(curl -fsS "$BASE/profile")"
 DISK="$(curl -fsS "$BASE/disk")"
 
 log "Installing profile '$PROFILE' onto $DISK"
-/tmp/archwork/scripts/archwork-install.sh \
+
+# The installer prints the target device and makes the operator type it back
+# before it writes anything (guard_confirm_target in scripts/lib/guards.sh).
+# An unattended install has to answer that prompt. Feed the answer in rather
+# than adding a bypass flag to the installer: the guard still runs, and it
+# still refuses anything that is not an exact match for the target device.
+printf '%s\n' "$DISK" | /tmp/archwork/scripts/archwork-install.sh \
 	--profile "$PROFILE" \
 	--luks-passphrase-file /tmp/passphrase \
 	--authorized-key /tmp/id_test.pub \
