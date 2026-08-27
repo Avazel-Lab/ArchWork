@@ -238,6 +238,7 @@ qemu_base_args() {
 		-drive "if=pflash,format=raw,readonly=on,file=$OVMF_CODE" \
 		-drive "if=pflash,format=raw,file=$WORK_DIR/OVMF_VARS.fd" \
 		-drive "if=virtio,format=qcow2,file=$WORK_DIR/disk.qcow2" \
+		-vga none \
 		-no-reboot
 }
 
@@ -352,14 +353,17 @@ phase_recovery() {
 
 	log "Waiting for the recovery UKI to reach a rescue shell"
 
-	# sulogin refuses to open a shell when the root account is locked, which
-	# is the state a fresh Arch install leaves it in. That is a recovery path
-	# that boots and then hands the operator nothing, so treat it as a
-	# failure rather than waiting for the timeout.
+	# Wait for a shell prompt rather than for "Started Rescue Shell". The unit
+	# starting proves systemd tried, not that anyone can type into the result.
+	#
+	# sulogin refuses to open a shell when the root account is locked, which is
+	# the state a fresh Arch install leaves it in. That would be a recovery path
+	# that boots and then hands the operator nothing, so name it as a failure
+	# rather than waiting out the timeout.
 	python3 "$SCRIPT_DIR/serial-unlock.py" \
 		--socket "$WORK_DIR/serial.sock" \
 		--passphrase-file "$WORK_DIR/passphrase" \
-		--expect "(rescue|maintenance|Control-D|root@)" \
+		--expect "(Give root password|Press Enter for maintenance|You are in rescue mode|root@)" \
 		--fail-on "(account is locked|Cannot open access to console)" \
 		--log "$WORK_DIR/recovery-console.log" ||
 		die "the recovery UKI did not reach a rescue shell, see $WORK_DIR/recovery-console.log"
