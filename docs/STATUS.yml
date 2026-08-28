@@ -19,7 +19,10 @@ milestones:
       commit: f4bd326fa3311d5efa93522ab2dab2e0a92a3b1e
       date: 2026-08-27
   M2:
-    status: in-progress
+    status: complete
+    evidence:
+      commit: d16cf4c6cdd04a6814e7e04c26844bf1515bd139
+      date: 2026-08-28
   M3:
     status: in-progress
   M4:
@@ -48,8 +51,7 @@ last_rebuild:
   date: 2026-08-28
 
 next_actions:
-  - Review M2 against its exit criteria; marking it complete is the owner's call
-  - Answer D-020, three packages M3 needs that no document names
+  - Answer the bar and the fonts in D-020
   - Log in at the greeter with sendkey, then assert the session from inside
 
 blockers: []
