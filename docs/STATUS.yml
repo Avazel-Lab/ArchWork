@@ -5,7 +5,7 @@
 schema: 1
 updated: 2026-08-28
 
-phase: M2
+phase: M3
 
 milestones:
   M0:
@@ -21,7 +21,7 @@ milestones:
   M2:
     status: in-progress
   M3:
-    status: not-started
+    status: in-progress
   M4:
     status: not-started
   M5:
@@ -48,6 +48,7 @@ last_rebuild:
 
 next_actions:
   - Review M2 against its exit criteria; marking it complete is the owner's call
-  - Start M3, the minimal Hyprland desktop
+  - Answer D-020, three packages M3 needs that no document names
+  - Configure the greetd session and the PAM keyring unlock (D-004, D-012)
 
 blockers: []

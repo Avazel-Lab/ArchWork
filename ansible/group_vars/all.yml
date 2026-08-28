@@ -21,6 +21,40 @@ archwork_build_user: archwork-build
 # it belongs here rather than in host_vars (D-010).
 archwork_admin_user: gary
 
+# The graphical session (M3). Separate from archwork_packages_shared, which is
+# base tooling, because M6 has to install exactly this set with Quickshell
+# removed and prove the desktop still works. A named list makes that test mean
+# something; a comment heading inside one flat list would not.
+#
+# Both profiles get all of it. desktop-laptop-differences.md makes the desktop
+# environment shared and lists only microcode, AI models, gaming, swap, kernel
+# parameters and the host name as differences. archwork_packages_profile is
+# the AMD or Intel box, not the desktop environment.
+archwork_packages_session:
+  # Compositor and session entry (desktop-shell.md, D-004)
+  - hyprland
+  - greetd
+  - greetd-tuigreet
+  # Portals and privilege UI (desktop-shell.md)
+  - xdg-desktop-portal
+  - xdg-desktop-portal-hyprland
+  - xdg-desktop-portal-gtk
+  - hyprpolkitagent
+  # Terminal, launcher, lock screen, wallpaper (desktop-shell.md, D-001)
+  - kitty
+  - fuzzel
+  - hyprlock
+  - hyprpaper
+  # Notifications until Quickshell takes them at M6, and part of the fallback
+  # set that must keep working afterwards (desktop-shell.md)
+  - mako
+  # Screenshots, which the M3 exit criteria test (desktop-shell.md)
+  - grim
+  # Secret Service, so the greetd password unlocks the keyring (D-012)
+  - gnome-keyring
+  # Qt theming (desktop-shell.md)
+  - kvantum
+
 # AUR packages, pinned by name like everything else (D-005). Empty until a
 # decision document names one that is needed: Quickshell and Satty arrive at
 # M6, OpenDeck at M8.

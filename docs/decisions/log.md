@@ -453,3 +453,25 @@ Consequences:
 - Tailscale enters at M3, in that milestone's manifests, tested by that milestone's exit criteria.
 
 One thing to carry into M3: D-002 has this repository mask `systemd-resolved`, and Tailscale's split DNS works best through it. That may be a real tension rather than a theoretical one, and M3 tests coexistence rather than assuming it.
+
+## D-020 Three things M3 needs that no document names
+
+**Status:** open
+**Date:** 2026-08-28
+**Affects:** `desktop-shell.md`, M3, M6
+
+The M3 session manifest is otherwise fully specified: every package in it traces to `desktop-shell.md`, D-001, D-004 or D-012. Three things are required by the documents in prose but named by none of them, and `CLAUDE.md` forbids adding a package no decision document lists.
+
+**A bar.** `desktop-shell.md` says M3 builds "a working desktop with no Quickshell in it: fuzzel, mako and a conventional bar", and that the fallback set stays installed after M6 so a broken Quickshell leaves an ugly desktop rather than an unusable one. It does not say which bar.
+
+Recommendation: `waybar`. It is in `extra`, it is what most Hyprland setups use, and its configuration is a JSON and CSS pair that this repository can hold as dotfiles like anything else. The M3 exit criteria do not test a bar, so this is about the fallback set at M6 rather than about M3 working.
+
+**A GTK theme.** `desktop-shell.md` says Kvantum is used "with a matching GTK theme". Kvantum themes Qt only, so without a GTK counterpart every GTK application stays light while the Qt ones follow the theme, which the M3 portal criteria will make immediately visible.
+
+Recommendation: leave this open until the Kvantum theme itself is chosen, because "matching" is the requirement and neither is picked yet. It is the one of the three that most deserves being looked at rather than decided on paper.
+
+**Fonts.** Nothing names any. A session with no font packages falls back to whatever came in as a dependency, which is how a desktop ends up looking wrong in a way nobody can quite attribute.
+
+Recommendation: `ttf-dejavu` as the general fallback, `noto-fonts` and `noto-fonts-emoji` for coverage, and one monospace face for Kitty and the bar. All are in `extra`. Worth deciding before M3's first screenshot rather than after.
+
+None of these block the session manifest, which is complete without them. They block M3 looking finished.
