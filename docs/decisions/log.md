@@ -160,7 +160,7 @@ Everything else on the machine is reproducible from this repository, which is th
 
 Consequences:
 
-- **Verify the NAS runs btrfs before relying on this.** `btrfs receive` needs a btrfs target. A ZFS or ext4 NAS means either a btrfs-formatted dataset on it, or a different backup tool, and finding that out at M8 is late. Check during M5, when btrbk goes in.
+- **Verify the NAS runs btrfs before relying on this.** `btrfs receive` needs a btrfs target. A ZFS or ext4 NAS means either a btrfs-formatted dataset on it, or a different backup tool, and finding that out at M8 is late. Check during M5, when btrbk goes in. Confirmed by the repository owner on 2026-08-28: the NAS runs btrfs. M5 still has to prove a send and receive actually completes, which is a different claim from the filesystem being right.
 - Residual risk accepted: the NAS is in the same building. This covers drive failure, accidental deletion and a bad update. It does not cover fire or theft. Revisit if the data on `@home` becomes worth more than that.
 - Add a restore test to the M8 exit criteria. A backup nobody has restored from is a hypothesis.
 - `@ai_models` is desktop-only per `desktop-laptop-differences.md`, so the laptop backs up `@home` alone.
@@ -180,7 +180,7 @@ Consequences:
 - `ansible/inventory/` defines `desktop` and `laptop` groups. `group_vars/desktop.yml`, `group_vars/laptop.yml` and `group_vars/all.yml` hold the differences from `desktop-laptop-differences.md`.
 - `host_vars/` stays empty unless a genuine per-machine fact appears. A value that belongs to the profile goes in `group_vars`, not `host_vars`.
 - No role, task or template reads the host name to decide behaviour. `CLAUDE.md` already forbids this.
-- A rebuild being tested alongside the machine it replaces gets the next number, not a special-case name.
+- A rebuild being tested alongside the machine it replaces gets the next number, not a special-case name. Applied on 2026-08-28: the Arch desktop is `hmlxdesktop02`, because the same hardware already carries `hmlxdesktop01` as its Kubuntu development install and the two dual boot.
 
 ## D-011 Bootloader, reopened
 
@@ -360,7 +360,7 @@ Rejected alternatives:
 
 Consequences:
 
-- `ansible_connection: local` goes in `group_vars/all.yml`. The installer already sets the host name to `hmlxdesktop01` or `hmlxlaptop01` and `inventory/hosts.yml` already names those hosts, so the committed inventory then works unchanged on hardware and in a VM with `ansible-playbook -l "$(hostname)" site.yml`. No synthetic inventory, no connection flags at the call site.
+- `ansible_connection: local` goes in `group_vars/all.yml`. The installer already sets the host name to `hmlxdesktop02` or `hmlxlaptop01` and `inventory/hosts.yml` already names those hosts, so the committed inventory then works unchanged on hardware and in a VM with `ansible-playbook -l "$(hostname)" site.yml`. No synthetic inventory, no connection flags at the call site.
 - The harness keeps SSH, but only as the terminal driving a machine nobody can physically touch. Ansible no longer travels over it.
 - The installer clones the checkout it runs from rather than fetching fresh, so the installed system carries the commit that built it. The same reasoning already governs `git archive HEAD` in the harness. It then points `origin` upstream, because a clone keeping its local origin works until the first `git pull`.
 - The repository lives at `/home/<user>/src/ArchWork`, inside `@home` and so outside the rollback boundary. Inside `@`, a rollback would rewind the checkout at the moment it was being used to debug that rollback.
@@ -368,3 +368,28 @@ Consequences:
 - Driving Ansible from another machine is not forbidden, but it is unsupported and untested. Nothing may come to depend on it.
 
 This collides with nothing. D-015 is the recovery UKI shell decision, and D-016 supersedes no earlier decision.
+
+## D-017 Sharing hardware with another operating system
+
+**Status:** accepted
+**Date:** 2026-08-28
+**Affects:** `storage-boot.md`, M8
+
+ArchWork takes a whole disk and owns the ESP on it. It does not share an ESP with another operating system, and it does not enumerate other operating systems in its boot menu yet. Choosing between installs is a firmware boot menu job for now.
+
+The desktop hardware dual boots three systems: Kubuntu on `nvme0n1`, Windows 11 on `sdb`, and ArchWork on `nvme1n1`. Each keeps its own bootloader on its own disk. The installer already behaves this way, because it writes a fresh GPT with its own ESP to the device it is given and `bootctl install` only ever scans the ESP it installed to.
+
+Two facts make the separation worth writing down rather than leaving implicit.
+
+**A shared ESP is a shared failure.** The 1 GiB ESP the installer creates is sized for UKIs, and a UKI is large. An ESP that another installer also writes to is one Windows feature update away from a full filesystem or a rewritten boot entry, and the recovery UKI is exactly the thing that must still be there on the day something else has gone wrong.
+
+**os-prober would undo D-011.** The conventional way to get a menu covering every install is GRUB with `os-prober`, which D-011 already rejected and re-rejected. Do not reach for it as a convenience here.
+
+Deferred rather than rejected: adding `systemd-boot` loader entries for Kubuntu and Windows 11, so one menu covers all three. `bootctl` can chain a `.efi` on another ESP through a type 1 entry that names the other partition, and doing it by hand in the repository is compatible with D-011. It is not needed to install, so it is not M8 work. Nothing may make it a prerequisite for a rebuild.
+
+Consequences:
+
+- The installer keeps taking a whole disk. It gains no option to install alongside an existing operating system, and no option to reuse an ESP it did not create.
+- `bootctl install` makes ArchWork the first entry in the firmware boot order. That is a side effect of installing, not a decision to be the default, and reordering with `efibootmgr` or the firmware menu changes it back.
+- Before wiping a disk on shared hardware, prove the other systems boot without it. Observed on `hmlxdesktop01` on 2026-08-28: `efibootmgr -v` showed `Windows Boot Manager` registered against the ESP on `nvme1n1p4`, the disk ArchWork is to take, while the Windows install on `sdb` carries no ESP of its own. Windows on `sdb` therefore needs its own ESP and its own boot manager before `nvme1n1` is touched.
+- When the loader entries do arrive, they go in the repository as configuration like everything else, and a rebuild has to recreate them. An entry typed once into a live ESP is exactly the manual configuration the capture rule exists to prevent.
