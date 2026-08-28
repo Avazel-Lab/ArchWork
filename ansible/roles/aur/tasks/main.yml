@@ -1,0 +1,103 @@
+---
+# D-005: AUR packages build in a clean chroot through devtools, never on the
+# workstation. D-018 places the chroot and gives the build its own account,
+# because makechrootpkg refuses to run as root.
+#
+# Nothing here asks which machine it is running on. Both profiles get the same
+# chroot; only the package list differs, and that arrives as a group variable.
+
+- name: Create the build root
+  ansible.builtin.file:
+    path: "{{ archwork_build_root }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Create the build user
+  # A system account with a locked password and no authorized keys. The
+  # sudoers rule below is reachable only by something that can already become
+  # this user, which means root.
+  ansible.builtin.user:
+    name: "{{ archwork_build_user }}"
+    system: true
+    home: "{{ archwork_build_home }}"
+    create_home: true
+    shell: /bin/bash
+    password: "!"
+    comment: ArchWork AUR chroot builds
+
+- name: Allow the build user to drive devtools
+  ansible.builtin.copy:
+    dest: /etc/sudoers.d/20-archwork-build
+    content: |
+      # D-018. makechrootpkg refuses to run as root and calls sudo itself, so
+      # the build needs an account that is neither root nor password-prompted.
+      # This account has a locked password and no login route.
+      {{ archwork_build_user }} ALL=(ALL:ALL) NOPASSWD: ALL
+    owner: root
+    group: root
+    mode: "0440"
+    validate: visudo -cf %s
+
+- name: Create the clean chroot
+  # mkarchroot leaves .arch-chroot behind, which is what makes this idempotent.
+  ansible.builtin.command:
+    cmd: mkarchroot {{ archwork_chroot }}/root base-devel
+    creates: "{{ archwork_chroot }}/root/.arch-chroot"
+
+- name: Check whether the AUR helper is installed
+  ansible.builtin.command: pacman -Q paru
+  register: aur_paru_installed
+  changed_when: false
+  failed_when: false
+
+- name: Bootstrap the AUR helper
+  when: aur_paru_installed.rc != 0
+  block:
+    - name: Clone the paru package repository
+      ansible.builtin.git:
+        repo: https://aur.archlinux.org/paru.git
+        dest: "{{ archwork_build_home }}/paru"
+        version: master
+        single_branch: true
+
+    - name: Give the clone to the build user
+      ansible.builtin.file:
+        path: "{{ archwork_build_home }}/paru"
+        state: directory
+        owner: "{{ archwork_build_user }}"
+        group: "{{ archwork_build_user }}"
+        recurse: true
+
+    # runuser rather than become_user: dropping from root to an unprivileged
+    # account is where Ansible needs world-readable temporary files or acl, and
+    # a plain command avoids the whole question.
+    - name: Build paru in the clean chroot
+      ansible.builtin.command:
+        cmd: >-
+          runuser -u {{ archwork_build_user }} --
+          makechrootpkg -c -r {{ archwork_chroot }}
+        chdir: "{{ archwork_build_home }}/paru"
+      changed_when: true
+
+    - name: Find the package that build produced
+      ansible.builtin.command:
+        cmd: runuser -u {{ archwork_build_user }} -- makepkg --packagelist
+        chdir: "{{ archwork_build_home }}/paru"
+      register: aur_paru_package
+      changed_when: false
+
+    - name: Install the AUR helper
+      ansible.builtin.command:
+        cmd: pacman -U --noconfirm {{ aur_paru_package.stdout_lines | first }}
+      changed_when: true
+
+- name: Install the AUR package set
+  # paru builds through the same chroot, so this never leaves make dependencies
+  # on the workstation (D-005). The list is empty until M3 needs it.
+  ansible.builtin.command:
+    cmd: paru --sync --noconfirm --chroot --needed {{ archwork_packages_aur | join(' ') }}
+  register: aur_paru_sync
+  when: archwork_packages_aur | length > 0
+  changed_when: "'there is nothing to do' not in aur_paru_sync.stdout | lower"

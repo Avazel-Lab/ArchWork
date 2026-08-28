@@ -9,6 +9,19 @@
 #   ansible-playbook -l "$(hostname)" site.yml
 ansible_connection: local
 
+# AUR builds (D-005, D-018). The chroot lives under /var/cache, which is
+# @var_cache and so outside the rollback boundary: it is a build cache, it is
+# large, and a rollback has no reason to carry it.
+archwork_build_root: /var/cache/archwork
+archwork_build_home: /var/cache/archwork/build
+archwork_chroot: /var/cache/archwork/chroot
+archwork_build_user: archwork-build
+
+# AUR packages, pinned by name like everything else (D-005). Empty until a
+# decision document names one that is needed: Quickshell and Satty arrive at
+# M6, OpenDeck at M8.
+archwork_packages_aur: []
+
 # Packages required on both profiles.
 #
 # Every entry traces to docs/decisions/applications-tooling.md or to a decision
