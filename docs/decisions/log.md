@@ -508,3 +508,21 @@ Consequences:
 - Appearance is therefore judged by a person looking at the captures a run saves, recorded against a commit like any other evidence. That is a deliberate manual step, and the only one in the test ladder.
 - The count is absolute rather than a ratio. The first version asked that the dominant colour cover under 99.5% of the screen; a real tuigreet measured 99.450% and the next run 99.453%, so the run-to-run variance was larger than the margin. `tests/unit/screendump.bats` holds those measurements.
 - The kernel command line names both `tty0` and `ttyS0`, because a machine with a display would otherwise leave the serial console silent and the LUKS prompt unanswerable.
+
+## D-022 Two M3 choices the documents leave to implementation
+
+**Status:** open
+**Date:** 2026-08-29
+**Affects:** `desktop-shell.md`, M2, M3, M6
+
+Both were reached while building the M3 desktop. Neither is answered anywhere, both had to be answered for a rebuild to produce a desktop at all, and the code now does what is recommended below so that M3 could be tested. Reversing either is a small change, and this entry exists so that the choices are visible rather than buried in a role.
+
+**How user configuration reaches the machine.** `CLAUDE.md` gives `dotfiles/` its place in the repository and says nothing about how a file there becomes a file in `~/.config`. The two answers are copying, which Ansible does natively, and linking the clone D-016 already puts in the user's home directory.
+
+Recommendation: link. An edit made at the machine is then an edit to the repository, so `git status` in the clone shows what was changed at 23:00 on a Tuesday, and Hyprland reloads a saved file immediately. Copying leaves the two diverging silently until the next rebuild throws the local changes away, which for a personal workstation is the failure that actually happens. The cost is that the desktop depends on the clone staying where it is: delete it and the configuration goes with it.
+
+**Whether tailscaled runs at boot.** D-019 puts Tailscale in M3 and the M3 criteria say it "comes up", which implies a daemon that starts by itself, but D-019 answered the same question for Docker explicitly rather than leaving it implied, and a VPN daemon deserves the same treatment.
+
+Recommendation: enable `tailscaled.service`. Unlike `docker.socket` this widens nothing on its own: the daemon carries no traffic until something signs it in, and the auth key that would is one of the secrets D-006 has yet to bring. A machine that has to be told to start its own network every boot is a machine that will be found offline.
+
+Neither blocks M3. Both should be confirmed or reversed before M7 treats the rebuild as the thing being proven.
