@@ -64,6 +64,14 @@ check "NetworkManager is enabled" systemctl is-enabled NetworkManager
 check "hostname is set" test -s /etc/hostname
 check "administrator account exists" id gary
 
+printf '\nSelf-configuration (D-016)\n'
+check "ansible is installed" command_installed ansible-playbook
+check "age is installed" command_installed age
+check "the repository is cloned" repo_present gary
+check "the clone belongs to the user" repo_owned_by_user gary
+check "origin points upstream, not at the ISO" repo_origin_is_upstream gary
+check "bootstrap.sh is present and executable" test -x /home/gary/src/ArchWork/bootstrap.sh
+
 printf '\n'
 if [ "$CHECK_FAILURES" -eq 0 ]; then
 	printf 'All M1 criteria pass.\n'

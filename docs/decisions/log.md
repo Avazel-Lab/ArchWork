@@ -327,3 +327,44 @@ Consequences:
 - The M10 Secure Boot work retests rescue, per D-008. Retest this drop-in then:
   Secure Boot changes what can reach the boot menu, not what sulogin does, but
   the rescue path is worth re-proving rather than assuming.
+
+## D-016 Configuration model
+
+**Status:** accepted
+**Date:** 2026-08-28
+**Affects:** `applications-tooling.md`, `storage-boot.md`, M2, M7
+
+Ansible runs on the target machine with a local connection. Nothing in the build path requires a second machine.
+
+A machine being installed cannot configure itself from the machine being installed, which raised whether to drive Ansible from the other workstation over SSH. Three things settle it against that, in increasing order of weight.
+
+**Recovery.** Push means rebuilding the desktop needs the laptop alive. That is the same shape as fetching the age key from Vaultwarden, which D-006 rejected: a rebuild path depending on a second thing being up fails on the day you need it. It also has no answer for the first machine, or for both being down at once.
+
+**One tested path.** M7 proves reproducibility through three clean rebuilds. If VMs are configured one way and hardware another, that test proves the wrong path.
+
+**The wireless deadlock, which is what actually fixes the ordering.** A laptop with no wired connection has no network at first boot. The WiFi PSK lives in the encrypted secrets, which live in the repository, which cannot be cloned without network.
+
+So the order is fixed rather than chosen:
+
+1. The ISO has network. Install the base system, `ansible` and `age`, and clone the repository onto the target.
+2. Reboot. There may be no network yet.
+3. `bootstrap.sh` prompts for the age passphrase, decrypts the secrets, brings up networking, then runs `ansible-playbook` locally and can finally fetch packages.
+
+`ansible` and `age` are therefore pacstrapped during install. Bootstrap cannot install what it needs before it has the network that needs it.
+
+Rejected alternatives:
+
+- **Push over SSH.** Above. This is what the M2 harness did until this decision, so `phase_reconcile` changes with it.
+- **Both models supported.** Two connection models, two authentication stories, and M2 and M7 would each have to prove both. Twice the surface for a convenience.
+- **Ansible inside the chroot during install**, so the machine boots already configured. The tempting shortcut, and it lies. `systemctl` cannot start units in a chroot, so service state cannot be verified and idempotence cannot be measured at all. Idempotence is M2's exit criterion. It would report success for work that never happened.
+
+Consequences:
+
+- `ansible_connection: local` goes in `group_vars/all.yml`. The installer already sets the host name to `hmlxdesktop01` or `hmlxlaptop01` and `inventory/hosts.yml` already names those hosts, so the committed inventory then works unchanged on hardware and in a VM with `ansible-playbook -l "$(hostname)" site.yml`. No synthetic inventory, no connection flags at the call site.
+- The harness keeps SSH, but only as the terminal driving a machine nobody can physically touch. Ansible no longer travels over it.
+- The installer clones the checkout it runs from rather than fetching fresh, so the installed system carries the commit that built it. The same reasoning already governs `git archive HEAD` in the harness. It then points `origin` upstream, because a clone keeping its local origin works until the first `git pull`.
+- The repository lives at `/home/<user>/src/ArchWork`, inside `@home` and so outside the rollback boundary. Inside `@`, a rollback would rewind the checkout at the moment it was being used to debug that rollback.
+- `--authorized-key` stays a virtual-machine-only test affordance. With no push model, sshd has no place in the build path.
+- Driving Ansible from another machine is not forbidden, but it is unsupported and untested. Nothing may come to depend on it.
+
+This collides with nothing. D-015 is the recovery UKI shell decision, and D-016 supersedes no earlier decision.

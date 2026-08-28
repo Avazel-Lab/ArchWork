@@ -46,6 +46,8 @@ Exit criteria:
 
 Bring a freshly installed machine to a defined state, repeatably.
 
+Ansible runs on the target with a local connection (D-016). Nothing here may require a second machine. `bootstrap.sh` prompts for the age passphrase, decrypts the secrets, brings up networking, then runs the playbook, in that order, because a wireless-only laptop has no network until the WiFi PSK has been decrypted.
+
 Exit criteria:
 
 - Inventory defines `desktop` and `laptop` groups plus shared defaults.
@@ -55,6 +57,9 @@ Exit criteria:
 - A real run followed by a second run reports zero changed tasks.
 - `ansible-lint` passes.
 - `host_vars/` is empty, or every entry in it is a genuine per-machine fact (D-010).
+- The whole run completes on the target alone, with no second machine involved and nothing connecting inward to it (D-016).
+- The machine arrives able to do that: `ansible` and `age` are installed by the installer, this repository is cloned into the user's home and owned by them, `origin` points upstream rather than at a path on the ISO, and `bootstrap.sh` is present and executable.
+- The run uses the committed inventory, not one generated for the test.
 
 ### M3 Minimal Hyprland desktop
 

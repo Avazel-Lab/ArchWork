@@ -1,4 +1,14 @@
 ---
+# Every ArchWork machine configures itself (D-016). Nothing in the build path
+# requires a second machine, so Ansible never connects over the network.
+#
+# The M1 installer sets the host name to the one inventory/hosts.yml names, so
+# with this setting the committed inventory works unchanged on real hardware
+# and in a test VM:
+#
+#   ansible-playbook -l "$(hostname)" site.yml
+ansible_connection: local
+
 # Packages required on both profiles.
 #
 # Every entry traces to docs/decisions/applications-tooling.md or to a decision
@@ -8,6 +18,11 @@
 #
 #   Pandoc   -> pandoc-cli   (pandoc is not a package name)
 #   xorriso  -> libisoburn   (the xorriso binary ships in libisoburn)
+#
+# ansible, age and python appear here and are also pacstrapped by the M1
+# installer. That is not duplication: this playbook cannot be what installs
+# the tools it needs to run, and bootstrap needs age before any network
+# exists to fetch it (D-016).
 #
 # Packages the base install already places (base, linux, btrfs-progs,
 # cryptsetup, mkinitcpio, networkmanager, zram-generator, sudo, git, vim,

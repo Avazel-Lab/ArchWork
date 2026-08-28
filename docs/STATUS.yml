@@ -38,14 +38,20 @@ milestones:
     status: not-started
 
 # A rebuild claim without a commit SHA is rejected by the checker.
+# This run passed, then D-016 replaced the reconciliation path it exercised:
+# Ansible reached the guest over SSH from the host. Re-run and re-record before
+# M2 can be called complete.
 last_rebuild:
-  status: passed
+  status: superseded
   commit: 3dc1912be02c917d98fc501ade882e52a0bbe772
   date: 2026-08-28
 
 next_actions:
+  - Re-run the reconciliation on the D-016 path and record fresh evidence
   - Bootstrap paru through devtools so AUR packages reach the manifests
   - Extend M2 past packages to services and configuration
-  - Confirm the NAS runs btrfs, needed by D-009 before M8
 
-blockers: []
+blockers:
+  - M2 reconciliation evidence is superseded. D-016 moved Ansible onto the
+    target, and the recorded run used the old SSH path. The new path is
+    written and linted but has never run.

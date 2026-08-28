@@ -30,6 +30,8 @@ DRY_RUN=false
 ACKNOWLEDGED=false
 AUTHORIZED_KEY=""
 PASSPHRASE_FILE=""
+REPO_URL=""
+REPO_PATH="src/ArchWork"
 TIMEZONE="Europe/London"
 LOCALE="en_GB.UTF-8"
 KEYMAP="uk"
@@ -55,6 +57,8 @@ Options:
   --i-know-this-wipes-my-disk     permit running outside a virtual machine
   --authorized-key FILE           install an SSH key and enable sshd.
                                   VM only. Used by the M1 test harness.
+  --repo-url URL                  upstream remote for the cloned repository.
+                                  Defaults to this checkout's origin.
   --luks-passphrase-file FILE     read the LUKS passphrase from FILE rather
                                   than prompting. VM only.
   -h, --help                      this text
@@ -124,6 +128,10 @@ parse_args() {
 			AUTHORIZED_KEY="${2:-}"
 			shift 2
 			;;
+		--repo-url)
+			REPO_URL="${2:-}"
+			shift 2
+			;;
 		--luks-passphrase-file)
 			PASSPHRASE_FILE="${2:-}"
 			shift 2
@@ -167,6 +175,14 @@ validate_args() {
 
 	if [ -z "$HOSTNAME_VALUE" ]; then
 		HOSTNAME_VALUE="hmlx${PROFILE}01"
+	fi
+
+	git -C "$REPO_ROOT" rev-parse --git-dir >/dev/null 2>&1 ||
+		die "$REPO_ROOT is not a git checkout, so there is nothing to clone onto the target"
+
+	if [ -z "$REPO_URL" ]; then
+		REPO_URL="$(git -C "$REPO_ROOT" remote get-url origin 2>/dev/null || true)"
+		[ -n "$REPO_URL" ] || die "this checkout has no origin remote. Pass --repo-url."
 	fi
 
 	local cmdline_template="$REPO_ROOT/ansible/files/kernel-cmdline/$PROFILE"
@@ -307,10 +323,14 @@ base_packages() {
 		sudo
 		git
 		vim
-		# Ansible needs an interpreter on the target before it can do anything,
-		# and every ArchWork machine runs the M2 reconciliation.
-		# applications-tooling.md lists Python as platform tooling.
+		# The target configures itself (D-016), so these cannot wait for the
+		# playbook that needs them, nor for a network bootstrap has not yet
+		# brought up. age in particular decrypts the WiFi PSK that a
+		# wireless-only laptop needs before it has any network at all.
+		# applications-tooling.md lists all three as platform tooling.
 		python
+		ansible
+		age
 	)
 
 	case "$PROFILE" in
@@ -447,6 +467,36 @@ HibernateDelaySec=30min"
 	fi
 }
 
+# The target configures itself (D-016), so the repository has to be on it
+# before first boot. A wireless-only laptop has no network then, and the WiFi
+# PSK it needs to get one lives in the encrypted secrets inside this
+# repository.
+clone_repository() {
+	local destination="/home/$USERNAME/$REPO_PATH"
+
+	log "Cloning the repository to $destination"
+
+	if [ "$DRY_RUN" = true ]; then
+		printf '  would clone %s to %s%s\n' "$REPO_ROOT" "$MOUNT_ROOT" "$destination"
+		printf '  would set origin to %s\n' "$REPO_URL"
+		printf '  would chown the clone to %s\n' "$USERNAME"
+		return 0
+	fi
+
+	mkdir -p "$MOUNT_ROOT$(dirname "$destination")"
+
+	# Clone the checkout this installer runs from rather than fetching fresh,
+	# so the installed system carries exactly the commit that built it.
+	git clone "$REPO_ROOT" "$MOUNT_ROOT$destination"
+
+	# A clone keeps its source as origin, which here is a path on the ISO.
+	# That works perfectly until the first git pull.
+	git -C "$MOUNT_ROOT$destination" remote set-url origin "$REPO_URL"
+
+	arch-chroot "$MOUNT_ROOT" chown -R "$USERNAME:$USERNAME" \
+		"/home/$USERNAME/$(dirname "$REPO_PATH")"
+}
+
 configure_initramfs() {
 	log "Configuring mkinitcpio and the kernel command line"
 
@@ -566,6 +616,10 @@ Set a password for $USERNAME before rebooting:
 
   arch-chroot $MOUNT_ROOT passwd $USERNAME
 
+Then reboot and run bootstrap.sh from the cloned repository at
+/home/$USERNAME/$REPO_PATH. It configures this machine on the machine itself:
+no second machine is involved (D-016).
+
 SUMMARY
 }
 
@@ -588,6 +642,7 @@ main() {
 	install_base
 	create_swapfile
 	configure_system
+	clone_repository
 	configure_initramfs
 	build_recovery_uki
 	install_bootloader

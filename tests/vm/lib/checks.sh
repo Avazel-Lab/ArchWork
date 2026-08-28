@@ -90,3 +90,27 @@ check_no_token() {
 check_recovery_no_autodetect() {
 	! grep -q autodetect /etc/mkinitcpio-recovery.conf
 }
+
+# D-016: the machine configures itself, so it must arrive able to do so.
+repo_present() {
+	test -d "/home/$1/src/ArchWork/.git"
+}
+
+repo_owned_by_user() {
+	[ "$(stat -c '%U' "/home/$1/src/ArchWork")" = "$1" ]
+}
+
+# A clone keeps its source as origin, which on the target is a path on the ISO
+# that no longer exists. It works perfectly until the first git pull.
+repo_origin_is_upstream() {
+	local origin
+	origin="$(git -C "/home/$1/src/ArchWork" remote get-url origin 2>/dev/null)"
+	case "$origin" in
+	"" | /* | file:*) return 1 ;;
+	*) return 0 ;;
+	esac
+}
+
+command_installed() {
+	command -v "$1" >/dev/null 2>&1
+}
