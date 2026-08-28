@@ -26,15 +26,32 @@ command -v ansible-playbook >/dev/null ||
 
 cd "$REPO/ansible"
 
-# -l limits the run to this machine. group_vars/all.yml sets the connection to
-# local, and the installer set a host name that inventory/hosts.yml names, so
-# nothing here needs an inventory generated for the test.
+# uname -n rather than hostname: a base Arch install has coreutils and does
+# not have inetutils, so hostname is not there. It failed silently, the limit
+# below became empty, and an empty -l means every host in the inventory.
+HOST="$(uname -n)"
+
+[ -n "$HOST" ] ||
+	die "cannot determine this machine's host name, and an empty -l reconciles every host in the inventory"
+
+# An -l pattern that matches nothing is a warning to ansible rather than an
+# error, so prove the inventory names this machine before trusting the limit.
+#
+# Getting this wrong is worse than it sounds. group_vars/all.yml sets the
+# connection to local (D-016), so every host in the inventory resolves to this
+# machine: an unlimited run reconciles it once per host, concurrently, and two
+# pacman processes then fight over one database lock.
+ansible-inventory --host "$HOST" >/dev/null 2>&1 ||
+	die "inventory/hosts.yml does not name '$HOST'. Fix the host name or the inventory."
+
+# -l limits the run to this machine. Nothing here needs an inventory generated
+# for the test.
 case "$MODE" in
 check)
-	exec ansible-playbook --check -l "$(hostname)" site.yml
+	exec ansible-playbook --check -l "$HOST" site.yml
 	;;
 run)
-	exec ansible-playbook -l "$(hostname)" site.yml
+	exec ansible-playbook -l "$HOST" site.yml
 	;;
 *)
 	printf 'error: unknown mode %s. Use check or run.\n' "$MODE" >&2
