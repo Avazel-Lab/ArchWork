@@ -5,7 +5,7 @@
 schema: 1
 updated: 2026-08-28
 
-phase: M2
+phase: M3
 
 milestones:
   M0:
@@ -21,7 +21,7 @@ milestones:
   M2:
     status: in-progress
   M3:
-    status: not-started
+    status: in-progress
   M4:
     status: not-started
   M5:
@@ -40,14 +40,15 @@ milestones:
 # A rebuild claim without a commit SHA is rejected by the checker.
 # Clean install from the ISO, M1 assertions, the D-016 reconciliation twice
 # with the second run reporting zero changed tasks, and the recovery UKI.
-# Both profiles, separately, on this commit.
+# Desktop profile on this commit. Both profiles passed on d16cf4c.
 last_rebuild:
   status: passed
-  commit: d16cf4c6cdd04a6814e7e04c26844bf1515bd139
+  commit: 6ad019f1fbd77ced66436a5b5b18918756b49ece
   date: 2026-08-28
 
 next_actions:
   - Review M2 against its exit criteria; marking it complete is the owner's call
-  - Start M3, the minimal Hyprland desktop
+  - Answer D-020, three packages M3 needs that no document names
+  - Configure the greetd session and the PAM keyring unlock (D-004, D-012)
 
 blockers: []

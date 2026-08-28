@@ -18,6 +18,9 @@
 
 - name: Install the shared and profile package sets
   community.general.pacman:
-    name: "{{ archwork_packages_shared + archwork_packages_profile }}"
+    name: >-
+      {{ archwork_packages_shared
+         + archwork_packages_session
+         + archwork_packages_profile }}
     state: present
   become: true
