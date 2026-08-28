@@ -25,9 +25,18 @@ import socket
 import sys
 import time
 
-# A screen is "blank" when one colour covers at least this much of it. A text
-# greeter is mostly background, so the threshold has to be close to 1.
-BLANK_RATIO = 0.995
+# How many sampled pixels must differ from the background before the screen
+# counts as having something on it.
+#
+# An absolute count rather than a ratio. The first version of this asked that
+# the dominant colour cover less than 99.5% of the screen, and the real
+# greeter measured 99.45%: it passed by five hundredths of a percentage point,
+# and a slightly smaller login box would have failed it. A text greeter is
+# almost all background, so any ratio threshold has to sit so close to 1 that
+# it stops discriminating. The same capture has 1407 differing pixels out of
+# 256000 sampled, against exactly 0 for a blank screen, which is a gap worth
+# putting a threshold in the middle of.
+MIN_DRAWN_PIXELS = 200
 
 
 def monitor_command(path: str, command: str, timeout: float = 10.0) -> str:
@@ -85,24 +94,42 @@ def read_ppm(path: str) -> tuple[int, int, bytes]:
     return width, height, data[index : index + width * height * 3]
 
 
-def describe(pixels: bytes, sample: int = 4) -> tuple[float, list[tuple[tuple[int, int, int], int]]]:
-    """Most common colour's share of the screen, and the top few colours.
+def describe(pixels: bytes, sample: int = 4) -> tuple[int, float, list[tuple[tuple[int, int, int], int]]]:
+    """How many sampled pixels are not the background, its share, and the top colours.
 
-    Samples every nth pixel. A full count of a 1024x768 screen is 786k tuples
-    for no extra confidence.
+    Samples every nth pixel. A full count of a 1280x800 screen is a million
+    tuples for no extra confidence.
     """
     counts: collections.Counter = collections.Counter()
     for offset in range(0, len(pixels) - 2, 3 * sample):
         counts[(pixels[offset], pixels[offset + 1], pixels[offset + 2])] += 1
 
     total = sum(counts.values()) or 1
-    return counts.most_common(1)[0][1] / total, counts.most_common(4)
+    dominant = counts.most_common(1)[0][1]
+    return total - dominant, dominant / total, counts.most_common(4)
+
+
+def verdict(path: str) -> tuple[bool, str]:
+    """Read a PPM and say whether anything is drawn on it."""
+    width, height, pixels = read_ppm(path)
+    drawn, ratio, top = describe(pixels)
+    summary = (
+        f"screen {width}x{height}, {drawn} sampled pixels differ from the "
+        f"background, which covers {ratio:.3%}"
+    )
+    for colour, count in top:
+        summary += f"\n  rgb{colour}: {count}"
+    return drawn >= MIN_DRAWN_PIXELS, summary
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--monitor", required=True, help="QEMU HMP monitor socket")
-    parser.add_argument("--output", required=True, help="where to write the PPM")
+    parser.add_argument("--monitor", help="QEMU HMP monitor socket")
+    parser.add_argument("--output", help="where to write the PPM")
+    parser.add_argument(
+        "--analyse",
+        help="judge an existing PPM instead of capturing one, so the verdict is testable",
+    )
     parser.add_argument("--wait", type=float, default=60.0, help="seconds to wait for content")
     parser.add_argument(
         "--allow-blank",
@@ -110,6 +137,17 @@ def main() -> int:
         help="capture and report, but do not fail on a blank screen",
     )
     args = parser.parse_args()
+
+    if args.analyse:
+        drawn, summary = verdict(args.analyse)
+        print(summary)
+        if not drawn:
+            print("nothing is drawn on this screen", file=sys.stderr)
+            return 1
+        return 0
+
+    if not args.monitor or not args.output:
+        parser.error("--monitor and --output are required unless --analyse is given")
 
     deadline = time.monotonic() + args.wait
     ratio = 1.0
@@ -128,7 +166,7 @@ def main() -> int:
             time.sleep(0.25)
 
         try:
-            width, height, pixels = read_ppm(args.output)
+            drawn, summary = verdict(args.output)
         except (OSError, ValueError) as exc:
             print(f"could not read a screenshot yet: {exc}", file=sys.stderr)
             if time.monotonic() > deadline:
@@ -136,24 +174,20 @@ def main() -> int:
             time.sleep(2)
             continue
 
-        ratio, top = describe(pixels)
-        print(f"screen {width}x{height}, dominant colour covers {ratio:.3%}")
+        print(summary)
 
-        if ratio < BLANK_RATIO or args.allow_blank:
+        if drawn or args.allow_blank:
             break
 
         if time.monotonic() > deadline:
             print(
-                f"the screen stayed blank for {args.wait:.0f}s: "
-                f"one colour covers {ratio:.3%} of it",
+                f"the screen stayed blank for {args.wait:.0f}s",
                 file=sys.stderr,
             )
             return 1
 
         time.sleep(2)
 
-    for colour, count in top:
-        print(f"  rgb{colour}: {count}")
     print(f"saved {args.output}")
     return 0
 
