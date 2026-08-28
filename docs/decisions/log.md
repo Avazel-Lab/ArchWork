@@ -424,3 +424,23 @@ Consequences:
 - The M5 update script builds AUR updates through this same chroot and this same account, per D-005.
 - `archwork-build` stays unprivileged. If something later seems to need it in sudoers, read the tool first: this decision already made that mistake once.
 - A half-built chroot blocks `mkarchroot`, which refuses a working directory that already exists. The role reports it and names the command to clear it rather than deleting it, because `@var_cache` is btrfs and the chroot is a subvolume, not a plain directory.
+
+## D-019 Which daemons run, and where Tailscale belongs
+
+**Status:** open
+**Date:** 2026-08-28
+**Affects:** `applications-tooling.md`, M2, M3
+
+Raised while extending M2 from packages to service state. Two things the documents do not answer, and neither should be inferred from a package list.
+
+**Do the container runtimes run at boot?** `applications-tooling.md` lists Docker, "required for managing existing Docker workloads, including the VPS", and Podman "so it can be learned and used alongside Docker". It says nothing about whether either daemon starts at boot, and the answer carries a security consequence rather than being a convenience: reaching a running Docker daemon means membership of the `docker` group, and that group is root without a password prompt.
+
+Recommendation: enable `docker.socket` rather than `docker.service`, so the daemon starts when something first asks for it and is otherwise not running. Leave Podman alone, since rootless Podman needs no system daemon and that is most of why it is worth learning alongside Docker. Decide the `docker` group separately from the daemon: it is the part that actually widens what a compromised session reaches.
+
+**Where does Tailscale belong?** It appears in `applications-tooling.md` as something NetworkManager must coexist with, in `security-power.md` twice, and in D-002's consequences, which put the verification in the M3 exit criteria. It is in no package manifest, so nothing installs it.
+
+Recommendation: leave it to M3, and treat its absence from the M2 manifests as deliberate rather than an oversight, because M3 is where the exit criteria test it and installing a VPN daemon a milestone early proves nothing.
+
+One thing to carry into M3 either way: D-002 has this repository mask `systemd-resolved`, and Tailscale's split DNS works best through it. That may be a real tension rather than a theoretical one, and M3 tests coexistence rather than assuming it.
+
+This blocks nothing that is currently in progress. M2's service state covers what D-002 asked for, and the rest waits here rather than being guessed at.

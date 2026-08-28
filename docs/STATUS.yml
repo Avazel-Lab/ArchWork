@@ -42,11 +42,11 @@ milestones:
 # with the second run reporting zero changed tasks, and the recovery UKI.
 last_rebuild:
   status: passed
-  commit: 0269b506305d62fcc18422311249cd9c53afa976
+  commit: 78f5939eaf7eac6e478debba57f43f4dfbbe5e0c
   date: 2026-08-28
 
 next_actions:
-  - Extend M2 past packages to services and configuration
+  - Answer D-019, which holds the rest of M2 service state
   - Run the laptop profile through the same path, which only desktop has taken
 
 blockers: []
