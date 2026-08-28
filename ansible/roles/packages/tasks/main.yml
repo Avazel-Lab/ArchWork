@@ -23,4 +23,11 @@
          + archwork_packages_session
          + archwork_packages_profile }}
     state: present
+    # pacman aborts a download that moves slower than one byte for ten
+    # seconds. On a mirror having a bad minute that ends the whole
+    # transaction, and the reconcile fails on the machine rather than on the
+    # mirror: a run on 2026-08-29 died there with the desktop set half
+    # fetched. Nothing about this machine had changed, so let a slow transfer
+    # be slow.
+    extra_args: --disable-download-timeout
   become: true

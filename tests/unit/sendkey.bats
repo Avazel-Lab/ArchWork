@@ -50,10 +50,26 @@ teardown() {
 	[[ "$output" == *"uk and us"* ]]
 }
 
+@test "presses a keybinding, modifiers and all" {
+	# How the harness reaches a desktop keybinding: meta_l is what Hyprland
+	# calls SUPER, so this is SUPER + Return, the terminal bind.
+	run python3 "$SENDKEY" --print --key meta_l-ret
+	[ "$status" -eq 0 ]
+	[ "${lines[0]}" = "sendkey meta_l-ret" ]
+}
+
 @test "refuses a key name it does not know" {
 	run python3 "$SENDKEY" --print --key "any" --text "x"
 	[ "$status" -eq 2 ]
 	[[ "$output" == *"unknown key"* ]]
+}
+
+@test "refuses a modifier it does not know" {
+	# QEMU would reject this too, and the run would report a desktop that did
+	# not respond to a keybinding rather than a typo in the test.
+	run python3 "$SENDKEY" --print --key "hyper-x"
+	[ "$status" -eq 2 ]
+	[[ "$output" == *"unknown modifier"* ]]
 }
 
 @test "refuses to send with nothing to type" {

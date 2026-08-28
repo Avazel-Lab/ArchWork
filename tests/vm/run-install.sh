@@ -449,10 +449,95 @@ phase_session() {
 
 	ssh "${SSH_OPTS[@]}" gary@127.0.0.1 "mkdir -p /tmp/checks/lib"
 	scp "${SCP_OPTS[@]}" -q "$SCRIPT_DIR/assert-m3.sh" gary@127.0.0.1:/tmp/checks/
+	scp "${SCP_OPTS[@]}" -q "$SCRIPT_DIR/check-session.sh" gary@127.0.0.1:/tmp/checks/
 	scp "${SCP_OPTS[@]}" -q "$SCRIPT_DIR/lib/checks.sh" gary@127.0.0.1:/tmp/checks/lib/
+	ssh "${SSH_OPTS[@]}" gary@127.0.0.1 "chmod +x /tmp/checks/check-session.sh"
 
 	ssh "${SSH_OPTS[@]}" gary@127.0.0.1 \
 		'chmod +x /tmp/checks/assert-m3.sh && sudo /tmp/checks/assert-m3.sh gary'
+}
+
+# Press a key on the guest's keyboard, from outside the guest.
+press() {
+	python3 "$SCRIPT_DIR/sendkey.py" --monitor "$WORK_DIR/monitor.sock" "$@"
+}
+
+# Ask the machine one question about its session.
+ask() {
+	# shellcheck disable=SC2029 # the arguments name the check and are meant to expand here, on the host
+	ssh "${SSH_OPTS[@]}" gary@127.0.0.1 "sudo /tmp/checks/check-session.sh $*"
+}
+
+# Keep whatever is on screen, whether or not anything is drawn on it. Used
+# where a capture is evidence for a person rather than an assertion.
+capture() {
+	python3 "$SCRIPT_DIR/screendump.py" \
+		--monitor "$WORK_DIR/monitor.sock" \
+		--output "$WORK_DIR/$1.ppm" \
+		--allow-blank --wait 5 >/dev/null 2>&1 || true
+}
+
+# The M3 criteria that describe using the machine: open a terminal, launch an
+# application from the launcher, lock the session, unlock it. Every one of them
+# is a real key press at the framebuffer followed by a question asked over SSH,
+# because a keybinding that never fired and a compositor that ignored it look
+# identical from inside the guest.
+#
+# Pressing the binding rather than running the command is the point. Half of
+# what M3 delivers is the configuration that maps SUPER+Return to a terminal,
+# and hyprctl dispatch exec would prove kitty runs while saying nothing about
+# whether the desktop can start it.
+phase_desktop() {
+	log "Phase 8: using the desktop the way the M3 criteria describe"
+
+	log "SUPER+Return opens a terminal"
+	press --key meta_l-ret
+	ask --wait 20 client_class_present "$LOGIN_USER" kitty || {
+		capture terminal-failed
+		die "SUPER+Return opened no terminal. The screen is at $WORK_DIR/terminal-failed.ppm"
+	}
+
+	log "SUPER+Q closes it"
+	press --key meta_l-q
+	ask --wait 20 client_class_absent "$LOGIN_USER" kitty || {
+		capture close-failed
+		die "SUPER+Q left the terminal open. The screen is at $WORK_DIR/close-failed.ppm"
+	}
+
+	log "SUPER+D opens the launcher"
+	press --key meta_l-d
+	ask --wait 20 user_process_running "$LOGIN_USER" fuzzel || {
+		capture launcher-failed
+		die "SUPER+D opened no launcher. The screen is at $WORK_DIR/launcher-failed.ppm"
+	}
+
+	log "The launcher starts an application"
+	press --text kitty
+	sleep 1
+	press --key ret
+	ask --wait 30 client_class_present "$LOGIN_USER" kitty || {
+		capture launch-failed
+		die "the launcher started nothing. The screen is at $WORK_DIR/launch-failed.ppm"
+	}
+
+	# The desktop in use, for the person who judges appearance (D-021).
+	capture desktop
+
+	log "SUPER+L locks the session"
+	press --key meta_l-l
+	ask --wait 20 user_process_running "$LOGIN_USER" hyprlock || {
+		capture lock-failed
+		die "SUPER+L did not lock the session. The screen is at $WORK_DIR/lock-failed.ppm"
+	}
+	capture locked
+
+	log "The login password unlocks it"
+	press --text "$LOGIN_PASSWORD" --enter
+	ask --wait 30 process_absent "$LOGIN_USER" hyprlock || {
+		capture unlock-failed
+		die "the session stayed locked after the password. The screen is at $WORK_DIR/unlock-failed.ppm"
+	}
+	capture unlocked
 }
 
 # D-021 judges appearance by looking at the captures, so a run that throws them
@@ -605,6 +690,7 @@ main() {
 			# find. M1 deliberately stops at a text login.
 			phase_greeter
 			phase_session
+			phase_desktop
 		fi
 		phase_recovery
 

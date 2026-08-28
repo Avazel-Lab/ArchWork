@@ -255,3 +255,23 @@ screenshot_works() {
 	as_user_in_session "$1" grim "$target" >/dev/null 2>&1 || return 1
 	[ -s "$target" ]
 }
+
+# A window the compositor has, rather than a process that started. A terminal
+# that launched and then died leaves the process check happy and the screen
+# empty, which is the failure worth catching.
+client_class_present() {
+	as_user_in_session "$1" hyprctl -j clients 2>/dev/null |
+		jq -e --arg class "$2" 'any(.[]; .class == $class)' >/dev/null 2>&1
+}
+
+client_class_absent() {
+	! client_class_present "$1" "$2"
+}
+
+process_absent() {
+	! user_process_running "$1" "$2"
+}
+
+user_unit_active() {
+	as_user "$1" systemctl --user is-active --quiet "$2"
+}

@@ -55,6 +55,10 @@ SHIFTED = {
 
 NAMED_KEYS = {"ret", "tab", "esc", "spc", "backspace", "delete", "up", "down", "left", "right"}
 
+# For pressing a keybinding rather than typing at a field. meta_l is the key
+# Hyprland calls SUPER.
+MODIFIERS = {"shift", "ctrl", "alt", "meta_l", "meta_r"}
+
 
 def key_for(char: str) -> str:
     """The QEMU sendkey argument that types one character."""
@@ -72,6 +76,28 @@ def key_for(char: str) -> str:
         f"cannot type {char!r}: it is not on a key that means the same thing "
         "under both the uk and us layouts"
     )
+
+
+def named_key(spec: str) -> str:
+    """Validate a key press given by name, such as ret or meta_l-ret.
+
+    Modifiers may be stacked. The key itself is a letter, a digit or one of
+    the named keys, which keeps a typo in a keybinding an error here rather
+    than a monitor command QEMU rejects and a test that says the desktop did
+    not respond.
+    """
+    parts = spec.split("-")
+    *modifiers, key = parts
+
+    unknown = [modifier for modifier in modifiers if modifier not in MODIFIERS]
+    if unknown:
+        raise ValueError(f"unknown modifier(s) in {spec!r}: {', '.join(unknown)}")
+
+    if key in NAMED_KEYS:
+        return spec
+    if len(key) == 1 and key.isascii() and (key.isalpha() or key.isdigit()):
+        return spec
+    raise ValueError(f"unknown key name: {spec!r}")
 
 
 def keys_for_text(text: str) -> list[str]:
@@ -93,7 +119,8 @@ def main() -> int:
         action="append",
         default=[],
         metavar="NAME",
-        help=f"a named key to press after the text, one of: {', '.join(sorted(NAMED_KEYS))}",
+        help="a key to press after the text: a letter, a digit, or one of "
+        f"{', '.join(sorted(NAMED_KEYS))}, optionally with modifiers, as in meta_l-ret",
     )
     parser.add_argument("--enter", action="store_true", help="press return after the text")
     parser.add_argument(
@@ -115,9 +142,10 @@ def main() -> int:
     if args.enter:
         trailing.append("ret")
 
-    unknown = [key for key in trailing if key not in NAMED_KEYS]
-    if unknown:
-        print(f"unknown key name(s): {', '.join(unknown)}", file=sys.stderr)
+    try:
+        trailing = [named_key(key) for key in trailing]
+    except ValueError as exc:
+        print(f"unknown key: {exc}", file=sys.stderr)
         return 2
 
     if not args.text and not trailing:
