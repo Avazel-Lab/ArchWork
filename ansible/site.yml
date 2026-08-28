@@ -10,5 +10,6 @@
   roles:
     - packages
     - aur
+    - dotfiles
     - services
     - session

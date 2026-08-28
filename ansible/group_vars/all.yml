@@ -21,6 +21,19 @@ archwork_build_user: archwork-build
 # it belongs here rather than in host_vars (D-010).
 archwork_admin_user: gary
 
+# Where the installer clones this repository, matching REPO_PATH in
+# scripts/archwork-install.sh. The dotfiles role links the user configuration
+# at this clone rather than copying it, so an edit made at the machine is an
+# edit to the repository.
+archwork_repo_dir: "/home/{{ archwork_admin_user }}/src/ArchWork"
+archwork_dotfiles_dir: "{{ archwork_repo_dir }}/dotfiles"
+
+# Directories under dotfiles/ that become directories under ~/.config. Whole
+# directories rather than single files, so a new file in one arrives on the
+# machine without a change here.
+archwork_dotfile_links:
+  - hypr
+
 # The graphical session (M3). Separate from archwork_packages_shared, which is
 # base tooling, because M6 has to install exactly this set with Quickshell
 # removed and prove the desktop still works. A named list makes that test mean
@@ -113,3 +126,8 @@ archwork_packages_shared:
   - wireplumber
   # Snapshots and backup (D-007, D-009)
   - btrbk
+  # The private network (D-002, D-019). It arrives at M3, not earlier: M3 is
+  # where the exit criteria test that it comes up and coexists with
+  # NetworkManager, and installing a VPN daemon a milestone early proves
+  # nothing.
+  - tailscale
