@@ -48,6 +48,12 @@ archwork_packages_session:
   # Notifications until Quickshell takes them at M6, and part of the fallback
   # set that must keep working afterwards (desktop-shell.md)
   - mako
+  # The bar, on the same terms as mako: conventional now, replaced by a
+  # Quickshell module at M6, kept afterwards so a broken shell still leaves a
+  # usable desktop (desktop-shell.md, D-020). No dotfiles: waybar's packaged
+  # configuration is enough for a fallback, and the M3 criteria do not test a
+  # bar. Style it once Quickshell has taken the job, or not at all.
+  - waybar
   # Screenshots, which the M3 exit criteria test (desktop-shell.md)
   - grim
   # Secret Service, so the greetd password unlocks the keyring (D-012)

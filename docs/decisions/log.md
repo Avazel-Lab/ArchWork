@@ -377,7 +377,7 @@ This collides with nothing. D-015 is the recovery UKI shell decision, and D-016 
 
 ArchWork takes a whole disk and owns the ESP on it. It does not share an ESP with another operating system, and it does not enumerate other operating systems in its boot menu yet. Choosing between installs is a firmware boot menu job for now.
 
-The desktop hardware dual boots three systems: Kubuntu on `nvme0n1`, Windows 11 on `sdb`, and ArchWork on `nvme1n1`. Each keeps its own bootloader on its own disk. The installer already behaves this way, because it writes a fresh GPT with its own ESP to the device it is given and `bootctl install` only ever scans the ESP it installed to.
+The desktop hardware dual boots three systems: Kubuntu on `nvme1n1`, Windows 11 on `sdb`, and ArchWork on `nvme0n1`. Each keeps its own bootloader on its own disk. The two NVMe drives are the same model and size, a Samsung 970 EVO Plus 2 TB each, so the kernel names alone do not identify them: the Kubuntu root is serial S6P1NS0T304068E and the disk ArchWork is to take is serial S4J4NX0R804138P. Address it as `/dev/disk/by-id/nvme-Samsung_SSD_970_EVO_Plus_2TB_S4J4NX0R804138P` and confirm the serial in the installer's own partition table printout before answering its prompt. The installer already behaves this way, because it writes a fresh GPT with its own ESP to the device it is given and `bootctl install` only ever scans the ESP it installed to.
 
 Two facts make the separation worth writing down rather than leaving implicit.
 
@@ -391,8 +391,11 @@ Consequences:
 
 - The installer keeps taking a whole disk. It gains no option to install alongside an existing operating system, and no option to reuse an ESP it did not create.
 - `bootctl install` makes ArchWork the first entry in the firmware boot order. That is a side effect of installing, not a decision to be the default, and reordering with `efibootmgr` or the firmware menu changes it back.
-- Before wiping a disk on shared hardware, prove the other systems boot without it. Observed on `hmlxdesktop01` on 2026-08-28: `efibootmgr -v` showed `Windows Boot Manager` registered against the ESP on `nvme1n1p4`, the disk ArchWork is to take, while the Windows install on `sdb` carries no ESP of its own. Windows on `sdb` therefore needs its own ESP and its own boot manager before `nvme1n1` is touched.
+- Before wiping a disk on shared hardware, prove the other systems boot without it. Observed on `hmlxdesktop01` on 2026-08-28: `efibootmgr -v` showed `Windows Boot Manager` registered against the ESP on `nvme0n1p4`, the disk ArchWork is to take, while the Windows install on `sdb` carried no ESP of its own. Wiping `nvme0n1` would have left a Windows install on disk with nothing to boot it.
+- Resolved the same day: Windows on `sdb` was given its own ESP at `sdb3`, and `efibootmgr` now shows a `Windows Boot Manager` entry against it, ahead of the stale `nvme0n1p4` one in the boot order. That entry is what survives the wipe. Boot Windows from it once before `nvme0n1` is touched, because an entry that exists is not the same as one that works, and this is the last chance to find out cheaply.
 - When the loader entries do arrive, they go in the repository as configuration like everything else, and a rebuild has to recreate them. An entry typed once into a live ESP is exactly the manual configuration the capture rule exists to prevent.
+
+**Correction, 2026-08-28:** this entry first named the two NVMe drives the other way round. They are identical 2 TB Samsung 970 EVO Plus units, and the mistake pointed the wipe at the running Kubuntu system. Names replaced with serials above.
 
 ## D-018 Where AUR builds run, and as whom
 
@@ -473,6 +476,8 @@ Recommendation: leave this open until the Kvantum theme itself is chosen, becaus
 **Fonts.** Nothing names any. A session with no font packages falls back to whatever came in as a dependency, which is how a desktop ends up looking wrong in a way nobody can quite attribute.
 
 Recommendation: `ttf-dejavu` as the general fallback, `noto-fonts` and `noto-fonts-emoji` for coverage, and one monospace face for Kitty and the bar. All are in `extra`. Worth deciding before M3's first screenshot rather than after.
+
+**Answered on 2026-08-28.** The bar is `waybar`, installed with the configuration it ships rather than a set of dotfiles: it is the fallback that M6 replaces, so effort spent styling it now is spent twice. The GTK theme stays open until the Kvantum theme it has to match is chosen. Fonts are still open.
 
 None of these block the session manifest, which is complete without them. They block M3 looking finished.
 
