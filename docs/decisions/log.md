@@ -400,25 +400,27 @@ Consequences:
 **Date:** 2026-08-28
 **Affects:** `applications-tooling.md`, `storage-boot.md`, M2, M5
 
-The devtools chroot lives at `/var/cache/archwork/chroot`, and builds run as a dedicated system account, `archwork-build`, which holds a passwordless sudoers rule.
+The devtools chroot lives at `/var/cache/archwork/chroot`, and builds run as a dedicated system account, `archwork-build`, which holds no privileges at all.
 
 D-005 settled that AUR packages build in a clean chroot rather than on the workstation. It did not say where the chroot sits or which account drives it, and neither answer is obvious.
 
 **Where.** `/var/cache` is `@var_cache`, which `storage-boot.md` puts outside the rollback boundary. A base-devel chroot is around a gigabyte of entirely reproducible content, so carrying it through every snapshot buys nothing. `/var/lib` was the alternative and is wrong twice over: it sits inside `@` by a constraint `CLAUDE.md` spells out, so the chroot would roll back with the system, and it would bloat every snapshot to do it.
 
-**As whom.** `makechrootpkg` refuses to run as root and escalates on its own, so it needs an account that is neither root nor prompted for a password. Ansible runs the reconciliation as root, and the administrator account has a real password that a `--check` run or an unattended rebuild cannot answer.
+**As whom.** `makepkg` refuses to run as root, so something in this chain has to be an unprivileged account. The administrator account is the obvious candidate and the wrong one: it logs in, has SSH access and runs the desktop session, and a build writing into its home is a standing reason to widen what that session can reach.
 
-So the build gets its own account: a system user with a locked password, no authorized keys and no login route. The rule is reachable only by something that can already become that user, and becoming it requires root, which has everything already. The rule is broad because `makechrootpkg` escalates at several points and the exact command lines move between devtools releases; a narrowly scoped rule written from reading the source would be a guess that breaks on the next update.
+So the build gets its own system account, with a locked password, no authorized keys and no login route. It holds no privileges of its own and appears in no sudoers file. Ansible already runs the reconciliation as root, and root becomes another user without needing a rule.
+
+`makechrootpkg` fits this exactly, once read rather than assumed. Its `check_root` returns immediately when `EUID` is 0, so the tool expects to be root and re-execs itself under sudo when it is not, and `-U` names the unprivileged account it drops to for the makepkg step.
 
 Rejected alternatives:
 
-- **Run the build as the administrator account.** That account logs in, has SSH access and runs the desktop session. Giving it passwordless root so that a package can build widens what a compromised session reaches, permanently, for a job that runs occasionally.
-- **Drive `mkarchroot` and `arch-nspawn` directly and skip `makechrootpkg`.** No new account, but it reimplements the tool D-005 chose, and the reimplementation would have to track devtools rather than being carried by it.
-- **Prompt for a password.** A rebuild is meant to be unattended, and M7 counts manual steps.
+- **Give the build account a passwordless sudoers rule.** This decision said to do that for several hours, on the belief that `makechrootpkg` refuses to run as root. It does not. The rule was never needed, and a privilege granted for a reason that turns out not to exist is the kind that stays forever.
+- **Run the build as the administrator account.** Above.
+- **Drive `mkarchroot` and `arch-nspawn` directly and skip `makechrootpkg`.** Reimplements the tool D-005 chose, and the reimplementation would have to track devtools rather than being carried by it.
 
 Consequences:
 
 - `@var_cache` now holds build state a rebuild recreates. Nothing may come to depend on the chroot surviving a rollback.
 - The M5 update script builds AUR updates through this same chroot and this same account, per D-005.
-- Anything running as `archwork-build` reaches root. Nothing else may be given that account, and no service may run under it.
-- Worth the repository owner's review. This is the first such rule on a real machine: the M1 installer writes one, but only under `--authorized-key`, which is refused outside a virtual machine.
+- `archwork-build` stays unprivileged. If something later seems to need it in sudoers, read the tool first: this decision already made that mistake once.
+- A half-built chroot blocks `mkarchroot`, which refuses a working directory that already exists. The role reports it and names the command to clear it rather than deleting it, because `@var_cache` is btrfs and the chroot is a subvolume, not a plain directory.

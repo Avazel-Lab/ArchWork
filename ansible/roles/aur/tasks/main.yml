@@ -16,9 +16,9 @@
   become: true
 
 - name: Create the build user
-  # A system account with a locked password and no authorized keys. The
-  # sudoers rule below is reachable only by something that can already become
-  # this user, which means root.
+  # makepkg refuses to run as root, so the build needs an unprivileged account
+  # to drop into. It holds no privileges of its own: a locked password, no
+  # authorized keys, and nothing in sudoers (D-018).
   ansible.builtin.user:
     name: "{{ archwork_build_user }}"
     system: true
@@ -29,19 +29,44 @@
     comment: ArchWork AUR chroot builds
   become: true
 
-- name: Allow the build user to drive devtools
-  ansible.builtin.copy:
-    dest: /etc/sudoers.d/20-archwork-build
-    content: |
-      # D-018. makechrootpkg refuses to run as root and calls sudo itself, so
-      # the build needs an account that is neither root nor password-prompted.
-      # This account has a locked password and no login route.
-      {{ archwork_build_user }} ALL=(ALL:ALL) NOPASSWD: ALL
+- name: Create the chroot parent directory
+  # mkarchroot resolves its argument with readlink -f, which returns nothing
+  # when the parent does not exist, and then reports "Please specify a working
+  # directory" as though the argument were missing.
+  ansible.builtin.file:
+    path: "{{ archwork_chroot }}"
+    state: directory
     owner: root
     group: root
-    mode: "0440"
-    validate: visudo -cf %s
+    mode: "0755"
   become: true
+
+- name: Look for a half-built chroot
+  ansible.builtin.stat:
+    path: "{{ archwork_chroot }}/root"
+  register: aur_chroot_root
+  become: true
+
+- name: Look for the marker a finished chroot leaves
+  ansible.builtin.stat:
+    path: "{{ archwork_chroot }}/root/.arch-chroot"
+  register: aur_chroot_marker
+  become: true
+
+- name: Refuse a half-built chroot rather than working around it
+  # mkarchroot refuses a working directory that already exists, so a build
+  # interrupted partway blocks every later run. Deleting it here would mean
+  # guessing whether it is a directory or a btrfs subvolume, and @var_cache is
+  # btrfs, so say what to do instead of guessing.
+  ansible.builtin.fail:
+    msg: >-
+      {{ archwork_chroot }}/root exists without a .arch-chroot marker, so an
+      earlier mkarchroot did not finish. Remove it and run again:
+      btrfs subvolume delete {{ archwork_chroot }}/root
+      (or rm -rf if it is a plain directory).
+  when:
+    - aur_chroot_root.stat.exists
+    - not aur_chroot_marker.stat.exists
 
 - name: Create the clean chroot
   # mkarchroot leaves .arch-chroot behind, which is what makes this idempotent.
@@ -84,17 +109,20 @@
         group: "{{ archwork_build_user }}"
         recurse: true
 
-    # runuser rather than become_user: dropping from root to an unprivileged
-    # account is where Ansible needs world-readable temporary files or acl, and
-    # a plain command avoids the whole question.
+    # makechrootpkg expects to be root and re-execs itself under sudo when it
+    # is not, so Ansible running as root is what it wants. -U names the
+    # unprivileged account it drops to for makepkg, which is the only part
+    # that must not be root.
     - name: Build paru in the clean chroot
       ansible.builtin.command:
         cmd: >-
-          runuser -u {{ archwork_build_user }} --
           makechrootpkg -c -r {{ archwork_chroot }}
+          -U {{ archwork_build_user }}
         chdir: "{{ archwork_build_home }}/paru"
       changed_when: true
 
+    # runuser, not sudo: root becomes another user without needing a rule, and
+    # makepkg refuses to run as root even to list what it would produce.
     - name: Find the package that build produced
       ansible.builtin.command:
         cmd: runuser -u {{ archwork_build_user }} -- makepkg --packagelist
