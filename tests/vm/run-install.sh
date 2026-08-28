@@ -174,7 +174,11 @@ check_prerequisites() {
 }
 
 prepare_work_dir() {
-	WORK_DIR="$(mktemp -d /tmp/archwork-vm.XXXXXX)"
+	# Respect TMPDIR. The work directory holds the disk image, which reached
+	# 4.4G once M2 started installing real packages. On a machine where /tmp is
+	# a tmpfs that image lives in RAM, so a disk-backed TMPDIR is the difference
+	# between a slow run and an out-of-memory one.
+	WORK_DIR="$(mktemp -d "${TMPDIR:-/tmp}/archwork-vm.XXXXXX")"
 	trap cleanup EXIT
 
 	log "Work directory $WORK_DIR"

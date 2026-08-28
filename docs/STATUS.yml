@@ -3,7 +3,7 @@
 # Validated by scripts/check-plan-status.py.
 ---
 schema: 1
-updated: 2026-08-27
+updated: 2026-08-28
 
 phase: M2
 
@@ -19,7 +19,7 @@ milestones:
       commit: f4bd326fa3311d5efa93522ab2dab2e0a92a3b1e
       date: 2026-08-27
   M2:
-    status: not-started
+    status: in-progress
   M3:
     status: not-started
   M4:
@@ -40,12 +40,12 @@ milestones:
 # A rebuild claim without a commit SHA is rejected by the checker.
 last_rebuild:
   status: passed
-  commit: f4bd326fa3311d5efa93522ab2dab2e0a92a3b1e
-  date: 2026-08-27
+  commit: 3dc1912be02c917d98fc501ade882e52a0bbe772
+  date: 2026-08-28
 
 next_actions:
-  - Build the M2 inventory, group_vars and package manifests
-  - Make ansible-lint and the idempotence check real, both are no-ops today
+  - Bootstrap paru through devtools so AUR packages reach the manifests
+  - Extend M2 past packages to services and configuration
   - Confirm the NAS runs btrfs, needed by D-009 before M8
 
 blockers: []
