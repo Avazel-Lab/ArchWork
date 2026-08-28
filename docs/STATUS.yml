@@ -42,11 +42,11 @@ milestones:
 # with the second run reporting zero changed tasks, and the recovery UKI.
 last_rebuild:
   status: passed
-  commit: 63fc4a501bf750bbb5367d6ee896bce17637f9ea
+  commit: 0269b506305d62fcc18422311249cd9c53afa976
   date: 2026-08-28
 
 next_actions:
-  - Bootstrap paru through devtools so AUR packages reach the manifests
   - Extend M2 past packages to services and configuration
+  - Run the laptop profile through the same path, which only desktop has taken
 
 blockers: []
