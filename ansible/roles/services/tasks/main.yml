@@ -62,3 +62,21 @@
         name: "{{ archwork_admin_user }}"
         groups: docker
         append: true
+
+# Same limit as the block above: the package arrives in this run, so under
+# --check there is no unit to enable.
+- name: Configure the private network
+  when: not ansible_check_mode
+  become: true
+  block:
+    - name: Run the Tailscale daemon
+      # D-002 and D-019. The daemon carries no traffic until something logs it
+      # in, and the auth key that would is one of the secrets D-006 has yet to
+      # bring, so a rebuilt machine arrives with tailscaled running and logged
+      # out. That is the honest state to arrive in: the coexistence the M3
+      # criteria test is between the daemon and NetworkManager, and it holds
+      # whether or not the machine is signed in.
+      ansible.builtin.systemd_service:
+        name: tailscaled.service
+        enabled: true
+        state: started
