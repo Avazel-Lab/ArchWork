@@ -13,6 +13,7 @@
     owner: root
     group: root
     mode: "0755"
+  become: true
 
 - name: Create the build user
   # A system account with a locked password and no authorized keys. The
@@ -26,6 +27,7 @@
     shell: /bin/bash
     password: "!"
     comment: ArchWork AUR chroot builds
+  become: true
 
 - name: Allow the build user to drive devtools
   ansible.builtin.copy:
@@ -39,21 +41,33 @@
     group: root
     mode: "0440"
     validate: visudo -cf %s
+  become: true
 
 - name: Create the clean chroot
   # mkarchroot leaves .arch-chroot behind, which is what makes this idempotent.
   ansible.builtin.command:
     cmd: mkarchroot {{ archwork_chroot }}/root base-devel
     creates: "{{ archwork_chroot }}/root/.arch-chroot"
+  become: true
 
 - name: Check whether the AUR helper is installed
+  # check_mode: false because command is skipped under --check, and the block
+  # below reads the result. Asking pacman a question changes nothing.
   ansible.builtin.command: pacman -Q paru
   register: aur_paru_installed
   changed_when: false
   failed_when: false
+  check_mode: false
+  become: true
 
 - name: Bootstrap the AUR helper
-  when: aur_paru_installed.rc != 0
+  # A package build cannot be dry-run, so --check reports this skipped rather
+  # than pretending. Without the second condition, --check runs the block far
+  # enough to reference a variable the skipped build never set.
+  when:
+    - aur_paru_installed.rc != 0
+    - not ansible_check_mode
+  become: true
   block:
     - name: Clone the paru package repository
       ansible.builtin.git:
@@ -101,3 +115,4 @@
   register: aur_paru_sync
   when: archwork_packages_aur | length > 0
   changed_when: "'there is nothing to do' not in aur_paru_sync.stdout | lower"
+  become: true
