@@ -1,0 +1,69 @@
+---
+# The graphical session: who greets you, and what the greeter starts.
+#
+# Both profiles get this. desktop-laptop-differences.md makes session entry
+# identical on the two machines, so nothing here reads the profile.
+
+# Every task here needs the greetd package, which the packages role installs
+# in this same run, so under --check none of it exists: no unit to enable, and
+# no /etc/greetd to write into. Reporting "would change" for a package that is
+# not there is not a useful dry run, so --check skips the role and says so.
+#
+# The third role to need this. It is a limit of dry-running a playbook that
+# installs what it then configures, not a problem with any one role.
+- name: Configure the graphical session
+  when: not ansible_check_mode
+  block:
+    - name: Configure the greeter
+      # D-004: greetd with tuigreet, and Hyprland launched from the greeter's
+      # session command rather than from a shell profile, per desktop-shell.md.
+      #
+      # vt = 1 is safe because the packaged greetd.service already declares
+      # Conflicts=getty@tty1.service, so the two never fight over the console.
+      ansible.builtin.copy:
+        dest: /etc/greetd/config.toml
+        content: |
+          # Managed by ArchWork. See ansible/roles/session (D-004).
+          [terminal]
+          vt = 1
+
+          [default_session]
+          command = "tuigreet --time --cmd Hyprland"
+          user = "greeter"
+        owner: root
+        group: root
+        mode: "0644"
+      become: true
+      notify: Restart the greeter
+
+    - name: Unlock the keyring from the login password
+      # D-012: gnome-keyring as the Secret Service, unlocked by PAM from the
+      # password typed at greetd, so there is no second prompt at first use. That
+      # second prompt is the whole reason D-004 chose greetd over autologin, so
+      # this file is what makes that choice worth its cost.
+      #
+      # The rest of the stack is the packaged greetd PAM configuration unchanged.
+      ansible.builtin.copy:
+        dest: /etc/pam.d/greetd
+        content: |
+          #%PAM-1.0
+          # Managed by ArchWork. See ansible/roles/session (D-004, D-012).
+
+          auth       required     pam_securetty.so
+          auth       requisite    pam_nologin.so
+          auth       include      system-local-login
+          auth       optional     pam_gnome_keyring.so
+          account    include      system-local-login
+          session    include      system-local-login
+          session    optional     pam_gnome_keyring.so auto_start
+        owner: root
+        group: root
+        mode: "0644"
+      become: true
+
+    - name: Run the greeter
+      ansible.builtin.systemd_service:
+        name: greetd.service
+        enabled: true
+        state: started
+      become: true

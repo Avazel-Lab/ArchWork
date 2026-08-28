@@ -1,0 +1,8 @@
+---
+- name: Restart the greeter
+  # Only when the configuration changed. Restarting greetd ends whatever
+  # session is on VT 1, so it is not something to do on every run.
+  ansible.builtin.systemd_service:
+    name: greetd.service
+    state: restarted
+  become: true

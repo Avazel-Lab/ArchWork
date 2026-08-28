@@ -40,15 +40,16 @@ milestones:
 # A rebuild claim without a commit SHA is rejected by the checker.
 # Clean install from the ISO, M1 assertions, the D-016 reconciliation twice
 # with the second run reporting zero changed tasks, and the recovery UKI.
-# Desktop profile on this commit. Both profiles passed on d16cf4c.
+# Desktop profile on this commit, greeter capture included. Both profiles
+# passed on d16cf4c.
 last_rebuild:
   status: passed
-  commit: 6ad019f1fbd77ced66436a5b5b18918756b49ece
+  commit: e0a049fa5800faba05d5b86d8bcb459229bbb991
   date: 2026-08-28
 
 next_actions:
   - Review M2 against its exit criteria; marking it complete is the owner's call
   - Answer D-020, three packages M3 needs that no document names
-  - Configure the greetd session and the PAM keyring unlock (D-004, D-012)
+  - Log in at the greeter with sendkey, then assert the session from inside
 
 blockers: []
