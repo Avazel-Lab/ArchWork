@@ -23,7 +23,10 @@ LOG = REPO / "docs" / "decisions" / "log.md"
 
 MAX_NEXT_ACTIONS = 3
 VALID_STATUS = {"not-started", "blocked", "in-progress", "complete"}
-VALID_REBUILD = {"never-run", "passed", "failed"}
+# "superseded" means the run passed, and then the path it exercised was
+# replaced. Deleting the record would erase a real event; calling it
+# "never-run" would be false.
+VALID_REBUILD = {"never-run", "passed", "failed", "superseded"}
 
 MILESTONE_HEADING = re.compile(r"^### (M\d+) ", re.MULTILINE)
 DECISION_HEADING = re.compile(r"^## (D-\d+) ", re.MULTILINE)
@@ -145,6 +148,7 @@ def check_rebuild(status: dict) -> None:
         return
     if state == "never-run":
         return
+    # A superseded record still has to say which run it was.
     if not rebuild.get("commit"):
         fail(f"last_rebuild claims {state!r} but records no commit SHA. Without a SHA it did not happen.")
     if not rebuild.get("date"):

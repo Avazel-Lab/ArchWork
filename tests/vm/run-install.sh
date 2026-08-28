@@ -342,45 +342,32 @@ phase_assert() {
 # Idempotence catches more real problems here than unit tests will, and the
 # only honest way to show it is to run the thing twice against a fresh machine.
 phase_reconcile() {
-	log "Phase 4: reconciling with Ansible, twice"
+	log "Phase 4: reconciling with Ansible on the guest, twice"
 
-	command -v ansible-playbook >/dev/null ||
-		die "ansible-playbook not found, needed by --reconcile"
+	# D-016: the machine configures itself. SSH here is the terminal driving a
+	# VM nobody can physically touch, not Ansible's transport. The playbook,
+	# the inventory and the connection all live on the guest, which is exactly
+	# what a real machine does.
+	#
+	# That also means this runs the committed inventory rather than one
+	# generated for the test. group_vars/all.yml sets ansible_connection to
+	# local, and the installer set the host name inventory/hosts.yml names.
+	scp "${SCP_OPTS[@]}" -q "$SCRIPT_DIR/reconcile.sh" gary@127.0.0.1:/tmp/reconcile.sh
+	ssh "${SSH_OPTS[@]}" gary@127.0.0.1 "chmod +x /tmp/reconcile.sh"
 
-	# The VM joins the group its profile names, so it picks up exactly the
-	# group_vars a real machine of that profile would.
-	cat >"$WORK_DIR/inventory.yml" <<-INVENTORY
-		---
-		all:
-		  children:
-		    $PROFILE:
-		      hosts:
-		        archwork-vm:
-		          ansible_host: 127.0.0.1
-		          ansible_port: $SSH_PORT
-		          ansible_user: gary
-		          ansible_ssh_private_key_file: $WORK_DIR/id_test
-		          ansible_ssh_common_args: >-
-		            -o StrictHostKeyChecking=no
-		            -o UserKnownHostsFile=/dev/null
-	INVENTORY
-
-	# M2 also asks that --check runs clean against a fresh machine. It runs
-	# first, while there is genuinely something for it to report, because a
-	# check run against an already-reconciled machine proves much less.
+	# M2 asks that --check runs clean against a fresh machine. It runs first,
+	# while there is genuinely something for it to report.
 	log "Reconciliation check run"
-	ansible-playbook --check \
-		-i "$WORK_DIR/inventory.yml" \
-		"$REPO_ROOT/ansible/site.yml" \
+	ssh "${SSH_OPTS[@]}" gary@127.0.0.1 \
+		/tmp/reconcile.sh check \
 		2>&1 | tee "$WORK_DIR/reconcile-check.log" ||
 		die "the --check run failed, see $WORK_DIR/reconcile-check.log"
 
 	local run_number
 	for run_number in 1 2; do
 		log "Reconciliation run $run_number of 2"
-		ansible-playbook \
-			-i "$WORK_DIR/inventory.yml" \
-			"$REPO_ROOT/ansible/site.yml" \
+		ssh "${SSH_OPTS[@]}" gary@127.0.0.1 \
+			/tmp/reconcile.sh run \
 			2>&1 | tee "$WORK_DIR/reconcile-$run_number.log" ||
 			die "reconciliation run $run_number failed, see $WORK_DIR/reconcile-$run_number.log"
 	done
@@ -394,7 +381,7 @@ phase_reconcile() {
 		die "the second reconciliation changed $changed task(s), so it is not idempotent. See $WORK_DIR/reconcile-2.log"
 	fi
 
-	printf '\nSecond run reported changed=0.\n'
+	printf '\nSecond run reported changed=0, with Ansible running on the guest.\n'
 }
 
 # plan.md M1 requires the recovery UKI to boot, not merely to exist. Assert it

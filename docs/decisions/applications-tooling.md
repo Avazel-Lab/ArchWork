@@ -33,6 +33,15 @@ review: 2027-02-27
 - Mermaid
 - xorriso
 
+## Configuration model
+
+Decided at D-016.
+
+- Ansible runs on the target machine with a local connection. Nothing in the build path requires a second machine.
+- `ansible_connection: local` lives in `group_vars/all.yml`, so the committed inventory works unchanged on hardware and in a test VM.
+- `ansible`, `python` and `age` are pacstrapped by the installer as well as listed in the shared manifest. The playbook cannot be what installs the tools it needs to run, and bootstrap needs `age` before any network exists to fetch it.
+- Driving Ansible from another machine over SSH is unsupported and untested. Nothing may come to depend on it.
+
 ## Secrets
 
 - `age` only (D-006). `git-crypt` is not used.

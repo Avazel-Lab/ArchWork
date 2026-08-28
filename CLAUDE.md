@@ -35,6 +35,8 @@ docs/             plan, status, decisions
 
 Do not invent top-level directories. Extend this list here first if the project genuinely needs another one.
 
+`bootstrap.sh` runs on the machine being built, never from another machine. **Nothing in the build path may require a second machine to be working.** A rebuild that needs the other workstation alive fails on the day it matters, and has no answer at all for the first machine. D-016 holds the reasoning, and this rule is easy to erode one convenient shortcut at a time.
+
 ## Profile model
 
 Two machine profiles share one platform:
