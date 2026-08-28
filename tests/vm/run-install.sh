@@ -140,10 +140,26 @@ parse_args() {
 	done
 }
 
+# One place that knows how to ask, so the readiness wait and the preflight
+# check cannot disagree about what "in use" means.
+port_in_use() {
+	ss -ltn "sport = :$1" 2>/dev/null | grep -q LISTEN
+}
+
 check_prerequisites() {
 	command -v qemu-system-x86_64 >/dev/null || die "qemu-system-x86_64 not found"
 	command -v bsdtar >/dev/null || die "bsdtar not found, needed to read the ISO"
 	command -v ssh >/dev/null || die "ssh not found"
+	command -v ss >/dev/null || die "ss not found, needed to check the ports are free"
+
+	# Both ports are fixed, so a run that died holding one makes the next run
+	# fail somewhere much less obvious. Say so here instead.
+	local port
+	for port in "$HTTP_PORT" "$SSH_PORT"; do
+		if port_in_use "$port"; then
+			die "port $port is already in use, probably by a run that did not clean up. Find it with: ss -ltnp 'sport = :$port'"
+		fi
+	done
 
 	[ -n "$ISO" ] || die "--iso is required and has no default"
 	[ -r "$ISO" ] || die "cannot read ISO '$ISO'"
@@ -258,10 +274,25 @@ extract_iso_boot_files() {
 
 start_http_server() {
 	log "Serving $WORK_DIR on port $HTTP_PORT"
-	(cd "$WORK_DIR" && python3 -m http.server "$HTTP_PORT" --bind 127.0.0.1 >"$WORK_DIR/http.log" 2>&1) &
+
+	# No subshell. --directory does what the cd did, and $! is then python's
+	# own pid rather than a subshell's. With the subshell, cleanup killed the
+	# wrapper and left python holding the port, so the next run died with
+	# nothing more useful than "the HTTP server did not start".
+	python3 -m http.server "$HTTP_PORT" --bind 127.0.0.1 \
+		--directory "$WORK_DIR" >"$WORK_DIR/http.log" 2>&1 &
 	HTTP_PID=$!
-	sleep 1
-	kill -0 "$HTTP_PID" 2>/dev/null || die "the HTTP server did not start, see $WORK_DIR/http.log"
+
+	# Wait for the port to answer, not for the process to exist. A process
+	# that is about to fail to bind is still alive a moment after starting.
+	local waited=0
+	until port_in_use "$HTTP_PORT"; do
+		waited=$((waited + 1))
+		if [ "$waited" -gt 20 ]; then
+			die "the HTTP server did not come up, see $WORK_DIR/http.log"
+		fi
+		sleep 0.5
+	done
 }
 
 qemu_base_args() {
