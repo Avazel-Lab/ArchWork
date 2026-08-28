@@ -53,6 +53,7 @@ Decided at D-013.
 ## Boot architecture
 
 - Use systemd-based boot tooling rather than GRUB. GRUB was reconsidered and rejected at D-011.
+- ArchWork owns a whole disk and the ESP on it. It does not share an ESP with another operating system, and other installs are reached through the firmware boot menu until loader entries are added deliberately (D-017).
 - Use Unified Kernel Images (UKIs).
 - Maintain a recovery UKI.
 - Document a rescue/recovery workflow, and ship a rollback script rather than a manual procedure (D-011).

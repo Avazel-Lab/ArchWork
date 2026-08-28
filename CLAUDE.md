@@ -28,7 +28,7 @@ Where code and a decision document disagree, change one of them on purpose and s
 bootstrap.sh      entry point for a fresh installation
 ansible/          roles, inventory, package manifests
 dotfiles/         user configuration
-scripts/          installer, update, snapshot, rollback, health check, repository checks
+scripts/          installer, installation media, update, snapshot, rollback, health check, repository checks
 tests/            bats unit tests and VM test harness
 docs/             plan, status, decisions
 ```
