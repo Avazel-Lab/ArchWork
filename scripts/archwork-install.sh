@@ -51,7 +51,7 @@ Required:
   --profile desktop|laptop        machine profile (D-010 inventory groups)
 
 Options:
-  --hostname NAME                 defaults to hmlxdesktop01 or hmlxlaptop01
+  --hostname NAME                 defaults to hmlxdesktop02 or hmlxlaptop01
   --user NAME                     administrator account, default 'gary'
   --dry-run                       print every command, write nothing
   --i-know-this-wipes-my-disk     permit running outside a virtual machine
@@ -174,7 +174,14 @@ validate_args() {
 	esac
 
 	if [ -z "$HOSTNAME_VALUE" ]; then
-		HOSTNAME_VALUE="hmlx${PROFILE}01"
+		# Not hmlx${PROFILE}01. The desktop hardware already carries
+		# hmlxdesktop01 on its Kubuntu development install, and the two dual
+		# boot on the same box, so the Arch side takes the next number in the
+		# estate convention (D-010).
+		case "$PROFILE" in
+		desktop) HOSTNAME_VALUE="hmlxdesktop02" ;;
+		laptop) HOSTNAME_VALUE="hmlxlaptop01" ;;
+		esac
 	fi
 
 	git -C "$REPO_ROOT" rev-parse --git-dir >/dev/null 2>&1 ||

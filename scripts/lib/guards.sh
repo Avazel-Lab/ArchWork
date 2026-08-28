@@ -127,6 +127,40 @@ guard_virtual_or_acknowledged() {
 	return 1
 }
 
+# A removable device, or an explicit acknowledgement. Nothing else.
+#
+# The installation medium is a USB stick. An internal disk reaching this guard
+# is a mistyped device path, and on a machine that dual boots it is a mistyped
+# path onto a disk holding another operating system.
+guard_is_removable_or_acknowledged() {
+	local device="${1:-}"
+	local acknowledged="${2:-false}"
+	local name removable
+
+	name="${device#"$ARCHWORK_DEV_PREFIX"}"
+	name="${name//\//!}"
+	removable="$ARCHWORK_SYS_BLOCK/$name/removable"
+
+	if [ ! -r "$removable" ]; then
+		guard_err "cannot read $removable, so cannot prove '$device' is a removable stick"
+		return 1
+	fi
+
+	if [ "$(cat "$removable")" = "1" ]; then
+		printf 'removable device (%s)\n' "$device"
+		return 0
+	fi
+
+	if [ "$acknowledged" = "true" ]; then
+		printf 'not a removable device, but --i-know-this-wipes-my-disk was given\n'
+		return 0
+	fi
+
+	# Some USB enclosures report 0 here, which is what the override is for.
+	guard_err "'$device' reports removable=0. A USB stick reports 1, an internal disk reports 0. Pass --i-know-this-wipes-my-disk if you mean it."
+	return 1
+}
+
 # Show the operator what they are about to destroy, then make them type it back.
 # Reading a device path back is deliberate: y/n is too easy to answer wrongly.
 guard_confirm_target() {

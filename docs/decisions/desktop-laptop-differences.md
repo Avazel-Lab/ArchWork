@@ -26,7 +26,7 @@ Track these differences explicitly in code and documentation rather than allowin
 | Backup scope | `@home` and `@ai_models` to the NAS (D-009) | `@home` only, since no models are deployed |
 | Networking | NetworkManager (D-002) | NetworkManager (D-002). Roaming and captive portals are the reason both profiles use it |
 | Session entry | greetd with tuigreet (D-004) | greetd with tuigreet (D-004) |
-| Host name | `hmlxdesktop01` (D-010) | `hmlxlaptop01` (D-010) |
+| Host name | `hmlxdesktop02` (D-010) | `hmlxlaptop01` (D-010) |
 | Inventory group | `desktop` | `laptop` |
 | Swap | zram only (D-013) | zram plus a RAM-sized swapfile on `@swap` (D-013) |
 | `@swap` Btrfs subvolume | Absent | Present, `NODATACOW`, compression off, outside the rollback boundary |
@@ -35,7 +35,9 @@ Track these differences explicitly in code and documentation rather than allowin
 
 ## Implementation principle
 
-Host names follow the existing estate convention (`hmlxdesktop01`, `hmlxlaptop01`). Inventory group names are `desktop` and `laptop` (D-010). Groups express the profile, host names identify the box.
+Host names follow the existing estate convention (`hmlxdesktop02`, `hmlxlaptop01`). Inventory group names are `desktop` and `laptop` (D-010). Groups express the profile, host names identify the box.
+
+The desktop is `hmlxdesktop02` rather than `hmlxdesktop01` because the hardware already carries `hmlxdesktop01` as its Kubuntu development install, and the two dual boot on the same box. D-010 already covers this: a rebuild tested alongside the machine it replaces takes the next number.
 
 Prefer explicit inventory/profile data such as:
 
