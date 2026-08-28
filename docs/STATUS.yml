@@ -40,13 +40,14 @@ milestones:
 # A rebuild claim without a commit SHA is rejected by the checker.
 # Clean install from the ISO, M1 assertions, the D-016 reconciliation twice
 # with the second run reporting zero changed tasks, and the recovery UKI.
+# Both profiles, separately, on this commit.
 last_rebuild:
   status: passed
-  commit: 79c39c7a88caad2ab375dd3065dde988643f8a8c
+  commit: d16cf4c6cdd04a6814e7e04c26844bf1515bd139
   date: 2026-08-28
 
 next_actions:
-  - Run the laptop profile through the same path, which only desktop has taken
   - Review M2 against its exit criteria; marking it complete is the owner's call
+  - Start M3, the minimal Hyprland desktop
 
 blockers: []
