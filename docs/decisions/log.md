@@ -475,3 +475,31 @@ Recommendation: leave this open until the Kvantum theme itself is chosen, becaus
 Recommendation: `ttf-dejavu` as the general fallback, `noto-fonts` and `noto-fonts-emoji` for coverage, and one monospace face for Kitty and the bar. All are in `extra`. Worth deciding before M3's first screenshot rather than after.
 
 None of these block the session manifest, which is complete without them. They block M3 looking finished.
+
+## D-021 How the graphical session gets tested
+
+**Status:** accepted
+**Date:** 2026-08-28
+**Affects:** `plan.md`, M3, M6
+
+Log in at the real greeter by typing at the framebuffer from outside the guest, assert everything inside the session over SSH, and judge appearance by looking at saved captures rather than by asserting on pixels.
+
+M3's criteria are about what a person sees: log in, open a terminal, launch something, lock, unlock, screenshot, open a file picker from GTK and from Qt. The harness drove a serial console, and none of that is reachable over one.
+
+One criterion decides the shape. The greetd password must unlock the keyring through PAM with no second prompt (D-004, D-012), and proving that needs a real password going through the real PAM stack at the real greeter. Autologin, a unit that starts Hyprland, or `machinectl shell` all bypass the password, so none of them can prove it, and D-004 chose greetd over autologin for exactly this. greetd runs on a VT, so there has to be a display and a way to type at it.
+
+So the harness gains a virtio VGA device and a QEMU monitor socket. `sendkey` types at the greeter and `screendump` captures the framebuffer, both from outside the guest, which means a machine that is quietly broken cannot report otherwise. Everything after login is asserted from inside over SSH with `hyprctl`, `grim`, `gdbus` and `secret-tool`, which is cheaper and more precise than reading pixels.
+
+Rejected alternatives:
+
+- **Assert only from inside the session.** Much less harness work, and it cannot start a session without bypassing greetd, so the keyring criterion becomes unprovable. That criterion is the reason D-004 accepted a second password prompt at every boot.
+- **Guest-side input injection** with `wtype` or `ydotool`. Its distinctive ability, simulated typing, is what `sendkey` does anyway, except `sendkey` works before a session exists and needs nothing installed on the machine under test.
+- **Text recognition on the captures**, so assertions could name what is on screen. Strongest evidence and the most machinery, with a new failure mode when it misreads. Revisit if looking at images by hand stops being enough.
+- **Run the criteria by hand each rebuild.** The plan's wording allows it. It stops being true the first time nobody repeats it.
+
+Consequences:
+
+- The pixel check asserts only that something is drawn, as a count of pixels differing from the background. It does not read the screen and claims nothing about themes, fonts or layout. A check that claimed to verify theming and did not would be worse than none, and this repository has found several of those.
+- Appearance is therefore judged by a person looking at the captures a run saves, recorded against a commit like any other evidence. That is a deliberate manual step, and the only one in the test ladder.
+- The count is absolute rather than a ratio. The first version asked that the dominant colour cover under 99.5% of the screen; a real tuigreet measured 99.450% and the next run 99.453%, so the run-to-run variance was larger than the margin. `tests/unit/screendump.bats` holds those measurements.
+- The kernel command line names both `tty0` and `ttyS0`, because a machine with a display would otherwise leave the serial console silent and the LUKS prompt unanswerable.
