@@ -1,0 +1,30 @@
+---
+# Service state the decision documents call for. Packages are the packages
+# role's job; this role decides what runs.
+#
+# Nothing here asks which machine it is running on. D-002 puts the same
+# networking stack on both profiles deliberately.
+
+- name: Mask the networking daemons NetworkManager replaces
+  # D-002: "Mask systemd-networkd and systemd-resolved conflicts explicitly
+  # rather than leaving both installed and racing." Neither is enabled on a
+  # fresh Arch install, so this is a latch rather than a repair: it stops
+  # anything later turning one on underneath NetworkManager.
+  ansible.builtin.systemd_service:
+    name: "{{ item }}"
+    masked: true
+  loop:
+    - systemd-networkd.service
+    - systemd-networkd.socket
+    - systemd-resolved.service
+  become: true
+
+- name: Run NetworkManager
+  # The installer enables this, so on a machine it built the task changes
+  # nothing. It is here because reconciliation owns service state, and a
+  # machine that lost it should get it back without a reinstall.
+  ansible.builtin.systemd_service:
+    name: NetworkManager.service
+    enabled: true
+    state: started
+  become: true

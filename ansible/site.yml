@@ -10,3 +10,4 @@
   roles:
     - packages
     - aur
+    - services
