@@ -23,8 +23,11 @@ review: 2027-02-27
 - curl
 - Docker
   - Required for managing existing Docker workloads, including the VPS.
+  - Starts on demand through `docker.socket`, not at boot (D-019). Nothing may depend on a container running before something asks for it.
+  - The administrator account is in the `docker` group, which reaches a root daemon without a password prompt (D-019).
 - Podman
   - Install on the desktop as well so it can be learned and used alongside Docker.
+  - No system daemon and no group. Rootless Podman needs neither (D-019).
 - kubectl
 - OpenSSH client
 - ShellCheck

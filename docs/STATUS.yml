@@ -46,7 +46,7 @@ last_rebuild:
   date: 2026-08-28
 
 next_actions:
-  - Answer D-019, which holds the rest of M2 service state
   - Run the laptop profile through the same path, which only desktop has taken
+  - Review M2 against its exit criteria; marking it complete is the owner's call
 
 blockers: []

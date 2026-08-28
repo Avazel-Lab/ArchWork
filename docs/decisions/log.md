@@ -427,11 +427,13 @@ Consequences:
 
 ## D-019 Which daemons run, and where Tailscale belongs
 
-**Status:** open
+**Status:** accepted
 **Date:** 2026-08-28
 **Affects:** `applications-tooling.md`, M2, M3
 
-Raised while extending M2 from packages to service state. Two things the documents do not answer, and neither should be inferred from a package list.
+Docker starts on demand through `docker.socket`, not at boot. The administrator account joins the `docker` group. Podman gets no system daemon. Tailscale stays out of the M2 manifests and arrives at M3.
+
+Raised while extending M2 from packages to service state. Two things the documents did not answer, and neither should be inferred from a package list.
 
 **Do the container runtimes run at boot?** `applications-tooling.md` lists Docker, "required for managing existing Docker workloads, including the VPS", and Podman "so it can be learned and used alongside Docker". It says nothing about whether either daemon starts at boot, and the answer carries a security consequence rather than being a convenience: reaching a running Docker daemon means membership of the `docker` group, and that group is root without a password prompt.
 
@@ -441,6 +443,13 @@ Recommendation: enable `docker.socket` rather than `docker.service`, so the daem
 
 Recommendation: leave it to M3, and treat its absence from the M2 manifests as deliberate rather than an oversight, because M3 is where the exit criteria test it and installing a VPN daemon a milestone early proves nothing.
 
-One thing to carry into M3 either way: D-002 has this repository mask `systemd-resolved`, and Tailscale's split DNS works best through it. That may be a real tension rather than a theoretical one, and M3 tests coexistence rather than assuming it.
+Both recommendations accepted by the repository owner on 2026-08-28, with the `docker` group added.
 
-This blocks nothing that is currently in progress. M2's service state covers what D-002 asked for, and the rest waits here rather than being guessed at.
+Consequences:
+
+- `docker.socket` is enabled, `docker.service` is not. Nothing on the workstation may come to depend on a container being up before something asks for it, which rules out restart policies as a way of running anything that matters. If that becomes wanted, this decision is the thing to reopen.
+- The administrator account joins the `docker` group, so it reaches the daemon without a password prompt, and the daemon is root. Accepted knowingly for a single-user workstation whose owner already holds sudo: it changes where the prompt is, not the ceiling. It does mean anything running as that account reaches root without asking, which is a real widening and the reason it is written down rather than assumed.
+- Podman gets no system daemon and no group. Rootless Podman needs neither, and that is most of why `applications-tooling.md` wants it learned alongside Docker.
+- Tailscale enters at M3, in that milestone's manifests, tested by that milestone's exit criteria.
+
+One thing to carry into M3: D-002 has this repository mask `systemd-resolved`, and Tailscale's split DNS works best through it. That may be a real tension rather than a theoretical one, and M3 tests coexistence rather than assuming it.
