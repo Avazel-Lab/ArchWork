@@ -7,6 +7,17 @@ CI does not run any of this. GitHub Actions has no nested virtualisation, and a
 job that skips itself and reports green is worse than no job. See
 `docs/plan.md`.
 
+## Work directory and memory
+
+The harness writes the disk image into `${TMPDIR:-/tmp}`. With the M2 package
+set that image reaches roughly 4.4G. Where `/tmp` is a tmpfs, as it is on
+Ubuntu, that sits in RAM alongside the guest's own memory. Set `TMPDIR` to
+somewhere disk-backed on a machine with less RAM to spare:
+
+```bash
+TMPDIR=~/.cache/archwork make vm-idempotence ISO=/path/to/archlinux.iso
+```
+
 ## What you need
 
 - `qemu-system-x86_64` and `/dev/kvm`

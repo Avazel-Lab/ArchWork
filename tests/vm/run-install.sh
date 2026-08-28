@@ -25,6 +25,7 @@ MEMORY="4096"
 CPUS="4"
 REPEAT=1
 KEEP=false
+RECONCILE=false
 WORK_DIR=""
 HTTP_PORT="8000"
 # Long enough for a slow mirror, short enough that a wedged install fails the
@@ -59,6 +60,8 @@ Options:
   --memory MB           default 4096
   --cpus N              default 4
   --keep                keep the work directory for inspection
+  --reconcile           run the M2 Ansible reconciliation twice and require
+                        the second run to change nothing
   -h, --help            this text
 
 Needs qemu-system-x86_64, an OVMF firmware image and nested virtualisation.
@@ -122,6 +125,10 @@ parse_args() {
 			KEEP=true
 			shift
 			;;
+		--reconcile)
+			RECONCILE=true
+			shift
+			;;
 		-h | --help)
 			usage
 			exit 0
@@ -167,7 +174,11 @@ check_prerequisites() {
 }
 
 prepare_work_dir() {
-	WORK_DIR="$(mktemp -d /tmp/archwork-vm.XXXXXX)"
+	# Respect TMPDIR. The work directory holds the disk image, which reached
+	# 4.4G once M2 started installing real packages. On a machine where /tmp is
+	# a tmpfs that image lives in RAM, so a disk-backed TMPDIR is the difference
+	# between a slow run and an out-of-memory one.
+	WORK_DIR="$(mktemp -d "${TMPDIR:-/tmp}/archwork-vm.XXXXXX")"
 	trap cleanup EXIT
 
 	log "Work directory $WORK_DIR"
@@ -327,10 +338,69 @@ phase_assert() {
 		'chmod +x /tmp/checks/assert-m1.sh && sudo /tmp/checks/assert-m1.sh "$(cat /tmp/checks/profile)"' 
 }
 
+# M2 asks for a real run followed by a second run reporting zero changed tasks.
+# Idempotence catches more real problems here than unit tests will, and the
+# only honest way to show it is to run the thing twice against a fresh machine.
+phase_reconcile() {
+	log "Phase 4: reconciling with Ansible, twice"
+
+	command -v ansible-playbook >/dev/null ||
+		die "ansible-playbook not found, needed by --reconcile"
+
+	# The VM joins the group its profile names, so it picks up exactly the
+	# group_vars a real machine of that profile would.
+	cat >"$WORK_DIR/inventory.yml" <<-INVENTORY
+		---
+		all:
+		  children:
+		    $PROFILE:
+		      hosts:
+		        archwork-vm:
+		          ansible_host: 127.0.0.1
+		          ansible_port: $SSH_PORT
+		          ansible_user: gary
+		          ansible_ssh_private_key_file: $WORK_DIR/id_test
+		          ansible_ssh_common_args: >-
+		            -o StrictHostKeyChecking=no
+		            -o UserKnownHostsFile=/dev/null
+	INVENTORY
+
+	# M2 also asks that --check runs clean against a fresh machine. It runs
+	# first, while there is genuinely something for it to report, because a
+	# check run against an already-reconciled machine proves much less.
+	log "Reconciliation check run"
+	ansible-playbook --check \
+		-i "$WORK_DIR/inventory.yml" \
+		"$REPO_ROOT/ansible/site.yml" \
+		2>&1 | tee "$WORK_DIR/reconcile-check.log" ||
+		die "the --check run failed, see $WORK_DIR/reconcile-check.log"
+
+	local run_number
+	for run_number in 1 2; do
+		log "Reconciliation run $run_number of 2"
+		ansible-playbook \
+			-i "$WORK_DIR/inventory.yml" \
+			"$REPO_ROOT/ansible/site.yml" \
+			2>&1 | tee "$WORK_DIR/reconcile-$run_number.log" ||
+			die "reconciliation run $run_number failed, see $WORK_DIR/reconcile-$run_number.log"
+	done
+
+	# A second run that changes anything means a task is not idempotent.
+	local changed
+	changed="$(sed -n 's/.*changed=\([0-9]\+\).*/\1/p' "$WORK_DIR/reconcile-2.log" | tail -1)"
+	[ -n "$changed" ] || die "could not read changed= from the second run recap"
+
+	if [ "$changed" -ne 0 ]; then
+		die "the second reconciliation changed $changed task(s), so it is not idempotent. See $WORK_DIR/reconcile-2.log"
+	fi
+
+	printf '\nSecond run reported changed=0.\n'
+}
+
 # plan.md M1 requires the recovery UKI to boot, not merely to exist. Assert it
 # by booting it: anything less proves the file is present and nothing else.
 phase_recovery() {
-	log "Phase 4: booting the recovery UKI"
+	log "Phase 5: booting the recovery UKI"
 
 	# bootctl writes LoaderEntryOneShot into the UEFI variable store, which
 	# lives in OVMF_VARS.fd and survives the restart below.
@@ -384,6 +454,9 @@ main() {
 		phase_install
 		phase_boot
 		phase_assert
+		if [ "$RECONCILE" = true ]; then
+			phase_reconcile
+		fi
 		phase_recovery
 
 		kill_if_running "$QEMU_PID"

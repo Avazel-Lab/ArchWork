@@ -49,9 +49,13 @@ vm-rebuild:
 	@test -n "$(ISO)" || { echo "vm-rebuild needs ISO=/path/to/archlinux.iso"; exit 1; }
 	tests/vm/run-install.sh --iso "$(ISO)" $(VM_ARGS)
 
-# L2, L4 and L5 arrive with M2 and M5. CI cannot run these, and no CI job
-# should pretend to.
-vm-idempotence vm-health vm-recovery:
+## vm-idempotence: L2, install then reconcile twice. Pass ISO=/path/to.iso
+vm-idempotence:
+	@test -n "$(ISO)" || { echo "vm-idempotence needs ISO=/path/to/archlinux.iso"; exit 1; }
+	tests/vm/run-install.sh --iso "$(ISO)" --reconcile $(VM_ARGS)
+
+# L4 and L5 arrive with M5. CI cannot run these, and no CI job should pretend to.
+vm-health vm-recovery:
 	@echo "$@ is not implemented yet. See docs/plan.md for which milestone delivers it."
 	@exit 1
 
