@@ -21,9 +21,10 @@ from __future__ import annotations
 import argparse
 import collections
 import os
-import socket
 import sys
 import time
+
+from qemu_monitor import monitor_command
 
 # How many sampled pixels must differ from the background before the screen
 # counts as having something on it.
@@ -37,33 +38,6 @@ import time
 # 256000 sampled, against exactly 0 for a blank screen, which is a gap worth
 # putting a threshold in the middle of.
 MIN_DRAWN_PIXELS = 200
-
-
-def monitor_command(path: str, command: str, timeout: float = 10.0) -> str:
-    """Send one command to a QEMU HMP monitor socket and return what it said."""
-    with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as sock:
-        sock.settimeout(timeout)
-        sock.connect(path)
-        # The monitor greets first. Read whatever is waiting, then send.
-        time.sleep(0.2)
-        try:
-            sock.recv(65536)
-        except socket.timeout:
-            pass
-        sock.sendall(command.encode() + b"\n")
-        time.sleep(0.5)
-        out = b""
-        try:
-            while True:
-                chunk = sock.recv(65536)
-                if not chunk:
-                    break
-                out += chunk
-                if b"(qemu)" in out:
-                    break
-        except socket.timeout:
-            pass
-        return out.decode(errors="replace")
 
 
 def read_ppm(path: str) -> tuple[int, int, bytes]:

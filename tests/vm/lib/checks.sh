@@ -114,3 +114,144 @@ repo_origin_is_upstream() {
 command_installed() {
 	command -v "$1" >/dev/null 2>&1
 }
+
+# --- The graphical session (M3, D-021) --------------------------------------
+#
+# These assertions arrive over SSH, which is outside the graphical session and
+# inherits nothing from it: no runtime directory, no bus address, no Hyprland
+# instance. Each has to be handed in, so the helpers below build that
+# environment rather than every check repeating it.
+
+session_runtime_dir() {
+	printf '/run/user/%s' "$(id -u "$1")"
+}
+
+# Hyprland names its socket directory after the instance signature. Newest
+# first, so a directory left by an earlier crashed instance does not win.
+hypr_signature() {
+	local dir
+	dir="$(session_runtime_dir "$1")/hypr"
+	[ -d "$dir" ] || return 1
+
+	find "$dir" -mindepth 1 -maxdepth 1 -printf '%T@ %f\n' 2>/dev/null |
+		sort -rn | head -1 | cut -d' ' -f2- | grep .
+}
+
+wayland_display() {
+	local runtime socket
+	runtime="$(session_runtime_dir "$1")"
+	for socket in "$runtime"/wayland-*; do
+		case "$socket" in
+		*.lock) continue ;;
+		esac
+		[ -S "$socket" ] || continue
+		basename "$socket"
+		return 0
+	done
+	return 1
+}
+
+as_user() {
+	local user="$1" runtime
+	shift
+	runtime="$(session_runtime_dir "$user")"
+
+	runuser -u "$user" -- env \
+		XDG_RUNTIME_DIR="$runtime" \
+		DBUS_SESSION_BUS_ADDRESS="unix:path=$runtime/bus" \
+		"$@"
+}
+
+# For anything that has to talk to the compositor: hyprctl finds its instance
+# through the signature, and Wayland clients through the display name.
+as_user_in_session() {
+	local user="$1" signature display
+	shift
+	signature="$(hypr_signature "$user")" || return 1
+	display="$(wayland_display "$user")" || return 1
+
+	as_user "$user" env \
+		HYPRLAND_INSTANCE_SIGNATURE="$signature" \
+		WAYLAND_DISPLAY="$display" \
+		"$@"
+}
+
+user_process_running() {
+	pgrep -u "$1" -x "$2" >/dev/null 2>&1
+}
+
+# A session logind opened, rather than a process that happens to be running.
+# Only the former means a password went through PAM.
+graphical_session_open() {
+	local user="$1" id
+	while read -r id; do
+		[ -n "$id" ] || continue
+		[ "$(loginctl show-session "$id" --property=Name --value)" = "$user" ] || continue
+		[ "$(loginctl show-session "$id" --property=Type --value)" = "wayland" ] || continue
+		[ "$(loginctl show-session "$id" --property=Active --value)" = "yes" ] || continue
+		return 0
+	done < <(loginctl list-sessions --no-legend | awk '{print $1}')
+	return 1
+}
+
+session_on_seat() {
+	local user="$1" seat="$2" id
+	while read -r id; do
+		[ -n "$id" ] || continue
+		[ "$(loginctl show-session "$id" --property=Name --value)" = "$user" ] || continue
+		[ "$(loginctl show-session "$id" --property=Seat --value)" = "$seat" ] || continue
+		return 0
+	done < <(loginctl list-sessions --no-legend | awk '{print $1}')
+	return 1
+}
+
+compositor_answers() {
+	as_user_in_session "$1" hyprctl version >/dev/null
+}
+
+wayland_socket_present() {
+	wayland_display "$1" >/dev/null
+}
+
+secret_service_present() {
+	as_user "$1" timeout 15 gdbus call --session \
+		--dest org.freedesktop.DBus \
+		--object-path /org/freedesktop/DBus \
+		--method org.freedesktop.DBus.GetNameOwner \
+		org.freedesktop.secrets >/dev/null 2>&1
+}
+
+# D-012: the password typed at greetd unlocked the keyring through PAM. A
+# keyring that exists but is locked would prompt at first use, which is the
+# second prompt D-004 accepted a login password in order to avoid, so Locked
+# being false is the entire criterion.
+keyring_unlocked() {
+	local reply
+	reply="$(as_user "$1" timeout 15 gdbus call --session \
+		--dest org.freedesktop.secrets \
+		--object-path /org/freedesktop/secrets/collection/login \
+		--method org.freedesktop.DBus.Properties.Get \
+		org.freedesktop.Secret.Collection Locked 2>/dev/null)" || return 1
+
+	case "$reply" in
+	*false*) return 0 ;;
+	*) return 1 ;;
+	esac
+}
+
+# Weaker than the M3 criterion, which asks for a file picker from a GTK and a
+# Qt application. This says the portal is reachable and activates, which is
+# what has to be true before any picker can open.
+portal_answers() {
+	as_user "$1" timeout 20 gdbus call --session \
+		--dest org.freedesktop.portal.Desktop \
+		--object-path /org/freedesktop/portal/desktop \
+		--method org.freedesktop.DBus.Peer.Ping >/dev/null 2>&1
+}
+
+screenshot_works() {
+	local target="/tmp/archwork-m3-screenshot.png"
+	rm -f "$target"
+	as_user_in_session "$1" grim "$target" >/dev/null 2>&1 || return 1
+	[ -s "$target" ]
+}

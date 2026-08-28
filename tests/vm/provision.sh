@@ -62,8 +62,10 @@ git -C /tmp/archwork remote set-url origin "$(cat /tmp/repo-url)"
 
 log "Fetching the test credentials"
 curl -fsS "$BASE/passphrase" -o /tmp/passphrase
+curl -fsS "$BASE/login-password" -o /tmp/login-password
 curl -fsS "$BASE/id_test.pub" -o /tmp/id_test.pub
-chmod 600 /tmp/passphrase
+chmod 600 /tmp/passphrase /tmp/login-password
+LOGIN_USER="$(curl -fsS "$BASE/login-user")"
 
 PROFILE="$(curl -fsS "$BASE/profile")"
 DISK="$(curl -fsS "$BASE/disk")"
@@ -89,6 +91,15 @@ printf '%s\n' "$DISK" | /tmp/archwork/scripts/archwork-install.sh \
 # The installer leaves the account without a password. The test harness reaches
 # the machine over SSH with a key, so lock the password rather than setting one.
 arch-chroot /mnt passwd --lock root
+
+# The greeter, though, has to have a password to accept (D-021). The installer
+# deliberately sets none and tells the operator to, which is right for a real
+# machine and impossible for an unattended run. So the harness sets the test
+# password here, where every other test-only credential already lives, rather
+# than teaching the installer a flag that could put a known password on a real
+# installation.
+log "Setting the test login password for $LOGIN_USER"
+printf '%s:%s\n' "$LOGIN_USER" "$(cat /tmp/login-password)" | arch-chroot /mnt chpasswd
 
 log "Install finished, powering off"
 sync

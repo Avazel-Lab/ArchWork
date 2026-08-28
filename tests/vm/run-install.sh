@@ -34,6 +34,12 @@ INSTALL_TIMEOUT="1800"
 SSH_PORT="2222"
 GUEST_DISK="/dev/vda"
 PASSPHRASE="archwork-test-passphrase"
+# What gets typed at the greeter (D-021). Separate from the LUKS passphrase so
+# that a run cannot pass by conflating the two, and restricted to characters
+# that sendkey.py can type under both the uk and us keymaps.
+LOGIN_PASSWORD="archwork-test-login"
+LOGIN_USER="gary"
+CAPTURE_DIR=""
 
 HTTP_PID=""
 QEMU_PID=""
@@ -60,6 +66,8 @@ Options:
   --memory MB           default 4096
   --cpus N              default 4
   --keep                keep the work directory for inspection
+  --captures DIR        copy the screen captures here, since D-021 has a
+                        person judge appearance by looking at them
   --reconcile           run the M2 Ansible reconciliation twice and require
                         the second run to change nothing
   -h, --help            this text
@@ -87,6 +95,7 @@ kill_if_running() {
 cleanup() {
 	kill_if_running "$QEMU_PID"
 	kill_if_running "$HTTP_PID"
+	save_captures
 	if [ "$KEEP" = false ] && [ -n "$WORK_DIR" ] && [ -d "$WORK_DIR" ]; then
 		rm -rf "$WORK_DIR"
 	elif [ -n "$WORK_DIR" ]; then
@@ -124,6 +133,10 @@ parse_args() {
 		--keep)
 			KEEP=true
 			shift
+			;;
+		--captures)
+			CAPTURE_DIR="${2:-}"
+			shift 2
 			;;
 		--reconcile)
 			RECONCILE=true
@@ -201,6 +214,8 @@ prepare_work_dir() {
 
 	# The provisioner fetches these over HTTP from the host.
 	printf '%s' "$PASSPHRASE" >"$WORK_DIR/passphrase"
+	printf '%s' "$LOGIN_USER" >"$WORK_DIR/login-user"
+	printf '%s' "$LOGIN_PASSWORD" >"$WORK_DIR/login-password"
 	printf '%s' "$PROFILE" >"$WORK_DIR/profile"
 	printf '%s' "$GUEST_DISK" >"$WORK_DIR/disk"
 
@@ -383,6 +398,78 @@ phase_greeter() {
 		die "no greeter appeared on the display. The last capture, if any, is at $WORK_DIR/greeter.ppm"
 }
 
+# D-021: log in by typing at the greeter, because a session started any other
+# way skips the PAM stack that the keyring criterion is about. Nothing inside
+# the guest takes part: the keys go onto the emulated keyboard from outside.
+phase_session() {
+	log "Phase 7: logging in at the greeter and asserting the session"
+
+	# tuigreet takes the user name, then the password. The pause matters: the
+	# password field does not exist until the name is submitted, and keys sent
+	# before it does are dropped rather than queued.
+	python3 "$SCRIPT_DIR/sendkey.py" \
+		--monitor "$WORK_DIR/monitor.sock" \
+		--text "$LOGIN_USER" --enter ||
+		die "could not type the user name at the greeter"
+	sleep 3
+	python3 "$SCRIPT_DIR/sendkey.py" \
+		--monitor "$WORK_DIR/monitor.sock" \
+		--text "$LOGIN_PASSWORD" --enter ||
+		die "could not type the password at the greeter"
+
+	log "Waiting for the compositor to come up"
+
+	# The socket directory Hyprland creates for its instance. Present only
+	# once the compositor is running, and it belongs to the user, so it says
+	# the login worked rather than that something started.
+	local attempt
+	for attempt in $(seq 1 45); do
+		if ssh "${SSH_OPTS[@]}" gary@127.0.0.1 \
+			'test -n "$(ls -A "/run/user/$(id -u)/hypr" 2>/dev/null)"' 2>/dev/null; then
+			break
+		fi
+		if [ "$attempt" -eq 45 ]; then
+			# Keep whatever is on screen: a rejected password and a crashed
+			# compositor look identical from out here, and different on it.
+			python3 "$SCRIPT_DIR/screendump.py" \
+				--monitor "$WORK_DIR/monitor.sock" \
+				--output "$WORK_DIR/session-failed.ppm" \
+				--allow-blank --wait 5 || true
+			die "no session appeared after the login. The screen at that point is at $WORK_DIR/session-failed.ppm"
+		fi
+		sleep 2
+	done
+
+	# What the session looks like, for the person who judges appearance (D-021).
+	python3 "$SCRIPT_DIR/screendump.py" \
+		--monitor "$WORK_DIR/monitor.sock" \
+		--output "$WORK_DIR/session.ppm" \
+		--wait 30 ||
+		die "the session drew nothing on the screen, see $WORK_DIR/session.ppm"
+
+	ssh "${SSH_OPTS[@]}" gary@127.0.0.1 "mkdir -p /tmp/checks/lib"
+	scp "${SCP_OPTS[@]}" -q "$SCRIPT_DIR/assert-m3.sh" gary@127.0.0.1:/tmp/checks/
+	scp "${SCP_OPTS[@]}" -q "$SCRIPT_DIR/lib/checks.sh" gary@127.0.0.1:/tmp/checks/lib/
+
+	ssh "${SSH_OPTS[@]}" gary@127.0.0.1 \
+		'chmod +x /tmp/checks/assert-m3.sh && sudo /tmp/checks/assert-m3.sh gary'
+}
+
+# D-021 judges appearance by looking at the captures, so a run that throws them
+# away leaves that criterion unprovable.
+save_captures() {
+	[ -n "$CAPTURE_DIR" ] || return 0
+	[ -n "$WORK_DIR" ] && [ -d "$WORK_DIR" ] || return 0
+
+	mkdir -p "$CAPTURE_DIR"
+	local capture
+	for capture in "$WORK_DIR"/*.ppm; do
+		[ -e "$capture" ] || continue
+		cp "$capture" "$CAPTURE_DIR/"
+	done
+	printf '\nCaptures saved in %s. Look at them: nothing else judges appearance.\n' "$CAPTURE_DIR"
+}
+
 phase_assert() {
 	log "Phase 3: asserting the M1 criteria"
 
@@ -517,6 +604,7 @@ main() {
 			# session role, so a freshly installed machine has no greeter to
 			# find. M1 deliberately stops at a text login.
 			phase_greeter
+			phase_session
 		fi
 		phase_recovery
 
