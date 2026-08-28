@@ -51,7 +51,7 @@ last_rebuild:
   date: 2026-08-28
 
 next_actions:
-  - Answer the bar and the fonts in D-020
+  - Answer the fonts in D-020
   - Log in at the greeter with sendkey, then assert the session from inside
 
 blockers: []
