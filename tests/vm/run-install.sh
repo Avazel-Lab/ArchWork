@@ -213,9 +213,13 @@ prepare_work_dir() {
 	local branch
 	branch="$(git -C "$REPO_ROOT" symbolic-ref --quiet --short HEAD || true)"
 	if [ -n "$branch" ]; then
-		# Bundling the branch rather than HEAD lands the clone on a branch.
-		# A detached HEAD on the installed machine is a poor place to start.
-		git -C "$REPO_ROOT" bundle create "$WORK_DIR/repo.bundle" "$branch" >/dev/null
+		# Name HEAD as well as the branch. A bundle carrying only
+		# refs/heads/<branch> has no HEAD, and git clone then falls back to
+		# guessing the default branch name: it checks out nothing at all,
+		# with a warning rather than an error, unless the branch happens to
+		# be called main. Naming both lands the clone on the branch, which
+		# is where a machine that will later git pull wants to be.
+		git -C "$REPO_ROOT" bundle create "$WORK_DIR/repo.bundle" HEAD "$branch" >/dev/null
 	else
 		git -C "$REPO_ROOT" bundle create "$WORK_DIR/repo.bundle" HEAD >/dev/null
 	fi

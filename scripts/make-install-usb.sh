@@ -56,8 +56,9 @@ So the procedure is:
 
   1. Boot the stick. Choose it from the firmware boot menu.
   2. Get networking up. The desktop has ethernet, so it is already up.
-  3. git clone https://github.com/Avazel-Lab/ArchWork
-  4. Run ArchWork/scripts/archwork-install.sh against the target disk.
+  3. pacman -Sy git, because the stock ISO does not ship it.
+  4. git clone https://github.com/Avazel-Lab/ArchWork
+  5. Run ArchWork/scripts/archwork-install.sh against the target disk.
 
 The installer clones the checkout it runs from onto the target (D-016), so the
 installed machine carries the commit that built it.
