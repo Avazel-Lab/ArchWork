@@ -204,7 +204,27 @@ prepare_work_dir() {
 
 	# The repository as the guest will see it. Committed state only, so a
 	# dirty tree cannot quietly change what the test installs.
-	git -C "$REPO_ROOT" archive --format=tar --prefix="" HEAD >"$WORK_DIR/repo.tar"
+	#
+	# A bundle rather than a tar, because D-016 made the installer clone the
+	# checkout it runs from. git archive produces no .git, so the installer
+	# refuses it and the D-016 path could never have run. A bundle carries the
+	# history, so the guest gets a real checkout and the machine it installs
+	# ends up recording the commit that built it.
+	local branch
+	branch="$(git -C "$REPO_ROOT" symbolic-ref --quiet --short HEAD || true)"
+	if [ -n "$branch" ]; then
+		# Bundling the branch rather than HEAD lands the clone on a branch.
+		# A detached HEAD on the installed machine is a poor place to start.
+		git -C "$REPO_ROOT" bundle create "$WORK_DIR/repo.bundle" "$branch" >/dev/null
+	else
+		git -C "$REPO_ROOT" bundle create "$WORK_DIR/repo.bundle" HEAD >/dev/null
+	fi
+
+	# Where the installed machine should fetch from afterwards. Without this
+	# the clone keeps the bundle path as origin, and assert-m1.sh rejects an
+	# origin that points at the ISO.
+	git -C "$REPO_ROOT" remote get-url origin >"$WORK_DIR/repo-url" 2>/dev/null ||
+		die "this checkout has no origin remote, so the guest has nothing to point at"
 
 	# Record the commit that went into that archive, not whatever HEAD points at
 	# when the run ends. A commit landing mid-run would otherwise be reported as

@@ -22,9 +22,14 @@ log() {
 trap 'log "Install FAILED, see the output above"; sync; systemctl poweroff' ERR
 
 log "Fetching the repository from $BASE"
-curl -fsS "$BASE/repo.tar" -o /tmp/repo.tar
-mkdir -p /tmp/archwork
-tar -xf /tmp/repo.tar -C /tmp/archwork
+curl -fsS "$BASE/repo.bundle" -o /tmp/repo.bundle
+git clone --quiet /tmp/repo.bundle /tmp/archwork
+
+# The installer clones the checkout it runs from onto the target (D-016) and
+# takes its origin from here, so point it upstream before it does. Left alone
+# it would be /tmp/repo.bundle, which does not exist on the installed machine.
+curl -fsS "$BASE/repo-url" -o /tmp/repo-url
+git -C /tmp/archwork remote set-url origin "$(cat /tmp/repo-url)"
 
 log "Fetching the test credentials"
 curl -fsS "$BASE/passphrase" -o /tmp/passphrase
