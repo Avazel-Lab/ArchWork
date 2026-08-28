@@ -28,3 +28,37 @@
     enabled: true
     state: started
   become: true
+
+# Both of these need the docker package, which the packages role installs in
+# this same run. Under --check nothing was installed, so the unit and the
+# group do not exist and the tasks below would fail on a fresh machine. That
+# is a limit of dry-running a playbook that installs what it then configures,
+# not something to work around: --check reports them skipped instead.
+- name: Configure the Docker daemon
+  when: not ansible_check_mode
+  become: true
+  block:
+    - name: Start the Docker daemon on demand rather than at boot
+      # D-019. The socket starts the daemon when something first talks to it,
+      # so interactive use feels the same as always-on without a root daemon
+      # listening through every boot that never touches a container.
+      #
+      # Podman is deliberately absent: rootless Podman has no system daemon,
+      # and that is most of why applications-tooling.md wants it learned
+      # alongside Docker.
+      ansible.builtin.systemd_service:
+        name: docker.socket
+        enabled: true
+        state: started
+
+    - name: Put the administrator in the docker group
+      # D-019, and the part with the real consequence: this group reaches the
+      # daemon, and the daemon is root without a password prompt. Accepted
+      # knowingly for a single-user workstation whose owner already holds
+      # sudo.
+      #
+      # Group changes only reach a session at its next login.
+      ansible.builtin.user:
+        name: "{{ archwork_admin_user }}"
+        groups: docker
+        append: true

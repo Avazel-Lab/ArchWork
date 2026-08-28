@@ -17,6 +17,10 @@ archwork_build_home: /var/cache/archwork/build
 archwork_chroot: /var/cache/archwork/chroot
 archwork_build_user: archwork-build
 
+# The administrator account the installer creates. Same on both profiles, so
+# it belongs here rather than in host_vars (D-010).
+archwork_admin_user: gary
+
 # AUR packages, pinned by name like everything else (D-005). Empty until a
 # decision document names one that is needed: Quickshell and Satty arrive at
 # M6, OpenDeck at M8.
