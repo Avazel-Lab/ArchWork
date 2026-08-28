@@ -341,14 +341,16 @@ start_installed_vm() {
 	local args=()
 	mapfile -t args < <(qemu_base_args)
 
-	rm -f "$WORK_DIR/serial.sock"
+	rm -f "$WORK_DIR/serial.sock" "$WORK_DIR/monitor.sock"
 
 	qemu-system-x86_64 \
 		"${args[@]}" \
 		-netdev "user,id=net0,hostfwd=tcp::$SSH_PORT-:22" \
 		-device virtio-net-pci,netdev=net0 \
 		-display none \
+		-device virtio-vga \
 		-serial "unix:$WORK_DIR/serial.sock,server,nowait" \
+		-monitor "unix:$WORK_DIR/monitor.sock,server,nowait" \
 		-daemonize -pidfile "$WORK_DIR/qemu.pid" ||
 		die "QEMU failed to start"
 
@@ -366,6 +368,19 @@ phase_boot() {
 		--passphrase-file "$WORK_DIR/passphrase" \
 		--log "$WORK_DIR/boot-console.log" ||
 		die "the system did not reach a login prompt, see $WORK_DIR/boot-console.log"
+}
+
+# The greeter is the first M3 criterion that nothing the guest says can prove.
+# A machine can report greetd active over SSH while the screen shows a blank
+# console or a stack trace, so this looks at the framebuffer from outside.
+phase_greeter() {
+	log "Phase 5: proving the greeter reaches the screen"
+
+	python3 "$SCRIPT_DIR/screendump.py" \
+		--monitor "$WORK_DIR/monitor.sock" \
+		--output "$WORK_DIR/greeter.ppm" \
+		--wait 90 ||
+		die "no greeter appeared on the display. The last capture, if any, is at $WORK_DIR/greeter.ppm"
 }
 
 phase_assert() {
@@ -442,7 +457,7 @@ phase_reconcile() {
 # plan.md M1 requires the recovery UKI to boot, not merely to exist. Assert it
 # by booting it: anything less proves the file is present and nothing else.
 phase_recovery() {
-	log "Phase 5: booting the recovery UKI"
+	log "Phase 6: booting the recovery UKI"
 
 	# bootctl writes LoaderEntryOneShot into the UEFI variable store, which
 	# lives in OVMF_VARS.fd and survives the restart below.
@@ -498,12 +513,16 @@ main() {
 		phase_assert
 		if [ "$RECONCILE" = true ]; then
 			phase_reconcile
+			# Only after reconciling: greetd is configured and started by the
+			# session role, so a freshly installed machine has no greeter to
+			# find. M1 deliberately stops at a text login.
+			phase_greeter
 		fi
 		phase_recovery
 
 		kill_if_running "$QEMU_PID"
 		QEMU_PID=""
-		rm -f "$WORK_DIR/disk.qcow2" "$WORK_DIR/serial.sock"
+		rm -f "$WORK_DIR/disk.qcow2" "$WORK_DIR/serial.sock" "$WORK_DIR/monitor.sock"
 
 		# The UEFI variable store outlives the disk, so run 2 would otherwise
 		# boot with run 1 boot entries pointing at a disk that no longer

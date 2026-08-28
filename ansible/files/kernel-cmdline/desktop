@@ -16,5 +16,14 @@ rw
 # AMD. amd_pstate=active gives the scheduler real frequency control.
 amd_pstate=active
 
+# Console. With no display the kernel makes ttyS0 its console; with one it
+# picks tty0 and the serial line goes quiet. M3 gives these machines a display,
+# so naming both keeps kernel output on screen and puts /dev/console on the
+# serial line, which is what answers the LUKS prompt in tests/vm and what a
+# rescue over a serial cable would use. The last console named wins for
+# /dev/console, so the order matters. Deliberate rather than accumulated, per
+# storage-boot.md.
+console=tty0 console=ttyS0
+
 # Quiet boot. Drop this line when debugging an install.
 quiet loglevel=3
