@@ -24,7 +24,9 @@ jobs:
           python-version: '3.13'
       - run: pip install pyyaml yamllint
       - run: python3 scripts/check-plan-status.py
-      - run: yamllint docs/STATUS.yml
+      # Match the Makefile. Linting STATUS.yml alone leaves the inventory and
+      # group_vars unchecked, and those are YAML that Ansible has to parse.
+      - run: yamllint docs/STATUS.yml ansible
 
   unit:
     name: bats unit tests
@@ -39,6 +41,20 @@ jobs:
       # ARCHWORK_REQUIRE_GUARD_TESTS so the job fails rather than skips if
       # that ever stops working.
       - run: sudo ARCHWORK_REQUIRE_GUARD_TESTS=1 bats tests/unit
+
+  ansible:
+    name: ansible-lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8  # v5.0.0
+      - uses: actions/setup-python@e797f83bcb11b83ae66e0230d6156d7c80228e7c  # v6.0.0
+        with:
+          python-version: '3.13'
+      - run: pip install ansible-lint ansible-core
+      - name: Install the collections the playbooks need
+        run: ansible-galaxy collection install -r ansible/requirements.yml
+      - run: ansible-lint
+        working-directory: ansible
 
   shell:
     name: shellcheck
