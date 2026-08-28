@@ -3,7 +3,7 @@
 # Validated by scripts/check-plan-status.py.
 ---
 schema: 1
-updated: 2026-08-28
+updated: 2026-08-29
 
 phase: M3
 
@@ -51,7 +51,11 @@ last_rebuild:
   date: 2026-08-28
 
 next_actions:
-  - Answer the fonts in D-020
-  - Log in at the greeter with sendkey, then assert the session from inside
+  - Answer the fonts in D-020 and the two choices in D-022
+  - Prove the M3 session run end to end. Two attempts on 2026-08-29 died
+    downloading packages, with the host link saturated rather than the mirrors
+    down
+  - Find applications that can open a file picker. The M3 portal criterion
+    needs a GTK and a Qt example, and no installed application can open one
 
 blockers: []
