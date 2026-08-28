@@ -40,10 +40,10 @@ milestones:
 # A rebuild claim without a commit SHA is rejected by the checker.
 # Clean install from the ISO, M1 assertions, the D-016 reconciliation twice
 # with the second run reporting zero changed tasks, and the recovery UKI.
-# Both profiles, separately, on this commit.
+# Desktop profile on this commit. Both profiles passed on d16cf4c.
 last_rebuild:
   status: passed
-  commit: d16cf4c6cdd04a6814e7e04c26844bf1515bd139
+  commit: 6ad019f1fbd77ced66436a5b5b18918756b49ece
   date: 2026-08-28
 
 next_actions:
