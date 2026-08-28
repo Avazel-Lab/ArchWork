@@ -1,9 +1,23 @@
 ---
 # Reconcile the package set. The profile difference arrives as a group
 # variable, so this file never asks which machine it is running on.
+- name: Refresh the package database
+  # Separate from the install, and never reported as a change. The module
+  # marks update_cache changed whenever the repository contents moved, which
+  # for Arch is most of the time: it compares the database before and after
+  # the refresh. That is news about the mirrors, not about this machine, and
+  # M2 requires a second run to report zero changed tasks.
+  #
+  # Found on the laptop profile, whose second run caught a repository update
+  # where the desktop's runs had happened to fall in a quiet window. The
+  # desktop was not more idempotent, only luckier.
+  community.general.pacman:
+    update_cache: true
+  changed_when: false
+  become: true
+
 - name: Install the shared and profile package sets
   community.general.pacman:
     name: "{{ archwork_packages_shared + archwork_packages_profile }}"
     state: present
-    update_cache: true
   become: true
