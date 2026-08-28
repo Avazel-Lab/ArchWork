@@ -29,9 +29,12 @@ trap 'log "Install FAILED"; journalctl -b --no-pager -n 60 >/dev/console 2>&1 ||
 # is the test harness, not a real installation.
 #
 # This comes first now, because the next step needs a working mirror.
-log "Pinning the package mirror"
+# Two of them, both Arch-operated. One is a pin; a pin with no fallback means
+# a single stalled download ends the run, which happened and cost ten minutes
+# for a reason that says nothing about the installer.
+log "Pinning the package mirrors"
 # shellcheck disable=SC2016 # $repo and $arch are pacman placeholders, and pacman expands them, not the shell
-printf 'Server = https://geo.mirror.pkgbuild.com/$repo/os/$arch\n' >/etc/pacman.d/mirrorlist
+printf 'Server = https://geo.mirror.pkgbuild.com/$repo/os/$arch\nServer = https://mirror.pkgbuild.com/$repo/os/$arch\n' >/etc/pacman.d/mirrorlist
 
 # The stock Arch ISO does not ship git. It has curl, tar, arch-install-scripts
 # and everything else the installer needs, but not git, and D-016 made the

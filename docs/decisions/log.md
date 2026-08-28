@@ -393,3 +393,34 @@ Consequences:
 - `bootctl install` makes ArchWork the first entry in the firmware boot order. That is a side effect of installing, not a decision to be the default, and reordering with `efibootmgr` or the firmware menu changes it back.
 - Before wiping a disk on shared hardware, prove the other systems boot without it. Observed on `hmlxdesktop01` on 2026-08-28: `efibootmgr -v` showed `Windows Boot Manager` registered against the ESP on `nvme1n1p4`, the disk ArchWork is to take, while the Windows install on `sdb` carries no ESP of its own. Windows on `sdb` therefore needs its own ESP and its own boot manager before `nvme1n1` is touched.
 - When the loader entries do arrive, they go in the repository as configuration like everything else, and a rebuild has to recreate them. An entry typed once into a live ESP is exactly the manual configuration the capture rule exists to prevent.
+
+## D-018 Where AUR builds run, and as whom
+
+**Status:** accepted
+**Date:** 2026-08-28
+**Affects:** `applications-tooling.md`, `storage-boot.md`, M2, M5
+
+The devtools chroot lives at `/var/cache/archwork/chroot`, and builds run as a dedicated system account, `archwork-build`, which holds no privileges at all.
+
+D-005 settled that AUR packages build in a clean chroot rather than on the workstation. It did not say where the chroot sits or which account drives it, and neither answer is obvious.
+
+**Where.** `/var/cache` is `@var_cache`, which `storage-boot.md` puts outside the rollback boundary. A base-devel chroot is around a gigabyte of entirely reproducible content, so carrying it through every snapshot buys nothing. `/var/lib` was the alternative and is wrong twice over: it sits inside `@` by a constraint `CLAUDE.md` spells out, so the chroot would roll back with the system, and it would bloat every snapshot to do it.
+
+**As whom.** `makepkg` refuses to run as root, so something in this chain has to be an unprivileged account. The administrator account is the obvious candidate and the wrong one: it logs in, has SSH access and runs the desktop session, and a build writing into its home is a standing reason to widen what that session can reach.
+
+So the build gets its own system account, with a locked password, no authorized keys and no login route. It holds no privileges of its own and appears in no sudoers file. Ansible already runs the reconciliation as root, and root becomes another user without needing a rule.
+
+`makechrootpkg` fits this exactly, once read rather than assumed. Its `check_root` returns immediately when `EUID` is 0, so the tool expects to be root and re-execs itself under sudo when it is not, and `-U` names the unprivileged account it drops to for the makepkg step.
+
+Rejected alternatives:
+
+- **Give the build account a passwordless sudoers rule.** This decision said to do that for several hours, on the belief that `makechrootpkg` refuses to run as root. It does not. The rule was never needed, and a privilege granted for a reason that turns out not to exist is the kind that stays forever.
+- **Run the build as the administrator account.** Above.
+- **Drive `mkarchroot` and `arch-nspawn` directly and skip `makechrootpkg`.** Reimplements the tool D-005 chose, and the reimplementation would have to track devtools rather than being carried by it.
+
+Consequences:
+
+- `@var_cache` now holds build state a rebuild recreates. Nothing may come to depend on the chroot surviving a rollback.
+- The M5 update script builds AUR updates through this same chroot and this same account, per D-005.
+- `archwork-build` stays unprivileged. If something later seems to need it in sudoers, read the tool first: this decision already made that mistake once.
+- A half-built chroot blocks `mkarchroot`, which refuses a working directory that already exists. The role reports it and names the command to clear it rather than deleting it, because `@var_cache` is btrfs and the chroot is a subvolume, not a plain directory.
