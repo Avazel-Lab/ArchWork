@@ -184,6 +184,11 @@ validate_args() {
 		esac
 	fi
 
+	# The stock Arch ISO does not ship git, and rev-parse below would report
+	# that as "not a git checkout", which sends you looking in the wrong place.
+	command -v git >/dev/null ||
+		die "git is not installed. The Arch ISO does not ship it, and D-016 needs it to clone this repository onto the target. Run: pacman -Sy git"
+
 	git -C "$REPO_ROOT" rev-parse --git-dir >/dev/null 2>&1 ||
 		die "$REPO_ROOT is not a git checkout, so there is nothing to clone onto the target"
 

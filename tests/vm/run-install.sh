@@ -140,10 +140,26 @@ parse_args() {
 	done
 }
 
+# One place that knows how to ask, so the readiness wait and the preflight
+# check cannot disagree about what "in use" means.
+port_in_use() {
+	ss -ltn "sport = :$1" 2>/dev/null | grep -q LISTEN
+}
+
 check_prerequisites() {
 	command -v qemu-system-x86_64 >/dev/null || die "qemu-system-x86_64 not found"
 	command -v bsdtar >/dev/null || die "bsdtar not found, needed to read the ISO"
 	command -v ssh >/dev/null || die "ssh not found"
+	command -v ss >/dev/null || die "ss not found, needed to check the ports are free"
+
+	# Both ports are fixed, so a run that died holding one makes the next run
+	# fail somewhere much less obvious. Say so here instead.
+	local port
+	for port in "$HTTP_PORT" "$SSH_PORT"; do
+		if port_in_use "$port"; then
+			die "port $port is already in use, probably by a run that did not clean up. Find it with: ss -ltnp 'sport = :$port'"
+		fi
+	done
 
 	[ -n "$ISO" ] || die "--iso is required and has no default"
 	[ -r "$ISO" ] || die "cannot read ISO '$ISO'"
@@ -204,7 +220,31 @@ prepare_work_dir() {
 
 	# The repository as the guest will see it. Committed state only, so a
 	# dirty tree cannot quietly change what the test installs.
-	git -C "$REPO_ROOT" archive --format=tar --prefix="" HEAD >"$WORK_DIR/repo.tar"
+	#
+	# A bundle rather than a tar, because D-016 made the installer clone the
+	# checkout it runs from. git archive produces no .git, so the installer
+	# refuses it and the D-016 path could never have run. A bundle carries the
+	# history, so the guest gets a real checkout and the machine it installs
+	# ends up recording the commit that built it.
+	local branch
+	branch="$(git -C "$REPO_ROOT" symbolic-ref --quiet --short HEAD || true)"
+	if [ -n "$branch" ]; then
+		# Name HEAD as well as the branch. A bundle carrying only
+		# refs/heads/<branch> has no HEAD, and git clone then falls back to
+		# guessing the default branch name: it checks out nothing at all,
+		# with a warning rather than an error, unless the branch happens to
+		# be called main. Naming both lands the clone on the branch, which
+		# is where a machine that will later git pull wants to be.
+		git -C "$REPO_ROOT" bundle create "$WORK_DIR/repo.bundle" HEAD "$branch" >/dev/null
+	else
+		git -C "$REPO_ROOT" bundle create "$WORK_DIR/repo.bundle" HEAD >/dev/null
+	fi
+
+	# Where the installed machine should fetch from afterwards. Without this
+	# the clone keeps the bundle path as origin, and assert-m1.sh rejects an
+	# origin that points at the ISO.
+	git -C "$REPO_ROOT" remote get-url origin >"$WORK_DIR/repo-url" 2>/dev/null ||
+		die "this checkout has no origin remote, so the guest has nothing to point at"
 
 	# Record the commit that went into that archive, not whatever HEAD points at
 	# when the run ends. A commit landing mid-run would otherwise be reported as
@@ -234,10 +274,25 @@ extract_iso_boot_files() {
 
 start_http_server() {
 	log "Serving $WORK_DIR on port $HTTP_PORT"
-	(cd "$WORK_DIR" && python3 -m http.server "$HTTP_PORT" --bind 127.0.0.1 >"$WORK_DIR/http.log" 2>&1) &
+
+	# No subshell. --directory does what the cd did, and $! is then python's
+	# own pid rather than a subshell's. With the subshell, cleanup killed the
+	# wrapper and left python holding the port, so the next run died with
+	# nothing more useful than "the HTTP server did not start".
+	python3 -m http.server "$HTTP_PORT" --bind 127.0.0.1 \
+		--directory "$WORK_DIR" >"$WORK_DIR/http.log" 2>&1 &
 	HTTP_PID=$!
-	sleep 1
-	kill -0 "$HTTP_PID" 2>/dev/null || die "the HTTP server did not start, see $WORK_DIR/http.log"
+
+	# Wait for the port to answer, not for the process to exist. A process
+	# that is about to fail to bind is still alive a moment after starting.
+	local waited=0
+	until port_in_use "$HTTP_PORT"; do
+		waited=$((waited + 1))
+		if [ "$waited" -gt 20 ]; then
+			die "the HTTP server did not come up, see $WORK_DIR/http.log"
+		fi
+		sleep 0.5
+	done
 }
 
 qemu_base_args() {
