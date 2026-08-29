@@ -43,7 +43,9 @@ milestones:
 # A rebuild claim without a commit SHA is rejected by the checker.
 # Clean install from the ISO, M1 assertions, the D-016 reconciliation twice
 # with the second run reporting zero changed tasks, and the recovery UKI.
-# Desktop profile on this commit. Both profiles passed on d16cf4c, at M2.
+# Both profiles on this commit, run separately: the desktop, then the laptop
+# with its @swap subvolume and swapfile that the desktop does not have. M3 had
+# only ever been shown on the desktop profile before this.
 #
 # Everything M3 asks of a machine, on a session greetd starts through
 # start-hyprland with its configuration in Lua (D-026): login at the real
@@ -70,11 +72,10 @@ next_actions:
     kept disk image, instead of reinstalling to test a keypress. Four runs on
     2026-08-29 were lost to one-line harness bugs, and M4 asks for timings
     measured in tens of minutes
-  - Run the laptop profile against the M3 criteria. Every run so far has been
-    the desktop profile, and the session set is shared between them, so it
-    should hold and has never been shown
-  - Answer the plan gap in D-024. No milestone installs the bulk of
-    applications.md, and M7 could pass today with "full desktop" meaning a
-    compositor and a terminal
+  - Write the runbook for the first install on the desktop hardware, before
+    the attempt rather than at the keyboard during it (D-017)
+  - Fill the manifests against applications.md, which M7 now requires. Most of
+    that document is in no manifest, and an entry deferred on purpose is fine
+    where an entry nobody has looked at is not
 
 blockers: []
