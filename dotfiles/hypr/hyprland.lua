@@ -16,11 +16,14 @@
 
 -- Whatever the machine has, at its preferred mode. Real monitor layout belongs
 -- to the physical machines at M8 and M9, not to a VM that has one virtual head.
+-- scale is a string here, not a number: Hyprland parses mode, position and
+-- scale as strings (MONITOR_FIELDS in LuaBindingsConfigRules.cpp), so the 1
+-- that the old hyprland.conf wrote as a bare number has to be quoted.
 hl.monitor({
     output   = "",
     mode     = "preferred",
     position = "auto",
-    scale    = 1,
+    scale    = "1",
 })
 
 hl.config({
