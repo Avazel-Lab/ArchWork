@@ -71,8 +71,22 @@ archwork_packages_session:
   - grim
   # Secret Service, so the greetd password unlocks the keyring (D-012)
   - gnome-keyring
-  # Qt theming (desktop-shell.md)
+  # Qt theming (desktop-shell.md). The package also carries kvantummanager,
+  # which is the Qt application the portal criterion opens a file picker from
+  # (D-023), so the Qt half of that criterion costs no extra package.
   - kvantum
+  # Fonts (D-020). Nothing named any until now, which leaves a session running
+  # on whatever arrived as a dependency: dejavu is the general fallback, the
+  # noto pair covers scripts and emoji, and the nerd variant of JetBrains Mono
+  # is what stops waybar's packaged configuration drawing its icons as boxes.
+  - ttf-dejavu
+  - noto-fonts
+  - noto-fonts-emoji
+  - ttf-jetbrains-mono-nerd
+  # The GTK application the portal criterion opens a file picker from (D-023).
+  # applications-tooling.md already lists PDF Arranger, so this is where it
+  # lands rather than a package this milestone invented.
+  - pdfarranger
 
 # AUR packages, pinned by name like everything else (D-005). Empty until a
 # decision document names one that is needed: Quickshell and Satty arrive at

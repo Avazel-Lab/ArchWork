@@ -249,6 +249,32 @@ portal_answers() {
 		--method org.freedesktop.DBus.Peer.Ping >/dev/null 2>&1
 }
 
+# The M3 criterion is a file picker, and a picker is a window rather than a
+# bus reply, so this asks the compositor what is on screen. Two things make it
+# a real answer: the window must not belong to the application that asked for
+# it, which is what separates a portal dialog from the application's own, and
+# the match is deliberately loose.
+#
+# Loose because which class and title xdg-desktop-portal-gtk gives its chooser
+# is not something this repository can establish by reading its own code, and
+# a run that fails against a guessed string teaches nothing. list_clients
+# prints what was actually there when this says no, so one run settles it.
+file_picker_open() {
+	as_user_in_session "$1" hyprctl -j clients 2>/dev/null |
+		jq -e --arg app "$2" 'any(.[];
+			.class != $app and
+			((.class + " " + .title) | ascii_downcase
+				| test("portal|open|choose|select|import|file")))' >/dev/null 2>&1
+}
+
+# Diagnostic rather than assertion. Prints every window the compositor has, so
+# a failed picker check names what was on screen instead of leaving the next
+# run to guess.
+list_clients() {
+	as_user_in_session "$1" hyprctl -j clients 2>/dev/null |
+		jq -r '.[] | "class=\(.class) title=\(.title)"'
+}
+
 screenshot_works() {
 	local target="/tmp/archwork-m3-screenshot.png"
 	rm -f "$target"

@@ -477,7 +477,9 @@ Recommendation: leave this open until the Kvantum theme itself is chosen, becaus
 
 Recommendation: `ttf-dejavu` as the general fallback, `noto-fonts` and `noto-fonts-emoji` for coverage, and one monospace face for Kitty and the bar. All are in `extra`. Worth deciding before M3's first screenshot rather than after.
 
-**Answered on 2026-08-28.** The bar is `waybar`, installed with the configuration it ships rather than a set of dotfiles: it is the fallback that M6 replaces, so effort spent styling it now is spent twice. The GTK theme stays open until the Kvantum theme it has to match is chosen. Fonts are still open.
+**Answered on 2026-08-28.** The bar is `waybar`, installed with the configuration it ships rather than a set of dotfiles: it is the fallback that M6 replaces, so effort spent styling it now is spent twice. The GTK theme stays open until the Kvantum theme it has to match is chosen.
+
+**Fonts answered on 2026-08-29.** `ttf-dejavu` as the general fallback, `noto-fonts` and `noto-fonts-emoji` for coverage, and `ttf-jetbrains-mono-nerd` as the monospace face. The nerd variant rather than plain `ttf-jetbrains-mono` for one reason: waybar ships a configuration that draws icons from a nerd font, and without one the fallback bar renders them as boxes, which is the sort of thing that gets blamed on the bar rather than on the font set. All four are in `extra`. The GTK theme remains the one part of this entry still open.
 
 None of these block the session manifest, which is complete without them. They block M3 looking finished.
 
@@ -511,7 +513,7 @@ Consequences:
 
 ## D-022 Two M3 choices the documents leave to implementation
 
-**Status:** open
+**Status:** accepted
 **Date:** 2026-08-29
 **Affects:** `desktop-shell.md`, M2, M3, M6
 
@@ -526,3 +528,34 @@ Recommendation: link. An edit made at the machine is then an edit to the reposit
 Recommendation: enable `tailscaled.service`. Unlike `docker.socket` this widens nothing on its own: the daemon carries no traffic until something signs it in, and the auth key that would is one of the secrets D-006 has yet to bring. A machine that has to be told to start its own network every boot is a machine that will be found offline.
 
 Neither blocks M3. Both should be confirmed or reversed before M7 treats the rebuild as the thing being proven.
+
+**Both confirmed by the repository owner on 2026-08-29**, as built. Status accepted.
+
+Consequences:
+
+- The desktop's configuration is the clone. Deleting `~/src/ArchWork` takes the Hyprland configuration with it, and an edit made at 23:00 on a Tuesday shows up in `git status` rather than being lost at the next rebuild.
+- `tailscaled.service` is enabled. The daemon starts at boot and carries nothing until an auth key signs it in, which is a D-006 secret that has yet to arrive.
+
+## D-023 Which applications prove the portal file picker, and the environment they need
+
+**Status:** accepted
+**Date:** 2026-08-29
+**Affects:** `desktop-shell.md`, M3
+
+M3 asks that "a file picker opens from a GTK application and from a Qt application". No application on an ArchWork machine could open one: the session manifest is a compositor, a terminal, a launcher, a bar, a lock screen and a notifier, and none of them has a file to choose. The criterion was untestable rather than failing, which is worse, because a run could pass without ever touching the code path.
+
+The applications are `pdfarranger` for GTK and `kvantummanager` for Qt. Neither is installed for the test alone: `applications-tooling.md` already lists PDF Arranger, so this decides where it lands rather than adding it, and Kvantum Manager arrives inside the `kvantum` that the theming criterion needs anyway.
+
+Rejected: toolkit demo applications such as `gtk3-demo`. They would be honest test scaffolding and would need a decision document to name a package that exists for no other reason, which is a worse trade than using two applications the workstation wants regardless. Also rejected: narrowing the criterion to a `gdbus` ping of the FileChooser interface. `assert-m3.sh` already pings the portal, and that check stays, but it says the portal is reachable and nothing about whether a picker opens.
+
+The environment matters more than the applications. Two settings are needed and one of them contradicts the usual advice:
+
+- `GTK_USE_PORTAL=1`. Without it a GTK application opens its own chooser, which looks the same on screen and proves nothing about `xdg-desktop-portal-gtk`.
+- `QT_QPA_PLATFORMTHEME=xdgdesktopportal` with `QT_STYLE_OVERRIDE=kvantum`. Setting the platform theme to `kvantum`, which is what most Kvantum instructions say, hands Qt its own file dialog and takes the portal out of the path. Splitting the two keeps the portal drawing dialogs and Kvantum painting widgets, so the picker criterion and the theming criterion stop competing.
+
+Consequences:
+
+- Both criteria can be tested by the same session. Before this they could not both hold.
+- `phase_portals` in the harness opens each application from the launcher, presses Ctrl+O, and asserts a window appears that does not belong to the application that asked for it. That last part is what distinguishes a portal dialog from an application's own.
+- Ctrl+O is a convention rather than a documented binding for either application, and whether each honours it is unverified until a run says so. The check therefore prints every window the compositor has when it fails, so one run names the right key instead of leaving the next to guess.
+- The window match is loose, on class and title. It can be tightened once a run has shown what the portal actually calls its chooser. Guessing the exact string now would fail a run for the wrong reason.

@@ -27,8 +27,10 @@ ALLOWED=(
 	client_class_present
 	client_class_absent
 	compositor_answers
+	file_picker_open
 	graphical_session_open
 	keyring_unlocked
+	list_clients
 	portal_answers
 	process_absent
 	screenshot_works

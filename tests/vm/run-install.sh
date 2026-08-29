@@ -540,6 +540,61 @@ phase_desktop() {
 	capture unlocked
 }
 
+# Open one application from the launcher and ask it for a file picker, then
+# assert that the window which appears is not its own.
+#
+# Ctrl+O is the accelerator both toolkits conventionally use. Whether each of
+# these two applications actually binds it is the part no document settles, so
+# a failure here prints every window the compositor has rather than only
+# saying no: one run then names what to press instead (D-023).
+open_picker() {
+	local label="$1" match="$2" app_class="$3"
+
+	log "$label opens a file picker through the portal"
+
+	press --key meta_l-d
+	ask --wait 20 user_process_running "$LOGIN_USER" fuzzel ||
+		die "the launcher did not open for $label"
+
+	press --text "$match"
+	sleep 1
+	press --key ret
+	ask --wait 60 client_class_present "$LOGIN_USER" "$app_class" || {
+		capture "picker-$app_class-no-window"
+		ask list_clients "$LOGIN_USER" || true
+		die "$label never opened a window. The screen is at $WORK_DIR/picker-$app_class-no-window.ppm"
+	}
+
+	press --key ctrl-o
+	ask --wait 30 file_picker_open "$LOGIN_USER" "$app_class" || {
+		capture "picker-$app_class-failed"
+		ask list_clients "$LOGIN_USER" || true
+		die "$label opened no file picker. The screen is at $WORK_DIR/picker-$app_class-failed.ppm"
+	}
+
+	# For the person who judges appearance, and because a picker that opens
+	# unthemed or unreadable still passes the assertion above (D-021).
+	capture "picker-$app_class"
+
+	press --key esc
+	press --key meta_l-q
+}
+
+# "Portals work. A file picker opens from a GTK application and from a Qt
+# application." assert-m3.sh only pings the portal, which says it is reachable
+# and nothing about a picker, so the criterion is finished here where there is
+# a keyboard and a screen.
+#
+# The two applications are chosen in D-023: kvantummanager arrives with the
+# kvantum the theming criterion already needs, and PDF Arranger is named in
+# applications-tooling.md. Neither is installed for the test alone.
+phase_portals() {
+	log "Phase 9: the portal file picker, from GTK and from Qt"
+
+	open_picker "PDF Arranger (GTK)" pdf pdfarranger
+	open_picker "Kvantum Manager (Qt)" kvantum kvantummanager
+}
+
 # D-021 judges appearance by looking at the captures, so a run that throws them
 # away leaves that criterion unprovable.
 save_captures() {
@@ -691,6 +746,7 @@ main() {
 			phase_greeter
 			phase_session
 			phase_desktop
+			phase_portals
 		fi
 		phase_recovery
 

@@ -51,11 +51,14 @@ last_rebuild:
   date: 2026-08-28
 
 next_actions:
-  - Answer the fonts in D-020 and the two choices in D-022
-  - Prove the M3 session run end to end. Two attempts on 2026-08-29 died
-    downloading packages, with the host link saturated rather than the mirrors
-    down
-  - Find applications that can open a file picker. The M3 portal criterion
-    needs a GTK and a Qt example, and no installed application can open one
+  - Prove the M3 session run end to end, greeter login through the portal
+    pickers. Two attempts on 2026-08-29 died downloading packages, with the
+    host link saturated rather than the mirrors down. This gates the first
+    install on the desktop hardware
+  - Confirm from that run that Ctrl+O opens a picker in pdfarranger and
+    kvantummanager, then tighten the loose window match in file_picker_open to
+    the class the portal actually uses (D-023)
+  - Choose the Kvantum theme, which is the last part of D-020 still open and
+    what the matching GTK theme waits on
 
 blockers: []
