@@ -43,24 +43,29 @@ milestones:
 # A rebuild claim without a commit SHA is rejected by the checker.
 # Clean install from the ISO, M1 assertions, the D-016 reconciliation twice
 # with the second run reporting zero changed tasks, and the recovery UKI.
-# Desktop profile on this commit, greeter capture included. Both profiles
-# passed on d16cf4c.
+# Desktop profile on this commit. Both profiles passed on d16cf4c.
+#
+# This run also drove the M3 desktop from outside the guest: login at the real
+# greeter, all 13 session assertions, terminal and launcher by keybinding,
+# lock and unlock, and a portal file picker from PDF Arranger and from Okular.
+# Two M3 criteria were not covered by it. Tailscale had no assertions at all,
+# which is fixed after this commit and unproven until the next run. Kvantum
+# and the GTK theme are judged from the captures by a person (D-021), and the
+# GTK half cannot pass while D-020 leaves that theme unchosen.
 last_rebuild:
   status: passed
-  commit: e0a049fa5800faba05d5b86d8bcb459229bbb991
-  date: 2026-08-28
+  commit: 2a98d461a5ddbc5f26bbb399b304f397ef4e4291
+  date: 2026-08-29
 
 next_actions:
-  - Prove the M3 session run end to end. The run of 2026-08-29 passed every
-    session criterion and the desktop criteria up to the lock screen, then
-    typed the password into a desktop hyprlock had not yet covered. The
-    harness now waits for the lock screen. The portal pickers are still
-    untested, and this gates the first install on the desktop hardware
-  - Confirm from that run that Ctrl+O opens a picker in pdfarranger and
-    kvantummanager, then tighten the loose window match in file_picker_open to
-    the class the portal actually uses (D-023)
-  - Answer the rest of D-024, which is the application baseline moving into
-    docs/decisions/ and git-crypt and SOPS being settled against D-006. The
-    Docker and Podman half is answered at D-025
+  - Prove the Tailscale assertions, which are written and have never run, and
+    the Podman change from D-025, which the green run predates. One clean
+    rebuild covers both and gates the first install on the desktop hardware
+  - Look at the captures and judge the theming criterion. Kvantum reaches Qt
+    applications, the portal chooser comes up light against a dark desktop,
+    and D-020 still has no GTK theme chosen
+  - Answer D-024 and D-026, which are the application baseline moving into
+    docs/decisions/, git-crypt and SOPS against D-006, and what Hyprland
+    dropping the .conf format in 0.57 means for dotfiles/hypr/
 
 blockers: []

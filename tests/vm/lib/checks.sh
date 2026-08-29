@@ -289,6 +289,47 @@ screenshot_works() {
 	[ -s "$target" ]
 }
 
+# --- Tailscale, and living alongside NetworkManager (D-002, D-019, D-022) ---
+#
+# The machine arrives with tailscaled running and logged out, because the auth
+# key that would sign it in is one of the secrets D-006 has yet to bring. So
+# what can honestly be asserted here is that the daemon is up and that it has
+# taken nothing over from NetworkManager. Split DNS and MagicDNS against a real
+# tailnet cannot be tested until that key exists, and nothing below pretends
+# otherwise.
+
+# Answers whether or not the machine is signed in, which is the point: a
+# daemon that is running but not reachable would pass a systemctl check and
+# fail the person trying to use it.
+tailscale_daemon_answers() {
+	tailscale status --json 2>/dev/null | grep -q '"BackendState"'
+}
+
+tailscale_interface_present() {
+	ip link show tailscale0 >/dev/null 2>&1
+}
+
+# The coexistence criterion, in the form it can take while logged out:
+# Tailscale has not taken the default route from the interface NetworkManager
+# manages. A logged-out daemon that had would have broken the machine's
+# network to prove a point.
+default_route_not_via() {
+	! ip route show default | grep -q "$1"
+}
+
+name_resolution_works() {
+	getent hosts "$1" >/dev/null 2>&1
+}
+
+# D-002 masks systemd-resolved, and D-019 flagged that Tailscale's split DNS
+# works best through it. That is a real tension rather than a theoretical one,
+# so this asserts the mask is still in place and that names still resolve
+# without it. If signing in later breaks resolution, this is the pair of
+# checks that will say so.
+unit_is_masked() {
+	[ "$(systemctl is-enabled "$1" 2>/dev/null)" = masked ]
+}
+
 # A window the compositor has, rather than a process that started. A terminal
 # that launched and then died leaves the process check happy and the screen
 # empty, which is the failure worth catching.

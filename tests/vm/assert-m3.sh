@@ -35,6 +35,16 @@ check "gnome-keyring-daemon is running as the user" user_process_running "$USER_
 check "the Secret Service is on the session bus" secret_service_present "$USER_NAME"
 check "the login keyring is unlocked, so nothing prompts a second time" keyring_unlocked "$USER_NAME"
 
+printf '\nTailscale alongside NetworkManager (D-002, D-019, D-022)\n'
+check "tailscaled is enabled at boot" systemctl is-enabled tailscaled.service
+check "tailscaled is running" systemctl is-active tailscaled.service
+check "the daemon answers, signed in or not" tailscale_daemon_answers
+check "the tailscale interface exists" tailscale_interface_present
+check "NetworkManager is still running" systemctl is-active NetworkManager.service
+check "the default route is not Tailscale's" default_route_not_via tailscale0
+check "systemd-resolved is still masked" unit_is_masked systemd-resolved.service
+check "names still resolve without it" name_resolution_works archlinux.org
+
 printf '\nDesktop integration (desktop-shell.md)\n'
 check "the desktop portal answers on the session bus" portal_answers "$USER_NAME"
 check "grim captures the screen from inside the session" screenshot_works "$USER_NAME"
