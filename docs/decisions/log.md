@@ -379,6 +379,10 @@ ArchWork takes a whole disk and owns the ESP on it. It does not share an ESP wit
 
 The desktop hardware dual boots three systems: Kubuntu on `nvme1n1`, Windows 11 on `sdb`, and ArchWork on `nvme0n1`. Each keeps its own bootloader on its own disk. The two NVMe drives are the same model and size, a Samsung 970 EVO Plus 2 TB each, so the kernel names alone do not identify them: the Kubuntu root is serial S6P1NS0T304068E and the disk ArchWork is to take is serial S4J4NX0R804138P. Address it as `/dev/disk/by-id/nvme-Samsung_SSD_970_EVO_Plus_2TB_S4J4NX0R804138P` and confirm the serial in the installer's own partition table printout before answering its prompt. The installer already behaves this way, because it writes a fresh GPT with its own ESP to the device it is given and `bootctl install` only ever scans the ESP it installed to.
 
+**What is on the target disk today, checked on 2026-08-29 rather than remembered.** `nvme0n1` is not empty. It carries five partitions: a 500 MB NTFS, a 1.8 TB NTFS, a 954 MB NTFS, a 100 MB EFI system partition and a 569 MB NTFS. That is a Windows installation with its own ESP and recovery partitions, plus the bulk of the data on the machine. Installing ArchWork there destroys all of it, which is the intent, and is the reason this paragraph exists rather than being left to the installer's confirmation prompt.
+
+One prerequisite follows and has not been met. Windows also lives on `sdb`, and until 2026-08-28 that disk had no ESP of its own: one was created at `sdb3` and now holds `Boot0000`. Whether Windows actually boots from it has never been tested. Because the disk about to be wiped holds an ESP too, that test has to happen before the wipe rather than after it. Boot Windows from `sdb` once, then wipe.
+
 Two facts make the separation worth writing down rather than leaving implicit.
 
 **A shared ESP is a shared failure.** The 1 GiB ESP the installer creates is sized for UKIs, and a UKI is large. An ESP that another installer also writes to is one Windows feature update away from a full filesystem or a rewritten boot entry, and the recovery UKI is exactly the thing that must still be there on the day something else has gone wrong.
@@ -594,13 +598,19 @@ Three disagreements matter more than the fonts, and none should be settled by an
 
 **git-crypt.** The baseline lists it under Git. `CLAUDE.md` says repository secrets use age and nothing else, and that git-crypt is not used. D-006 decided that.
 
-Recommendation: keep D-006 and drop git-crypt from the baseline. `CLAUDE.md` states it as a rule rather than a preference, and nothing in the repository uses it. This looks like the baseline predating D-006 rather than a live disagreement, but it should be struck from one document or the other rather than left in both.
+Recommendation was to drop it from the baseline. **Answered on 2026-08-29: keep it.** It is not a contradiction, it is two different questions that were being read as one. git-crypt is installed on the workstation because other repositories the owner works on use it. Nothing about that makes it a mechanism for *this* repository's secrets, which remain age and nothing else. The wording in `CLAUDE.md` and here now says which of the two it means, so that a future reader finding `git-crypt` in a package manifest does not conclude the rule was broken.
+
+The owner added "perhaps I need to question it", about those other repositories. The comparison that matters there: git-crypt is transparent, so a pattern that does not match, or a file added before the filter was configured, commits plaintext, and history keeps it. It also encrypts deterministically, so identical content produces identical ciphertext and the history leaks when a secret reverts to an earlier value, and revoking access means rewriting history. Against that, its convenience is real when secrets are edited constantly by several people. That is a decision for those repositories rather than this one, and it is recorded here only because the question was asked.
 
 **SOPS.** The baseline lists it for encrypted configuration. D-006's "age only" was about repository secrets, and SOPS is a different job, so this may be no contradiction at all.
 
-Recommendation: decide whether SOPS is in scope for this workstation at all, and if it is, say in D-006 that "age only" governs secrets in this repository rather than every encryption tool installed on the machine. As written the two can be read as conflicting.
+Recommendation was to leave it out. **Answered on 2026-08-29: not in scope.** It stays off the workstation, and D-006 is unchanged beyond the wording clarification above. Worth reopening only if hand editing `.age` files becomes a real irritation, in which case SOPS with the age backend keeps the crypto and adds reviewable diffs, which is a smaller change than it sounds.
 
 Recommendation for the entry as a whole: bring the baseline into `docs/decisions/` as the applications document, with `applications-tooling.md` either replaced by it or reduced to the decisions that are genuinely about this repository rather than about which applications the owner wants. Where the two disagree, the baseline wins except on git-crypt.
+
+**Answered on 2026-08-29.** The baseline is now `docs/decisions/applications.md`, carried in whole. `applications-tooling.md` keeps only what is a decision about this repository rather than a list of what the owner wants installed, and points at the new file for the list. Where they disagreed, the baseline won, and git-crypt turned out not to be a disagreement at all.
+
+This entry stays open on one point: most of what the baseline names is in no package manifest, and the milestones that would install it are M8 and M9. Nothing is lost by that, since the manifests are meant to grow milestone by milestone, but the gap between the two documents should be closed deliberately rather than discovered.
 
 ## D-025 Podman is the desktop container engine, and Docker is a client
 

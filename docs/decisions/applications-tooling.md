@@ -6,6 +6,8 @@ review: 2027-02-27
 
 # Applications and tooling decisions
 
+`applications.md` next to this file is the list of what an ArchWork machine has on it. This file holds the decisions *about* those choices: the ones with a consequence for how the repository works, rather than a record of what the owner wants installed. Where the two disagree, `applications.md` wins and the disagreement gets fixed (D-024).
+
 ## Development and platform tooling
 
 - Git
@@ -49,7 +51,8 @@ Decided at D-016.
 
 ## Secrets
 
-- `age` only (D-006). `git-crypt` is not used.
+- `age` only (D-006) for this repository's secrets. `git-crypt` is not a mechanism for them.
+- `git-crypt` is installed all the same, for other repositories that use it (D-024). Two different questions, and reading them as one made this look like a contradiction for a while.
 - The age private key is committed, wrapped with a diceware passphrase through `age -p`.
 - Bootstrap prompts for that passphrase and unwraps the key in memory.
 - Keep the encrypted set small: WiFi PSKs, Tailscale auth key, service tokens. Not SSH private keys.
@@ -74,22 +77,14 @@ Decided at D-016.
 
 ## Desktop applications
 
-- FSearch
-  - Chosen as the closest fit to Everything-style indexed search.
-  - NAS indexing is desirable where practical.
-- PDF Arranger
-- No dedicated download manager by default.
+The list is in `applications.md`. Two entries carry a decision rather than a preference:
+
+- FSearch was chosen as the closest fit to Everything-style indexed search, with NAS indexing desirable where practical.
+- PDF Arranger and Okular are what the M3 portal criterion opens a file picker from, GTK and Qt (D-023). They are in the M3 session manifest for that reason as well as their own.
 
 ## Scanning
 
-### Epson FastFoto FF-680W
-
-- Batching is important.
-- Linux workflow still needs implementation/research.
-
-### Epson M28-series wireless scanner/printer
-
-- Treat the wireless model as M28W unless later hardware verification shows otherwise.
+The hardware and the workflow that has to be proven are in `applications.md`. The decision here is narrower: batch scanning is the requirement that decides whether the Epson FastFoto workflow is solved, and the wireless M28-series model is treated as the M28W unless hardware verification shows otherwise.
 
 ## Desktop platform packages
 
