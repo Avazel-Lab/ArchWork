@@ -738,6 +738,16 @@ phase_reconcile() {
 	fi
 
 	printf '\nSecond run reported changed=0, with Ansible running on the guest.\n'
+
+	# Idempotence says the tasks settle, not what they settle on. D-025 turned
+	# off a group that reaches root without a prompt, and a role that turned it
+	# back on would be just as idempotent about it.
+	log "Asserting the service state reconciliation settled on"
+	ssh "${SSH_OPTS[@]}" gary@127.0.0.1 "mkdir -p /tmp/checks/lib"
+	scp "${SCP_OPTS[@]}" -q "$SCRIPT_DIR/assert-m2.sh" gary@127.0.0.1:/tmp/checks/
+	scp "${SCP_OPTS[@]}" -q "$SCRIPT_DIR/lib/checks.sh" gary@127.0.0.1:/tmp/checks/lib/
+	ssh "${SSH_OPTS[@]}" gary@127.0.0.1 \
+		'chmod +x /tmp/checks/assert-m2.sh && sudo /tmp/checks/assert-m2.sh gary'
 }
 
 # plan.md M1 requires the recovery UKI to boot, not merely to exist. Assert it

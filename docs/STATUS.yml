@@ -46,21 +46,27 @@ milestones:
 # Desktop profile on this commit. Both profiles passed on d16cf4c.
 #
 # This run also drove the M3 desktop from outside the guest: login at the real
-# greeter, all 13 session assertions, terminal and launcher by keybinding,
-# lock and unlock, and a portal file picker from PDF Arranger and from Okular.
-# Two M3 criteria were not covered by it. Tailscale had no assertions at all,
-# which is fixed after this commit and unproven until the next run. Kvantum
-# and the GTK theme are judged from the captures by a person (D-021), and the
-# GTK half cannot pass while D-020 leaves that theme unchosen.
+# greeter, all 21 session assertions including the eight for Tailscale,
+# terminal and launcher by keybinding, lock and unlock, and a portal file
+# picker from PDF Arranger and from Okular. It carried the D-025 container
+# change, and the second reconciliation still reported changed=0.
+#
+# One M3 criterion is not in it. Kvantum and the GTK theme are judged from the
+# captures by a person (D-021), and the GTK half cannot pass while D-020
+# leaves that theme unchosen. Tailscale is asserted only as far as a logged
+# out machine allows: split DNS against a real tailnet waits on the D-006
+# auth key.
+#
+# assert-m2.sh was added after this commit and has never run.
 last_rebuild:
   status: passed
-  commit: 2a98d461a5ddbc5f26bbb399b304f397ef4e4291
+  commit: 844bce5bf0b0ac37c64bef031d242bc965423a31
   date: 2026-08-29
 
 next_actions:
-  - Prove the Tailscale assertions, which are written and have never run, and
-    the Podman change from D-025, which the green run predates. One clean
-    rebuild covers both and gates the first install on the desktop hardware
+  - Run once more to prove assert-m2.sh, which guards the D-025 group and
+    socket and has never run. The rebuild that gates the first install on the
+    desktop hardware is otherwise green
   - Look at the captures and judge the theming criterion. Kvantum reaches Qt
     applications, the portal chooser comes up light against a dark desktop,
     and D-020 still has no GTK theme chosen

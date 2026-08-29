@@ -289,6 +289,24 @@ screenshot_works() {
 	[ -s "$target" ]
 }
 
+# --- Service state (D-025) --------------------------------------------------
+#
+# Stated as positives so that assert-m2.sh can wrap them in check_not and read
+# as the absence it is asserting. A negative predicate inside check_not reads
+# as a double negative and gets misread the first time someone edits it.
+
+unit_is_enabled() {
+	[ "$(systemctl is-enabled "$1" 2>/dev/null)" = enabled ]
+}
+
+unit_is_active() {
+	systemctl is-active --quiet "$1"
+}
+
+user_not_in_group() {
+	! id -nG "$1" 2>/dev/null | tr ' ' '\n' | grep -qx "$2"
+}
+
 # --- Tailscale, and living alongside NetworkManager (D-002, D-019, D-022) ---
 #
 # The machine arrives with tailscaled running and logged out, because the auth
