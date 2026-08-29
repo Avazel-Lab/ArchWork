@@ -5,7 +5,7 @@
 schema: 1
 updated: 2026-08-29
 
-phase: M3
+phase: M4
 
 milestones:
   M0:
@@ -24,7 +24,10 @@ milestones:
       commit: d16cf4c6cdd04a6814e7e04c26844bf1515bd139
       date: 2026-08-28
   M3:
-    status: in-progress
+    status: complete
+    evidence:
+      commit: 0d20ddfa9b3592ef3740f6f25b402afdb9984537
+      date: 2026-08-29
   M4:
     status: not-started
   M5:
@@ -71,7 +74,8 @@ next_actions:
   - Give the harness a way to re-run the desktop and portal phases against a
     kept disk image, instead of reinstalling to test a keypress. Four runs on
     2026-08-29 were lost to one-line harness bugs, and M4 asks for timings
-    measured in tens of minutes
+    measured in tens of minutes, which a full reinstall per iteration cannot
+    carry
   - Write the runbook for the first install on the desktop hardware, before
     the attempt rather than at the keyboard during it (D-017)
   - Fill the manifests against applications.md, which M7 now requires. Most of
