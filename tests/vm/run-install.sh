@@ -584,7 +584,8 @@ phase_desktop() {
 # applications. Dying on the first would mean a failure in the GTK half hides
 # whatever the Qt half would have shown, and each run costs a full install.
 open_picker() {
-	local label="$1" match="$2" app_class="$3"
+	local label="$1" match="$2" app_class="$3" dismiss="${4:-no}"
+	local short="${app_class##*.}"
 
 	log "$label opens a file picker through the portal"
 
@@ -598,16 +599,24 @@ open_picker() {
 	sleep 1
 	press --key ret
 	if ! ask --wait 60 client_class_present "$LOGIN_USER" "$app_class"; then
-		capture "picker-$app_class-no-window"
+		capture "picker-$short-no-window"
 		printf '%s never opened a window. What the compositor had:\n' "$label" >&2
 		ask list_clients "$LOGIN_USER" >&2 || true
 		press --key esc
 		return 1
 	fi
 
+	# Some applications open on a modal that swallows the accelerator. PDF
+	# Arranger greets a new profile with one about what cropping does not do,
+	# and its OK is the default button.
+	if [ "$dismiss" = dismiss ]; then
+		sleep 1
+		press --key ret
+	fi
+
 	press --key ctrl-o
 	if ! ask --wait 30 file_picker_open "$LOGIN_USER" "$app_class"; then
-		capture "picker-$app_class-failed"
+		capture "picker-$short-failed"
 		printf '%s opened no file picker on ctrl-o. What the compositor had:\n' "$label" >&2
 		ask list_clients "$LOGIN_USER" >&2 || true
 		press --key esc
@@ -617,7 +626,7 @@ open_picker() {
 
 	# For the person who judges appearance, and because a picker that opens
 	# unthemed or unreadable still passes the assertion above (D-021).
-	capture "picker-$app_class"
+	capture "picker-$short"
 
 	press --key esc
 	press --key meta_l-q
@@ -628,15 +637,18 @@ open_picker() {
 # and nothing about a picker, so the criterion is finished here where there is
 # a keyboard and a screen.
 #
-# The two applications are chosen in D-023: kvantummanager arrives with the
-# kvantum the theming criterion already needs, and PDF Arranger is named in
-# applications-tooling.md. Neither is installed for the test alone.
+# The two applications are chosen in D-023, both named in the application
+# baseline rather than installed for the test alone. Okular replaced
+# kvantummanager on 2026-08-29 once a run showed Kvantum Manager binds no
+# accelerator at all: its only picker sits behind a button, and it chooses a
+# directory rather than a file.
 phase_portals() {
 	log "Phase 9: the portal file picker, from GTK and from Qt"
 
 	local failures=0
-	open_picker "PDF Arranger (GTK)" pdf pdfarranger || failures=$((failures + 1))
-	open_picker "Kvantum Manager (Qt)" kvantum kvantummanager || failures=$((failures + 1))
+	open_picker "PDF Arranger (GTK)" pdf com.github.jeromerobert.pdfarranger dismiss ||
+		failures=$((failures + 1))
+	open_picker "Okular (Qt)" okular okular || failures=$((failures + 1))
 
 	[ "$failures" -eq 0 ] ||
 		die "$failures of 2 file picker criteria failed. The captures are in $WORK_DIR"

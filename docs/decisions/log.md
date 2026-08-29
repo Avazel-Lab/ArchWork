@@ -564,6 +564,14 @@ Consequences:
 - Ctrl+O is a convention rather than a documented binding for either application, and whether each honours it is unverified until a run says so. The check therefore prints every window the compositor has when it fails, so one run names the right key instead of leaving the next to guess.
 - The window match is loose, on class and title. It can be tightened once a run has shown what the portal actually calls its chooser. Guessing the exact string now would fail a run for the wrong reason.
 
+**Amended on 2026-08-29, after the run that was supposed to confirm it.** The diagnostic above did its job and both halves were wrong.
+
+Kvantum Manager binds no accelerator. It opened, Ctrl+O did nothing, and the capture shows why: its only file dialog sits behind a "Select a Kvantum theme folder" button, and it chooses a directory rather than a file. There is no key to press. It is replaced by `okular`, which the baseline names, which is Qt, and whose Ctrl+O is the standard KDE binding. The cost is 19.5 MiB and a KDE dependency chain in a session set meant to stay small, which is worth it for a criterion that can actually be tested. This was the repository owner's question 4, recommended and not yet answered when the change was made; reversing it is one line in the manifest and one in the harness.
+
+PDF Arranger opened perfectly and the harness looked for the wrong window. Its class is `com.github.jeromerobert.pdfarranger`, not `pdfarranger`, which is the reverse-DNS application id rather than the binary name. It also greets a new profile with a modal about the limits of cropping, and a modal swallows the accelerator, so the harness now dismisses it before pressing anything.
+
+Both facts came from the window list the failure printed rather than from another guess, which is the whole reason that dump exists.
+
 ## D-024 The application baseline is not in this repository
 
 **Status:** open

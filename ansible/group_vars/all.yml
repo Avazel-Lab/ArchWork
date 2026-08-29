@@ -86,10 +86,13 @@ archwork_packages_session:
   - inter-font
   - ttf-liberation
   - ttf-jetbrains-mono-nerd
-  # The GTK application the portal criterion opens a file picker from (D-023).
-  # applications-tooling.md already lists PDF Arranger, so this is where it
-  # lands rather than a package this milestone invented.
+  # The two applications the portal criterion opens a file picker from
+  # (D-023), GTK and Qt. Both are named in the application baseline, so this
+  # decides where they land rather than inventing a package for a test.
+  # Kvantum Manager was the first Qt candidate and binds no accelerator at
+  # all, which a run found out.
   - pdfarranger
+  - okular
 
 # AUR packages, pinned by name like everything else (D-005). Empty until a
 # decision document names one that is needed: Quickshell and Satty arrive at
