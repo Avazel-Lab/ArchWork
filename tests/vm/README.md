@@ -52,8 +52,18 @@ So a kept run can be booted again and its later phases repeated:
 ```bash
 tests/vm/run-install.sh --iso /path/to/archlinux.iso --reconcile --keep
 # ... it fails in phase 8, you fix the harness, then:
-tests/vm/run-install.sh --resume ~/.cache/archwork/archwork-vm.XXXXXX     --phases desktop,portals
+tests/vm/run-install.sh --resume ~/.cache/archwork/archwork-vm.XXXXXX \
+    --phases greeter,session,desktop,portals
 ```
+
+That took 38 seconds, against the 40 minutes a full run costs.
+
+`session` has to come before `desktop` or `portals`. A resumed run boots the
+machine from cold, so it arrives at the greeter with nobody logged in and an
+empty `/tmp`, and `phase_session` is both what types the password at that
+greeter and what puts the check scripts on the machine. Leaving it out is
+refused during preflight rather than 30 seconds later with "command not
+found".
 
 `--resume` needs no `--iso`, implies `--keep`, and takes the profile, the login
 and the SSH key out of the kept directory rather than from its own defaults,
