@@ -1,0 +1,8 @@
+# Kvantum, which themes Qt (D-020).
+#
+# Managed by ArchWork. Qt applications reach this through QT_STYLE_OVERRIDE,
+# which dotfiles/hypr/hyprland.lua sets. Their file dialogs deliberately do not
+# come from here: those come from the portal, which is what D-023 split
+# QT_QPA_PLATFORMTHEME away from Kvantum to arrange.
+[General]
+theme=MateriaDark

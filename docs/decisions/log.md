@@ -381,7 +381,7 @@ The desktop hardware dual boots three systems: Kubuntu on `nvme1n1`, Windows 11 
 
 **What is on the target disk today, checked on 2026-08-29 rather than remembered.** `nvme0n1` is not empty. It carries five partitions: a 500 MB NTFS, a 1.8 TB NTFS, a 954 MB NTFS, a 100 MB EFI system partition and a 569 MB NTFS. That is a Windows installation with its own ESP and recovery partitions, plus the bulk of the data on the machine. Installing ArchWork there destroys all of it, which is the intent, and is the reason this paragraph exists rather than being left to the installer's confirmation prompt.
 
-One prerequisite follows and has not been met. Windows also lives on `sdb`, and until 2026-08-28 that disk had no ESP of its own: one was created at `sdb3` and now holds `Boot0000`. Whether Windows actually boots from it has never been tested. Because the disk about to be wiped holds an ESP too, that test has to happen before the wipe rather than after it. Boot Windows from `sdb` once, then wipe.
+One prerequisite followed from that, and it has now been met. Windows also lives on `sdb`, and until 2026-08-28 that disk had no ESP of its own: one was created at `sdb3` and holds `Boot0000`. Because the disk about to be wiped carries an ESP too, Windows booting from `sdb` had to be proven before the wipe rather than discovered after it. **Confirmed by the repository owner on 2026-08-29: Windows boots from `sdb`.** The wipe no longer takes anything with it that has not been accounted for.
 
 Two facts make the separation worth writing down rather than leaving implicit.
 
@@ -463,7 +463,7 @@ One thing to carry into M3: D-002 has this repository mask `systemd-resolved`, a
 
 ## D-020 Three things M3 needs that no document names
 
-**Status:** open
+**Status:** accepted
 **Date:** 2026-08-28
 **Affects:** `desktop-shell.md`, M3, M6
 
@@ -487,7 +487,17 @@ Recommendation: `ttf-dejavu` as the general fallback, `noto-fonts` and `noto-fon
 
 A recommendation of `ttf-dejavu` briefly stood here and was wrong twice over: the baseline uses Liberation for that job, and it left out CJK and Inter entirely. It is recorded rather than quietly deleted because the lesson is about where the decision lived, not about a font. See D-024, which is about that document not being in this repository.
 
-The GTK theme remains the one part of this entry still open.
+**The GTK theme answered on 2026-08-29,** which closes this entry. `materia-gtk-theme` and `kvantum-theme-materia`, `Materia-dark` and `MateriaDark` respectively, both in `extra`.
+
+The recommendation had been to leave it until the Kvantum theme was chosen, because "matching" was the requirement and neither half was picked. Choosing a project that ships both settles the pair at once, which is why this is one answer rather than two. Neither is in the AUR, so neither takes the clean chroot path D-005 requires.
+
+What the choice actually consists of, since it is less obvious than it sounds. Qt and GTK share no theming machinery at all: Kvantum styles Qt through `QT_STYLE_OVERRIDE`, and GTK applications read a GTK theme that knows nothing about it. So "matching" means either two themes chosen to resemble each other or one project shipping both, and it governs GTK 3 far more than GTK 4, because libadwaita applications follow their own stylesheet and take only the dark preference.
+
+The visible consequence is the one the M3 captures kept showing: `xdg-desktop-portal-gtk` is a GTK 3 application, so the portal file chooser was coming up light against a dark desktop in every run. `dotfiles/gtk-3.0/settings.ini` is what fixes that.
+
+The forward-looking consequence is M6. A theme with a defined palette gives Quickshell colours to match rather than inventing them.
+
+Still not chosen, and deliberately out of scope here: an icon theme. Materia ships none, nothing in the baseline names one, and the M3 criteria do not test icons. It should be decided rather than discovered, like the fonts were.
 
 None of these block the session manifest, which is complete without them. They block M3 looking finished.
 

@@ -33,6 +33,12 @@ archwork_dotfiles_dir: "{{ archwork_repo_dir }}/dotfiles"
 # machine without a change here.
 archwork_dotfile_links:
   - hypr
+  # Theming (D-020). GTK 3 is the one that matters most: the portal file
+  # chooser is a GTK 3 application, so gtk-3.0 is what stops it coming up
+  # light against a dark desktop.
+  - gtk-3.0
+  - gtk-4.0
+  - Kvantum
 
 # The graphical session (M3). Separate from archwork_packages_shared, which is
 # base tooling, because M6 has to install exactly this set with Quickshell
@@ -71,10 +77,14 @@ archwork_packages_session:
   - grim
   # Secret Service, so the greetd password unlocks the keyring (D-012)
   - gnome-keyring
-  # Qt theming (desktop-shell.md). The package also carries kvantummanager,
-  # which is the Qt application the portal criterion opens a file picker from
-  # (D-023), so the Qt half of that criterion costs no extra package.
+  # Theming, Qt and GTK, as a matched pair from one project (D-020).
+  # desktop-shell.md asks for Kvantum "with a matching GTK theme", and Materia
+  # ships both, so matching is a fact about the theme rather than a judgement
+  # about two that happen to be dark. Both are in extra, so neither needs the
+  # AUR path D-005 routes through a clean chroot.
   - kvantum
+  - kvantum-theme-materia
+  - materia-gtk-theme
   # Fonts, as the application baseline names them (D-020). The noto set covers
   # Unicode, emoji and CJK, Inter is the UI face, Liberation carries the metric
   # compatibility with the common Microsoft faces that documents rely on, and

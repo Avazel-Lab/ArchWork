@@ -200,6 +200,12 @@ SOPS was considered and is out of scope (D-024).
 
 - **pavucontrol**, detailed graphical stream and device control, for troubleshooting.
 
+## Theming
+
+- **Kvantum** for Qt, with **kvantum-theme-materia** (`MateriaDark`).
+- **materia-gtk-theme** (`Materia-dark`) for GTK, the matching half (D-020).
+- No icon theme chosen yet. Materia ships none.
+
 ## Diagrams and documentation
 
 - **Mermaid** and the Mermaid CLI, diagrams as code for repositories and documentation.
