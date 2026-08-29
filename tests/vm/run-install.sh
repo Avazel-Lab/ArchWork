@@ -648,7 +648,7 @@ phase_portals() {
 	local failures=0
 	open_picker "PDF Arranger (GTK)" pdf com.github.jeromerobert.pdfarranger dismiss ||
 		failures=$((failures + 1))
-	open_picker "Okular (Qt)" okular okular || failures=$((failures + 1))
+	open_picker "Okular (Qt)" okular org.kde.okular || failures=$((failures + 1))
 
 	[ "$failures" -eq 0 ] ||
 		die "$failures of 2 file picker criteria failed. The captures are in $WORK_DIR"

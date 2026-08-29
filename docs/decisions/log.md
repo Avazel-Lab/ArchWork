@@ -572,6 +572,12 @@ PDF Arranger opened perfectly and the harness looked for the wrong window. Its c
 
 Both facts came from the window list the failure printed rather than from another guess, which is the whole reason that dump exists.
 
+**The GTK half passed on the next run.** Ctrl+O in PDF Arranger opened the portal chooser: Recent, Home and Other Locations down the side, the file columns across, an "Open files read-only" box. That is `xdg-desktop-portal-gtk` drawing it, which is what `GTK_USE_PORTAL=1` was set for, and it is the first time this criterion has been shown rather than assumed.
+
+Okular then failed on exactly the mistake PDF Arranger had already taught: its class is `org.kde.okular`, not `okular`. Both applications name their windows by application id rather than by binary, which is what a Wayland client does. Anything added to this phase should start from the application id and confirm it against a window list, rather than assuming the two match. They rarely do.
+
+The captures also show what the assertions cannot: the portal chooser comes up light against a dark desktop, because the GTK theme is the part of D-020 still open.
+
 ## D-024 The application baseline is not in this repository
 
 **Status:** open
