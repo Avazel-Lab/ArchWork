@@ -34,6 +34,16 @@ INSTALL_TIMEOUT="1800"
 SSH_PORT="2222"
 GUEST_DISK="/dev/vda"
 PASSPHRASE="archwork-test-passphrase"
+# What gets typed at the greeter (D-021). Separate from the LUKS passphrase so
+# that a run cannot pass by conflating the two, and restricted to characters
+# that sendkey.py can type under both the uk and us keymaps.
+LOGIN_PASSWORD="archwork-test-login"
+LOGIN_USER="gary"
+# The background colour dotfiles/hypr/hyprlock.conf paints, which is how the
+# harness tells the lock screen from the desktop it covers. Change it there and
+# change it here.
+LOCK_BACKGROUND="28,28,28"
+CAPTURE_DIR=""
 
 HTTP_PID=""
 QEMU_PID=""
@@ -60,6 +70,8 @@ Options:
   --memory MB           default 4096
   --cpus N              default 4
   --keep                keep the work directory for inspection
+  --captures DIR        copy the screen captures here, since D-021 has a
+                        person judge appearance by looking at them
   --reconcile           run the M2 Ansible reconciliation twice and require
                         the second run to change nothing
   -h, --help            this text
@@ -87,6 +99,7 @@ kill_if_running() {
 cleanup() {
 	kill_if_running "$QEMU_PID"
 	kill_if_running "$HTTP_PID"
+	save_captures
 	if [ "$KEEP" = false ] && [ -n "$WORK_DIR" ] && [ -d "$WORK_DIR" ]; then
 		rm -rf "$WORK_DIR"
 	elif [ -n "$WORK_DIR" ]; then
@@ -124,6 +137,10 @@ parse_args() {
 		--keep)
 			KEEP=true
 			shift
+			;;
+		--captures)
+			CAPTURE_DIR="${2:-}"
+			shift 2
 			;;
 		--reconcile)
 			RECONCILE=true
@@ -201,6 +218,8 @@ prepare_work_dir() {
 
 	# The provisioner fetches these over HTTP from the host.
 	printf '%s' "$PASSPHRASE" >"$WORK_DIR/passphrase"
+	printf '%s' "$LOGIN_USER" >"$WORK_DIR/login-user"
+	printf '%s' "$LOGIN_PASSWORD" >"$WORK_DIR/login-password"
 	printf '%s' "$PROFILE" >"$WORK_DIR/profile"
 	printf '%s' "$GUEST_DISK" >"$WORK_DIR/disk"
 
@@ -383,6 +402,273 @@ phase_greeter() {
 		die "no greeter appeared on the display. The last capture, if any, is at $WORK_DIR/greeter.ppm"
 }
 
+# D-021: log in by typing at the greeter, because a session started any other
+# way skips the PAM stack that the keyring criterion is about. Nothing inside
+# the guest takes part: the keys go onto the emulated keyboard from outside.
+phase_session() {
+	log "Phase 7: logging in at the greeter and asserting the session"
+
+	# tuigreet takes the user name, then the password. The pause matters: the
+	# password field does not exist until the name is submitted, and keys sent
+	# before it does are dropped rather than queued.
+	python3 "$SCRIPT_DIR/sendkey.py" \
+		--monitor "$WORK_DIR/monitor.sock" \
+		--text "$LOGIN_USER" --enter ||
+		die "could not type the user name at the greeter"
+	sleep 3
+	python3 "$SCRIPT_DIR/sendkey.py" \
+		--monitor "$WORK_DIR/monitor.sock" \
+		--text "$LOGIN_PASSWORD" --enter ||
+		die "could not type the password at the greeter"
+
+	log "Waiting for the compositor to come up"
+
+	# The socket directory Hyprland creates for its instance. Present only
+	# once the compositor is running, and it belongs to the user, so it says
+	# the login worked rather than that something started.
+	local attempt
+	for attempt in $(seq 1 45); do
+		if ssh "${SSH_OPTS[@]}" gary@127.0.0.1 \
+			'test -n "$(ls -A "/run/user/$(id -u)/hypr" 2>/dev/null)"' 2>/dev/null; then
+			break
+		fi
+		if [ "$attempt" -eq 45 ]; then
+			# Keep whatever is on screen: a rejected password and a crashed
+			# compositor look identical from out here, and different on it.
+			python3 "$SCRIPT_DIR/screendump.py" \
+				--monitor "$WORK_DIR/monitor.sock" \
+				--output "$WORK_DIR/session-failed.ppm" \
+				--allow-blank --wait 5 || true
+			die "no session appeared after the login. The screen at that point is at $WORK_DIR/session-failed.ppm"
+		fi
+		sleep 2
+	done
+
+	# What the session looks like, for the person who judges appearance (D-021).
+	python3 "$SCRIPT_DIR/screendump.py" \
+		--monitor "$WORK_DIR/monitor.sock" \
+		--output "$WORK_DIR/session.ppm" \
+		--wait 30 ||
+		die "the session drew nothing on the screen, see $WORK_DIR/session.ppm"
+
+	ssh "${SSH_OPTS[@]}" gary@127.0.0.1 "mkdir -p /tmp/checks/lib"
+	scp "${SCP_OPTS[@]}" -q "$SCRIPT_DIR/assert-m3.sh" gary@127.0.0.1:/tmp/checks/
+	scp "${SCP_OPTS[@]}" -q "$SCRIPT_DIR/check-session.sh" gary@127.0.0.1:/tmp/checks/
+	scp "${SCP_OPTS[@]}" -q "$SCRIPT_DIR/lib/checks.sh" gary@127.0.0.1:/tmp/checks/lib/
+	ssh "${SSH_OPTS[@]}" gary@127.0.0.1 "chmod +x /tmp/checks/check-session.sh"
+
+	ssh "${SSH_OPTS[@]}" gary@127.0.0.1 \
+		'chmod +x /tmp/checks/assert-m3.sh && sudo /tmp/checks/assert-m3.sh gary'
+}
+
+# Press a key on the guest's keyboard, from outside the guest.
+press() {
+	python3 "$SCRIPT_DIR/sendkey.py" --monitor "$WORK_DIR/monitor.sock" "$@"
+}
+
+# Ask the machine one question about its session.
+ask() {
+	# shellcheck disable=SC2029 # the arguments name the check and are meant to expand here, on the host
+	ssh "${SSH_OPTS[@]}" gary@127.0.0.1 "sudo /tmp/checks/check-session.sh $*"
+}
+
+# Keep whatever is on screen, whether or not anything is drawn on it. Used
+# where a capture is evidence for a person rather than an assertion.
+capture() {
+	python3 "$SCRIPT_DIR/screendump.py" \
+		--monitor "$WORK_DIR/monitor.sock" \
+		--output "$WORK_DIR/$1.ppm" \
+		--allow-blank --wait 5 >/dev/null 2>&1 || true
+}
+
+# The M3 criteria that describe using the machine: open a terminal, launch an
+# application from the launcher, lock the session, unlock it. Every one of them
+# is a real key press at the framebuffer followed by a question asked over SSH,
+# because a keybinding that never fired and a compositor that ignored it look
+# identical from inside the guest.
+#
+# Pressing the binding rather than running the command is the point. Half of
+# what M3 delivers is the configuration that maps SUPER+Return to a terminal,
+# and hyprctl dispatch exec would prove kitty runs while saying nothing about
+# whether the desktop can start it.
+phase_desktop() {
+	log "Phase 8: using the desktop the way the M3 criteria describe"
+
+	log "SUPER+Return opens a terminal"
+	press --key meta_l-ret
+	ask --wait 20 client_class_present "$LOGIN_USER" kitty || {
+		capture terminal-failed
+		die "SUPER+Return opened no terminal. The screen is at $WORK_DIR/terminal-failed.ppm"
+	}
+
+	log "SUPER+Q closes it"
+	press --key meta_l-q
+	ask --wait 20 client_class_absent "$LOGIN_USER" kitty || {
+		capture close-failed
+		die "SUPER+Q left the terminal open. The screen is at $WORK_DIR/close-failed.ppm"
+	}
+
+	log "SUPER+D opens the launcher"
+	press --key meta_l-d
+	ask --wait 20 user_process_running "$LOGIN_USER" fuzzel || {
+		capture launcher-failed
+		die "SUPER+D opened no launcher. The screen is at $WORK_DIR/launcher-failed.ppm"
+	}
+
+	log "The launcher starts an application"
+	press --text kitty
+	sleep 1
+	press --key ret
+	ask --wait 30 client_class_present "$LOGIN_USER" kitty || {
+		capture launch-failed
+		die "the launcher started nothing. The screen is at $WORK_DIR/launch-failed.ppm"
+	}
+
+	# The desktop in use, for the person who judges appearance (D-021).
+	capture desktop
+
+	log "SUPER+L locks the session"
+	press --key meta_l-l
+	ask --wait 20 user_process_running "$LOGIN_USER" hyprlock || {
+		capture lock-failed
+		die "SUPER+L did not lock the session. The screen is at $WORK_DIR/lock-failed.ppm"
+	}
+
+	# The process is not the lock screen. hyprlock appears in the process table
+	# well before its surface takes the display, and on 2026-08-29 the harness
+	# typed the password into that gap: the capture taken the moment the
+	# process check passed shows the desktop, waybar and a terminal, all still
+	# fully on screen. Every keystroke went to the terminal underneath.
+	#
+	# So wait for the screen itself. The background colour is the one
+	# dotfiles/hypr/hyprlock.conf sets, which the desktop does not have, and
+	# there must be something drawn on it as well, because hyprlock paints its
+	# background before it paints the clock and the field.
+	log "Waiting for the lock screen to take the display"
+	python3 "$SCRIPT_DIR/screendump.py" \
+		--monitor "$WORK_DIR/monitor.sock" \
+		--output "$WORK_DIR/locked.ppm" \
+		--expect-dominant "$LOCK_BACKGROUND" \
+		--wait 30 ||
+		die "the lock screen never reached the display. The screen is at $WORK_DIR/locked.ppm"
+
+	log "The login password unlocks it"
+	# Two attempts, never more. Arch enables pam_faillock, which locks the
+	# account after three failures, so a harness that retried freely would turn
+	# a slow lock screen into a locked-out account and a much more confusing
+	# failure. A failed attempt clears hyprlock's buffer, so the second attempt
+	# starts clean without needing to flush anything.
+	local attempt
+	for attempt in 1 2; do
+		press --text "$LOGIN_PASSWORD" --enter
+		if ask --wait 20 process_absent "$LOGIN_USER" hyprlock; then
+			break
+		fi
+		if [ "$attempt" -eq 2 ]; then
+			capture unlock-failed
+			die "the session stayed locked after 2 password attempts. The screen is at $WORK_DIR/unlock-failed.ppm"
+		fi
+		log "No unlock on attempt $attempt, trying once more"
+	done
+	capture unlocked
+}
+
+# Open one application from the launcher and ask it for a file picker, then
+# assert that the window which appears is not its own.
+#
+# Ctrl+O is the accelerator both toolkits conventionally use. Whether each of
+# these two applications actually binds it is the part no document settles, so
+# a failure here prints every window the compositor has rather than only
+# saying no: one run then names what to press instead (D-023).
+# Reports rather than dies, so that one run says something about both
+# applications. Dying on the first would mean a failure in the GTK half hides
+# whatever the Qt half would have shown, and each run costs a full install.
+open_picker() {
+	local label="$1" match="$2" app_class="$3" dismiss="${4:-no}"
+	local short="${app_class##*.}"
+
+	log "$label opens a file picker through the portal"
+
+	press --key meta_l-d
+	if ! ask --wait 20 user_process_running "$LOGIN_USER" fuzzel; then
+		printf 'the launcher did not open for %s\n' "$label" >&2
+		return 1
+	fi
+
+	press --text "$match"
+	sleep 1
+	press --key ret
+	if ! ask --wait 60 client_class_present "$LOGIN_USER" "$app_class"; then
+		capture "picker-$short-no-window"
+		printf '%s never opened a window. What the compositor had:\n' "$label" >&2
+		ask list_clients "$LOGIN_USER" >&2 || true
+		press --key esc
+		return 1
+	fi
+
+	# Some applications open on a modal that swallows the accelerator. PDF
+	# Arranger greets a new profile with one about what cropping does not do,
+	# and its OK is the default button.
+	if [ "$dismiss" = dismiss ]; then
+		sleep 1
+		press --key ret
+	fi
+
+	press --key ctrl-o
+	if ! ask --wait 30 file_picker_open "$LOGIN_USER" "$app_class"; then
+		capture "picker-$short-failed"
+		printf '%s opened no file picker on ctrl-o. What the compositor had:\n' "$label" >&2
+		ask list_clients "$LOGIN_USER" >&2 || true
+		press --key esc
+		press --key meta_l-q
+		return 1
+	fi
+
+	# For the person who judges appearance, and because a picker that opens
+	# unthemed or unreadable still passes the assertion above (D-021).
+	capture "picker-$short"
+
+	press --key esc
+	press --key meta_l-q
+}
+
+# "Portals work. A file picker opens from a GTK application and from a Qt
+# application." assert-m3.sh only pings the portal, which says it is reachable
+# and nothing about a picker, so the criterion is finished here where there is
+# a keyboard and a screen.
+#
+# The two applications are chosen in D-023, both named in the application
+# baseline rather than installed for the test alone. Okular replaced
+# kvantummanager on 2026-08-29 once a run showed Kvantum Manager binds no
+# accelerator at all: its only picker sits behind a button, and it chooses a
+# directory rather than a file.
+phase_portals() {
+	log "Phase 9: the portal file picker, from GTK and from Qt"
+
+	local failures=0
+	open_picker "PDF Arranger (GTK)" pdf com.github.jeromerobert.pdfarranger dismiss ||
+		failures=$((failures + 1))
+	open_picker "Okular (Qt)" okular org.kde.okular || failures=$((failures + 1))
+
+	[ "$failures" -eq 0 ] ||
+		die "$failures of 2 file picker criteria failed. The captures are in $WORK_DIR"
+}
+
+# D-021 judges appearance by looking at the captures, so a run that throws them
+# away leaves that criterion unprovable.
+save_captures() {
+	[ -n "$CAPTURE_DIR" ] || return 0
+	[ -n "$WORK_DIR" ] && [ -d "$WORK_DIR" ] || return 0
+
+	mkdir -p "$CAPTURE_DIR"
+	local capture
+	for capture in "$WORK_DIR"/*.ppm; do
+		[ -e "$capture" ] || continue
+		cp "$capture" "$CAPTURE_DIR/"
+	done
+	printf '\nCaptures saved in %s. Look at them: nothing else judges appearance.\n' "$CAPTURE_DIR"
+}
+
 phase_assert() {
 	log "Phase 3: asserting the M1 criteria"
 
@@ -452,6 +738,16 @@ phase_reconcile() {
 	fi
 
 	printf '\nSecond run reported changed=0, with Ansible running on the guest.\n'
+
+	# Idempotence says the tasks settle, not what they settle on. D-025 turned
+	# off a group that reaches root without a prompt, and a role that turned it
+	# back on would be just as idempotent about it.
+	log "Asserting the service state reconciliation settled on"
+	ssh "${SSH_OPTS[@]}" gary@127.0.0.1 "mkdir -p /tmp/checks/lib"
+	scp "${SCP_OPTS[@]}" -q "$SCRIPT_DIR/assert-m2.sh" gary@127.0.0.1:/tmp/checks/
+	scp "${SCP_OPTS[@]}" -q "$SCRIPT_DIR/lib/checks.sh" gary@127.0.0.1:/tmp/checks/lib/
+	ssh "${SSH_OPTS[@]}" gary@127.0.0.1 \
+		'chmod +x /tmp/checks/assert-m2.sh && sudo /tmp/checks/assert-m2.sh gary'
 }
 
 # plan.md M1 requires the recovery UKI to boot, not merely to exist. Assert it
@@ -517,6 +813,9 @@ main() {
 			# session role, so a freshly installed machine has no greeter to
 			# find. M1 deliberately stops at a text login.
 			phase_greeter
+			phase_session
+			phase_desktop
+			phase_portals
 		fi
 		phase_recovery
 

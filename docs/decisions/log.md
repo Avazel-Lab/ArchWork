@@ -477,7 +477,13 @@ Recommendation: leave this open until the Kvantum theme itself is chosen, becaus
 
 Recommendation: `ttf-dejavu` as the general fallback, `noto-fonts` and `noto-fonts-emoji` for coverage, and one monospace face for Kitty and the bar. All are in `extra`. Worth deciding before M3's first screenshot rather than after.
 
-**Answered on 2026-08-28.** The bar is `waybar`, installed with the configuration it ships rather than a set of dotfiles: it is the fallback that M6 replaces, so effort spent styling it now is spent twice. The GTK theme stays open until the Kvantum theme it has to match is chosen. Fonts are still open.
+**Answered on 2026-08-28.** The bar is `waybar`, installed with the configuration it ships rather than a set of dotfiles: it is the fallback that M6 replaces, so effort spent styling it now is spent twice. The GTK theme stays open until the Kvantum theme it has to match is chosen.
+
+**Fonts answered on 2026-08-29,** and the premise of the question was wrong. A document did name them: the application baseline the repository owner holds has a Fonts section, and this entry was written without it. The answer is that document's, not a recommendation: `noto-fonts`, `noto-fonts-emoji` and `noto-fonts-cjk` for Unicode, emoji and CJK coverage, `inter-font` as the UI face, `ttf-liberation` for metric compatibility with the common Microsoft faces, and `ttf-jetbrains-mono-nerd` as the terminal and editor face. All six are in `extra`.
+
+A recommendation of `ttf-dejavu` briefly stood here and was wrong twice over: the baseline uses Liberation for that job, and it left out CJK and Inter entirely. It is recorded rather than quietly deleted because the lesson is about where the decision lived, not about a font. See D-024, which is about that document not being in this repository.
+
+The GTK theme remains the one part of this entry still open.
 
 None of these block the session manifest, which is complete without them. They block M3 looking finished.
 
@@ -508,3 +514,134 @@ Consequences:
 - Appearance is therefore judged by a person looking at the captures a run saves, recorded against a commit like any other evidence. That is a deliberate manual step, and the only one in the test ladder.
 - The count is absolute rather than a ratio. The first version asked that the dominant colour cover under 99.5% of the screen; a real tuigreet measured 99.450% and the next run 99.453%, so the run-to-run variance was larger than the margin. `tests/unit/screendump.bats` holds those measurements.
 - The kernel command line names both `tty0` and `ttyS0`, because a machine with a display would otherwise leave the serial console silent and the LUKS prompt unanswerable.
+
+## D-022 Two M3 choices the documents leave to implementation
+
+**Status:** accepted
+**Date:** 2026-08-29
+**Affects:** `desktop-shell.md`, M2, M3, M6
+
+Both were reached while building the M3 desktop. Neither is answered anywhere, both had to be answered for a rebuild to produce a desktop at all, and the code now does what is recommended below so that M3 could be tested. Reversing either is a small change, and this entry exists so that the choices are visible rather than buried in a role.
+
+**How user configuration reaches the machine.** `CLAUDE.md` gives `dotfiles/` its place in the repository and says nothing about how a file there becomes a file in `~/.config`. The two answers are copying, which Ansible does natively, and linking the clone D-016 already puts in the user's home directory.
+
+Recommendation: link. An edit made at the machine is then an edit to the repository, so `git status` in the clone shows what was changed at 23:00 on a Tuesday, and Hyprland reloads a saved file immediately. Copying leaves the two diverging silently until the next rebuild throws the local changes away, which for a personal workstation is the failure that actually happens. The cost is that the desktop depends on the clone staying where it is: delete it and the configuration goes with it.
+
+**Whether tailscaled runs at boot.** D-019 puts Tailscale in M3 and the M3 criteria say it "comes up", which implies a daemon that starts by itself, but D-019 answered the same question for Docker explicitly rather than leaving it implied, and a VPN daemon deserves the same treatment.
+
+Recommendation: enable `tailscaled.service`. Unlike `docker.socket` this widens nothing on its own: the daemon carries no traffic until something signs it in, and the auth key that would is one of the secrets D-006 has yet to bring. A machine that has to be told to start its own network every boot is a machine that will be found offline.
+
+Neither blocks M3. Both should be confirmed or reversed before M7 treats the rebuild as the thing being proven.
+
+**Both confirmed by the repository owner on 2026-08-29**, as built. Status accepted.
+
+Consequences:
+
+- The desktop's configuration is the clone. Deleting `~/src/ArchWork` takes the Hyprland configuration with it, and an edit made at 23:00 on a Tuesday shows up in `git status` rather than being lost at the next rebuild.
+- `tailscaled.service` is enabled. The daemon starts at boot and carries nothing until an auth key signs it in, which is a D-006 secret that has yet to arrive.
+
+## D-023 Which applications prove the portal file picker, and the environment they need
+
+**Status:** accepted
+**Date:** 2026-08-29
+**Affects:** `desktop-shell.md`, M3
+
+M3 asks that "a file picker opens from a GTK application and from a Qt application". No application on an ArchWork machine could open one: the session manifest is a compositor, a terminal, a launcher, a bar, a lock screen and a notifier, and none of them has a file to choose. The criterion was untestable rather than failing, which is worse, because a run could pass without ever touching the code path.
+
+The applications are `pdfarranger` for GTK and `kvantummanager` for Qt. Neither is installed for the test alone: `applications-tooling.md` already lists PDF Arranger, so this decides where it lands rather than adding it, and Kvantum Manager arrives inside the `kvantum` that the theming criterion needs anyway.
+
+Rejected: toolkit demo applications such as `gtk3-demo`. They would be honest test scaffolding and would need a decision document to name a package that exists for no other reason, which is a worse trade than using two applications the workstation wants regardless. Also rejected: narrowing the criterion to a `gdbus` ping of the FileChooser interface. `assert-m3.sh` already pings the portal, and that check stays, but it says the portal is reachable and nothing about whether a picker opens.
+
+The environment matters more than the applications. Two settings are needed and one of them contradicts the usual advice:
+
+- `GTK_USE_PORTAL=1`. Without it a GTK application opens its own chooser, which looks the same on screen and proves nothing about `xdg-desktop-portal-gtk`.
+- `QT_QPA_PLATFORMTHEME=xdgdesktopportal` with `QT_STYLE_OVERRIDE=kvantum`. Setting the platform theme to `kvantum`, which is what most Kvantum instructions say, hands Qt its own file dialog and takes the portal out of the path. Splitting the two keeps the portal drawing dialogs and Kvantum painting widgets, so the picker criterion and the theming criterion stop competing.
+
+Consequences:
+
+- Both criteria can be tested by the same session. Before this they could not both hold.
+- `phase_portals` in the harness opens each application from the launcher, presses Ctrl+O, and asserts a window appears that does not belong to the application that asked for it. That last part is what distinguishes a portal dialog from an application's own.
+- Ctrl+O is a convention rather than a documented binding for either application, and whether each honours it is unverified until a run says so. The check therefore prints every window the compositor has when it fails, so one run names the right key instead of leaving the next to guess.
+- The window match is loose, on class and title. It can be tightened once a run has shown what the portal actually calls its chooser. Guessing the exact string now would fail a run for the wrong reason.
+
+**Amended on 2026-08-29, after the run that was supposed to confirm it.** The diagnostic above did its job and both halves were wrong.
+
+Kvantum Manager binds no accelerator. It opened, Ctrl+O did nothing, and the capture shows why: its only file dialog sits behind a "Select a Kvantum theme folder" button, and it chooses a directory rather than a file. There is no key to press. It is replaced by `okular`, which the baseline names, which is Qt, and whose Ctrl+O is the standard KDE binding. The cost is 19.5 MiB and a KDE dependency chain in a session set meant to stay small, which is worth it for a criterion that can actually be tested. This was the repository owner's question 4, recommended and not yet answered when the change was made; reversing it is one line in the manifest and one in the harness.
+
+PDF Arranger opened perfectly and the harness looked for the wrong window. Its class is `com.github.jeromerobert.pdfarranger`, not `pdfarranger`, which is the reverse-DNS application id rather than the binary name. It also greets a new profile with a modal about the limits of cropping, and a modal swallows the accelerator, so the harness now dismisses it before pressing anything.
+
+Both facts came from the window list the failure printed rather than from another guess, which is the whole reason that dump exists.
+
+**The GTK half passed on the next run.** Ctrl+O in PDF Arranger opened the portal chooser: Recent, Home and Other Locations down the side, the file columns across, an "Open files read-only" box. That is `xdg-desktop-portal-gtk` drawing it, which is what `GTK_USE_PORTAL=1` was set for, and it is the first time this criterion has been shown rather than assumed.
+
+Okular then failed on exactly the mistake PDF Arranger had already taught: its class is `org.kde.okular`, not `okular`. Both applications name their windows by application id rather than by binary, which is what a Wayland client does. Anything added to this phase should start from the application id and confirm it against a window list, rather than assuming the two match. They rarely do.
+
+The captures also show what the assertions cannot: the portal chooser comes up light against a dark desktop, because the GTK theme is the part of D-020 still open.
+
+## D-024 The application baseline is not in this repository
+
+**Status:** open
+**Date:** 2026-08-29
+**Affects:** `applications-tooling.md`, `CLAUDE.md`, D-006, D-019, D-020, M8, M9
+
+D-020 asked which fonts to install and said "nothing names any". That was wrong. The repository owner holds an application baseline with a Fonts section, and this repository does not contain it. `docs/decisions/applications-tooling.md` is a much shorter document that overlaps it in places and disagrees with it in others.
+
+The immediate cost was a font set invented on 2026-08-29 that named `ttf-dejavu`, which the baseline does not use, and omitted CJK coverage and the UI face entirely. That is now corrected. The cost worth preventing is the next one: an agent reading only what is in this repository cannot tell that a fuller document exists, and `CLAUDE.md` tells it not to add a package no decision document lists. It will keep inventing answers that already have them.
+
+Three disagreements matter more than the fonts, and none should be settled by an agent picking whichever document it read last.
+
+**Docker and Podman.** Answered on 2026-08-29 and moved to D-025, which supersedes the container half of D-019. Podman is the engine, Docker is a client for remote systems, and the `docker` group is removed rather than merely no longer added.
+
+**git-crypt.** The baseline lists it under Git. `CLAUDE.md` says repository secrets use age and nothing else, and that git-crypt is not used. D-006 decided that.
+
+Recommendation: keep D-006 and drop git-crypt from the baseline. `CLAUDE.md` states it as a rule rather than a preference, and nothing in the repository uses it. This looks like the baseline predating D-006 rather than a live disagreement, but it should be struck from one document or the other rather than left in both.
+
+**SOPS.** The baseline lists it for encrypted configuration. D-006's "age only" was about repository secrets, and SOPS is a different job, so this may be no contradiction at all.
+
+Recommendation: decide whether SOPS is in scope for this workstation at all, and if it is, say in D-006 that "age only" governs secrets in this repository rather than every encryption tool installed on the machine. As written the two can be read as conflicting.
+
+Recommendation for the entry as a whole: bring the baseline into `docs/decisions/` as the applications document, with `applications-tooling.md` either replaced by it or reduced to the decisions that are genuinely about this repository rather than about which applications the owner wants. Where the two disagree, the baseline wins except on git-crypt.
+
+## D-025 Podman is the desktop container engine, and Docker is a client
+
+**Status:** accepted
+**Date:** 2026-08-29
+**Affects:** `applications-tooling.md`, D-019, M2
+
+Supersedes the container half of D-019, which read the application baseline backwards.
+
+Podman is the container engine on this workstation, chosen over Docker deliberately and partly to gain practical Podman experience. Docker stays installed as tooling for remote Docker systems such as the VPS. Confirmed by the repository owner on 2026-08-29, from the baseline D-024 raises.
+
+D-019 had it the other way round, and the consequence was not cosmetic. It enabled `docker.socket` and put the administrator account in the `docker` group, and wrote down that the group reaches a root daemon with no password prompt. That widening was accepted on the understanding that Docker was the engine the workstation used. It was not, so the machine carried a root-equivalent group for a daemon nothing was meant to talk to.
+
+Consequences:
+
+- No `docker.socket`, and nobody in the `docker` group. Reconciliation actively removes that group membership rather than only stopping adding it, because a machine built under D-019 already has it and would otherwise keep it for its life while every document said otherwise.
+- Rootless Podman needs no daemon and no group, so there is nothing to enable and nothing to widen. `podman-compose` joins the manifest, which the baseline names and no manifest had.
+- Docker's daemon is installed and never started. Arch ships no separate client package, so the CLI arrives with a dockerd that this machine does not run. Verified against the package repositories rather than assumed: there is no `docker-cli` in `extra`.
+- Reaching a local Docker daemon now needs sudo, deliberately. If something on this workstation ever genuinely needs one, reopen this decision rather than restoring the socket, because the group comes back with it.
+- D-019's Tailscale half stands unchanged.
+
+## D-026 Hyprland says we start it the wrong way, and that our config format is going away
+
+**Status:** open
+**Date:** 2026-08-29
+**Affects:** `desktop-shell.md`, D-004, M3, M5, M6
+
+Neither of these was looked for. Both were read off a screen capture the M3 run saved on 2026-08-29, in two notifications Hyprland drew on its own desktop.
+
+**"Hyprland was started without start-hyprland. This is strongly discouraged unless you are in a debugging environment."**
+
+D-004 has greetd run `tuigreet --time --cmd Hyprland`, which is what every Hyprland and greetd guide said when it was written. The package now ships `/usr/bin/start-hyprland` and a `hyprland-uwsm.desktop` session alongside `/usr/bin/Hyprland`, and the compositor tells anyone who starts it directly that they should not. Verified against the package file list rather than inferred from the message.
+
+Recommendation: switch the greeter's command to `start-hyprland` and re-run the M3 criteria. The reason to change it is that a wrapper the project tells you to use is where session setup will keep landing, and a workstation that skips it drifts further from the supported path every release. The reason to be careful is that the wrapper's job is precisely the session environment, so it can move the keyring, the portal and the D-Bus activation environment, which are three criteria that currently pass. That makes it a change to make deliberately and test, not one to slip in. M3's criteria are the test.
+
+**"You are using the .conf config format, support for which will be removed in Hyprland 0.57."**
+
+`extra` has 0.56.2 today, so the release that drops the format is the next one. Every file in `dotfiles/hypr/` is in it. On a rolling distribution this arrives on its own schedule rather than ours, and a desktop that stops reading its configuration on an ordinary update is exactly the failure this repository exists to prevent.
+
+Recommendation: do not chase it before the first hardware install, and do not let it arrive unannounced either. What the replacement format is, and whether a converter ships, needs establishing before 0.57 lands. This also argues for the M5 update path surfacing deprecation warnings rather than discarding them, because this one was found by looking at a screenshot, which is not a process.
+
+Consequences either way:
+
+- The capture that carried both notifications is the first evidence in this repository that came from looking at the screen rather than from an assertion. D-021 argued for saving captures and having a person look at them. This is what that was for.

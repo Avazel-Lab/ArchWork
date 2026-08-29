@@ -1,0 +1,33 @@
+---
+# User configuration, linked from the clone rather than copied into place.
+#
+# D-016 puts this repository in the user's home directory, so the dotfiles are
+# already on the machine before this role runs. Linking means an edit made at
+# the machine is an edit to the repository: `git status` in the clone shows
+# what was changed at 23:00 on a Tuesday, which is the only way a personal
+# workstation stays reproducible. Copying would leave the two silently
+# diverging until the next rebuild threw the changes away.
+#
+# Nothing here reads the profile. The desktop environment is shared
+# (desktop-laptop-differences.md).
+
+- name: Ensure the user configuration directory exists
+  ansible.builtin.file:
+    path: "/home/{{ archwork_admin_user }}/.config"
+    state: directory
+    owner: "{{ archwork_admin_user }}"
+    group: "{{ archwork_admin_user }}"
+    mode: "0755"
+  become: true
+
+- name: Link the user configuration at the repository
+  ansible.builtin.file:
+    src: "{{ archwork_dotfiles_dir }}/{{ item }}"
+    dest: "/home/{{ archwork_admin_user }}/.config/{{ item }}"
+    state: link
+    force: true
+    follow: false
+    owner: "{{ archwork_admin_user }}"
+    group: "{{ archwork_admin_user }}"
+  loop: "{{ archwork_dotfile_links }}"
+  become: true

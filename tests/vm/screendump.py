@@ -12,6 +12,11 @@ screen. It does not read the screen, and it makes no claim about themes,
 fonts or layout. Those are judged by looking at the image this saves, because
 a check that claimed to verify them and did not would be worse than no check.
 
+--expect-dominant adds one more question, and only one: is the background the
+colour this repository set for a particular screen. That is enough to tell the
+lock screen from the desktop, which "something is drawn" cannot do, and it is
+still not reading the screen.
+
 Writes a PPM, since that is what screendump produces everywhere rather than
 only on newer QEMU. Exits 0 when the screen has content, non-zero on timeout.
 """
@@ -21,9 +26,10 @@ from __future__ import annotations
 import argparse
 import collections
 import os
-import socket
 import sys
 import time
+
+from qemu_monitor import monitor_command
 
 # How many sampled pixels must differ from the background before the screen
 # counts as having something on it.
@@ -37,33 +43,6 @@ import time
 # 256000 sampled, against exactly 0 for a blank screen, which is a gap worth
 # putting a threshold in the middle of.
 MIN_DRAWN_PIXELS = 200
-
-
-def monitor_command(path: str, command: str, timeout: float = 10.0) -> str:
-    """Send one command to a QEMU HMP monitor socket and return what it said."""
-    with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as sock:
-        sock.settimeout(timeout)
-        sock.connect(path)
-        # The monitor greets first. Read whatever is waiting, then send.
-        time.sleep(0.2)
-        try:
-            sock.recv(65536)
-        except socket.timeout:
-            pass
-        sock.sendall(command.encode() + b"\n")
-        time.sleep(0.5)
-        out = b""
-        try:
-            while True:
-                chunk = sock.recv(65536)
-                if not chunk:
-                    break
-                out += chunk
-                if b"(qemu)" in out:
-                    break
-        except socket.timeout:
-            pass
-        return out.decode(errors="replace")
 
 
 def read_ppm(path: str) -> tuple[int, int, bytes]:
@@ -109,17 +88,55 @@ def describe(pixels: bytes, sample: int = 4) -> tuple[int, float, list[tuple[tup
     return total - dominant, dominant / total, counts.most_common(4)
 
 
-def verdict(path: str) -> tuple[bool, str]:
-    """Read a PPM and say whether anything is drawn on it."""
+def parse_colour(text: str) -> tuple[int, int, int]:
+    """An R,G,B triple, as --expect-dominant takes it."""
+    parts = text.split(",")
+    if len(parts) != 3:
+        raise argparse.ArgumentTypeError(f"expected R,G,B but got {text!r}")
+    try:
+        values = tuple(int(part) for part in parts)
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"expected three numbers but got {text!r}") from None
+    if not all(0 <= value <= 255 for value in values):
+        raise argparse.ArgumentTypeError(f"channel out of range in {text!r}")
+    return values  # type: ignore[return-value]
+
+
+def verdict(path: str, expect_dominant: tuple[int, int, int] | None = None) -> tuple[bool, str]:
+    """Read a PPM and say whether the wanted screen is on it.
+
+    Without expect_dominant this asks only that something is drawn, which is
+    what the greeter check needs. With it, the background must also be the
+    given colour.
+
+    That second question exists because "something is drawn" cannot tell one
+    screen from another, and the harness has to wait for a specific one. On
+    2026-08-29 it pressed the lock keybinding, saw hyprlock's process appear,
+    and typed the password into a desktop that was still fully on screen: the
+    process exists well before the lock surface takes the display. The desktop
+    has plenty drawn on it, so only naming a colour the lock screen has and
+    the desktop does not can separate them.
+    """
     width, height, pixels = read_ppm(path)
     drawn, ratio, top = describe(pixels)
+    dominant = top[0][0]
     summary = (
         f"screen {width}x{height}, {drawn} sampled pixels differ from the "
         f"background, which covers {ratio:.3%}"
     )
     for colour, count in top:
         summary += f"\n  rgb{colour}: {count}"
-    return drawn >= MIN_DRAWN_PIXELS, summary
+
+    if drawn < MIN_DRAWN_PIXELS:
+        return False, summary
+
+    if expect_dominant is not None and dominant != expect_dominant:
+        summary += (
+            f"\n  background is rgb{dominant}, waiting for rgb{expect_dominant}"
+        )
+        return False, summary
+
+    return True, summary
 
 
 def main() -> int:
@@ -132,6 +149,13 @@ def main() -> int:
     )
     parser.add_argument("--wait", type=float, default=60.0, help="seconds to wait for content")
     parser.add_argument(
+        "--expect-dominant",
+        type=parse_colour,
+        metavar="R,G,B",
+        help="wait for a screen whose background is this colour, so that one "
+        "screen can be told from another",
+    )
+    parser.add_argument(
         "--allow-blank",
         action="store_true",
         help="capture and report, but do not fail on a blank screen",
@@ -139,10 +163,15 @@ def main() -> int:
     args = parser.parse_args()
 
     if args.analyse:
-        drawn, summary = verdict(args.analyse)
+        drawn, summary = verdict(args.analyse, args.expect_dominant)
         print(summary)
         if not drawn:
-            print("nothing is drawn on this screen", file=sys.stderr)
+            reason = (
+                "this is not the screen being waited for"
+                if args.expect_dominant is not None
+                else "nothing is drawn on this screen"
+            )
+            print(reason, file=sys.stderr)
             return 1
         return 0
 
@@ -166,7 +195,7 @@ def main() -> int:
             time.sleep(0.25)
 
         try:
-            drawn, summary = verdict(args.output)
+            drawn, summary = verdict(args.output, args.expect_dominant)
         except (OSError, ValueError) as exc:
             print(f"could not read a screenshot yet: {exc}", file=sys.stderr)
             if time.monotonic() > deadline:
@@ -180,10 +209,12 @@ def main() -> int:
             break
 
         if time.monotonic() > deadline:
-            print(
-                f"the screen stayed blank for {args.wait:.0f}s",
-                file=sys.stderr,
+            wanted = (
+                f"never showed a background of rgb{args.expect_dominant}"
+                if args.expect_dominant is not None
+                else "stayed blank"
             )
+            print(f"the screen {wanted} for {args.wait:.0f}s", file=sys.stderr)
             return 1
 
         time.sleep(2)

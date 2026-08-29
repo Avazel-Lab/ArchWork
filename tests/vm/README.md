@@ -1,7 +1,7 @@
 # VM test harness
 
-L3 of the test ladder: install ArchWork into a throwaway VM and assert the M1
-exit criteria.
+L3 of the test ladder: install ArchWork into a throwaway VM, reconcile it, log
+in at the greeter and assert the M1 and M3 exit criteria.
 
 CI does not run any of this. GitHub Actions has no nested virtualisation, and a
 job that skips itself and reports green is worse than no job. See
@@ -35,7 +35,9 @@ tests/vm/run-install.sh --iso /path/to/archlinux.iso --profile desktop
 tests/vm/run-install.sh --iso /path/to/archlinux.iso --profile laptop --repeat 2 --keep
 ```
 
-M1 needs `--repeat 2`, on both profiles.
+M1 needs `--repeat 2`, on both profiles. M3 needs `--reconcile`: greetd is
+configured by the session role, so a machine that has only been installed has
+no greeter to log in at.
 
 ## What happens
 
@@ -46,9 +48,50 @@ M1 needs `--repeat 2`, on both profiles.
    serial console and answers the LUKS passphrase prompt.
 3. **Assert.** `assert-m1.sh` runs on the guest over SSH and checks every M1
    criterion.
+4. **Reconcile**, with `--reconcile`. The guest runs `bootstrap.sh`, which is
+   the command an operator runs, once with `--dry-run` and then twice for
+   real. The second real run has to report `changed=0`.
+5. **Greeter.** `screendump.py` captures the framebuffer through the QEMU
+   monitor and refuses a screen with nothing drawn on it.
+6. **Log in.** `sendkey.py` types the user name and password at the real
+   greeter, from outside the guest. `assert-m3.sh` then asserts the session
+   over SSH, including the criterion the whole shape exists for: the login
+   password unlocked the keyring through PAM, with no second prompt.
+7. **Use the desktop.** Real key presses at the framebuffer open a terminal,
+   close it, open the launcher, start an application from it, lock the session
+   and unlock it. `check-session.sh` answers one question about the session
+   between presses.
+8. **Recovery.** The recovery UKI is selected with `bootctl set-oneshot` and
+   booted, and has to reach a rescue shell.
 
-The repository reaches the guest as `git archive HEAD`, so an uncommitted
-change cannot quietly alter what the test installs.
+The repository reaches the guest as a git bundle of committed state, so an
+uncommitted change cannot quietly alter what the test installs.
+
+## Looking at what it drew
+
+D-021 has a person judge appearance, because a pixel check that claimed to
+verify themes and fonts would be worse than no check. `--captures DIR` keeps
+the screen captures a run takes, including the ones a failing phase saves:
+
+```bash
+tests/vm/run-install.sh --iso /path/to/archlinux.iso --reconcile \
+    --captures ~/archwork-captures
+```
+
+They are PPM files, which anything can open. Nothing else in this repository
+says whether the desktop looks right.
+
+## Why the keys are typed from outside
+
+The greetd password has to go through the real PAM stack at the real greeter,
+or the keyring criterion is unprovable (D-021). Autologin, a unit that starts
+Hyprland and `machinectl shell` all bypass it.
+
+`sendkey` puts scancodes on the emulated keyboard, so it works before a
+session exists and needs nothing installed on the machine under test. QEMU
+names keys by position and the guest's keymap decides what they produce, so
+`sendkey.py` refuses any character whose key means something different under
+the `uk` keymap the installer sets and the `us` one it does not.
 
 ## Why the passphrase is typed rather than a keyfile
 

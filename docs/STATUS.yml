@@ -3,7 +3,7 @@
 # Validated by scripts/check-plan-status.py.
 ---
 schema: 1
-updated: 2026-08-28
+updated: 2026-08-29
 
 phase: M3
 
@@ -43,15 +43,35 @@ milestones:
 # A rebuild claim without a commit SHA is rejected by the checker.
 # Clean install from the ISO, M1 assertions, the D-016 reconciliation twice
 # with the second run reporting zero changed tasks, and the recovery UKI.
-# Desktop profile on this commit, greeter capture included. Both profiles
-# passed on d16cf4c.
+# Desktop profile on this commit. Both profiles passed on d16cf4c.
+#
+# This run also drove the M3 desktop from outside the guest: login at the real
+# greeter, all 21 session assertions including the eight for Tailscale,
+# terminal and launcher by keybinding, lock and unlock, and a portal file
+# picker from PDF Arranger and from Okular. The seven M2 service state
+# assertions passed with it, so the D-025 group and socket are watched rather
+# than assumed, and the second reconciliation reported changed=0.
+#
+# One M3 criterion is not in it. Kvantum and the GTK theme are judged from the
+# captures by a person (D-021), and the GTK half cannot pass while D-020
+# leaves that theme unchosen. Tailscale is asserted only as far as a logged
+# out machine allows: split DNS against a real tailnet waits on the D-006
+# auth key.
 last_rebuild:
   status: passed
-  commit: e0a049fa5800faba05d5b86d8bcb459229bbb991
-  date: 2026-08-28
+  commit: 58dc33205b8c443d032aadcfbdcba33234e12a70
+  date: 2026-08-29
 
 next_actions:
-  - Answer the fonts in D-020
-  - Log in at the greeter with sendkey, then assert the session from inside
+  - Look at the captures and judge the theming criterion, which is the last M3
+    criterion with no verdict. Kvantum reaches Qt applications, the portal
+    chooser comes up light against a dark desktop, and D-020 still has no GTK
+    theme chosen
+  - Answer D-024 and D-026, which are the application baseline moving into
+    docs/decisions/, git-crypt and SOPS against D-006, and what Hyprland
+    dropping the .conf format in 0.57 means for dotfiles/hypr/
+  - Correct the disk identity in D-017 before the first install on the desktop
+    hardware. The target is serial S4J4NX0R804138P, not the device name that
+    document records
 
 blockers: []
