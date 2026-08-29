@@ -18,17 +18,25 @@
       # D-004: greetd with tuigreet, and Hyprland launched from the greeter's
       # session command rather than from a shell profile, per desktop-shell.md.
       #
+      # start-hyprland rather than Hyprland (D-026). Hyprland tells anyone who
+      # starts it directly that they should not, on the desktop, in a
+      # notification: the wrapper carries crash recovery and a safe mode that
+      # boots a default configuration when the user's own is broken. That is
+      # worth having on a machine whose configuration is a git clone. It needs
+      # no extra package, because hyprland-guiutils is already a hard
+      # dependency of hyprland.
+      #
       # vt = 1 is safe because the packaged greetd.service already declares
       # Conflicts=getty@tty1.service, so the two never fight over the console.
       ansible.builtin.copy:
         dest: /etc/greetd/config.toml
         content: |
-          # Managed by ArchWork. See ansible/roles/session (D-004).
+          # Managed by ArchWork. See ansible/roles/session (D-004, D-026).
           [terminal]
           vt = 1
 
           [default_session]
-          command = "tuigreet --time --cmd Hyprland"
+          command = "tuigreet --time --cmd start-hyprland"
           user = "greeter"
         owner: root
         group: root

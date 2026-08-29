@@ -624,7 +624,7 @@ Consequences:
 
 ## D-026 Hyprland says we start it the wrong way, and that our config format is going away
 
-**Status:** open
+**Status:** accepted
 **Date:** 2026-08-29
 **Affects:** `desktop-shell.md`, D-004, M3, M5, M6
 
@@ -642,6 +642,17 @@ Recommendation: switch the greeter's command to `start-hyprland` and re-run the 
 
 Recommendation: do not chase it before the first hardware install, and do not let it arrive unannounced either. What the replacement format is, and whether a converter ships, needs establishing before 0.57 lands. This also argues for the M5 update path surfacing deprecation warnings rather than discarding them, because this one was found by looking at a screenshot, which is not a process.
 
-Consequences either way:
+**Both answered by the repository owner on 2026-08-29.** Switch the launcher before the first hardware install if the M3 criteria still pass with it, and migrate the configuration format now rather than at M5.
 
+What the launcher change is: greetd's session command becomes `tuigreet --time --cmd start-hyprland`. The wrapper carries crash recovery and a safe mode that starts a default configuration when the user's own is broken, which is worth having on a machine whose configuration is a git clone that an edit at 23:00 can break. It needs no new package: `hyprland-guiutils`, which safe mode uses, is already a hard dependency of `hyprland`.
+
+What the format change is, and it is larger than it sounds: hyprlang is not being tweaked, it is being replaced by Lua. `~/.config/hypr/hyprland.lua` holds a script that calls into an `hl` API rather than a list of assignments. `hl.config({ general = { gaps_in = 4 } })` where the old file said `general { gaps_in = 4 }`, `hl.bind("SUPER + Q", hl.dsp.window.close())` where it said `bind = $mod, Q, killactive`, and `hl.on("hyprland.start", ...)` where it said `exec-once`. Upstream has already deleted `example/hyprland.conf` from its repository.
+
+The dispatcher names were taken from `src/config/lua/bindings/LuaBindingsDispatchers.cpp` and the shape of the file from upstream's `example/hyprland.lua`, rather than guessed from the old names. They do not map one to one: `killactive` is `hl.dsp.window.close()`, `togglefloating` is `hl.dsp.window.float({ action = "toggle" })`, and `movetoworkspace` is `hl.dsp.window.move({ workspace = n })`.
+
+Consequences:
+
+- `dotfiles/hypr/hyprland.conf` is gone and `dotfiles/hypr/hyprland.lua` replaces it. The dotfiles role links the directory rather than the file, so nothing else changes.
+- `hyprlock.conf` stays as it is. The deprecation notice came from Hyprland about its own configuration, and hyprlock is a separate program that still reads hyprlang. If that changes it will announce itself the same way, which is an argument for the M5 update path surfacing deprecation warnings rather than discarding them.
+- Both changes are tested by the M3 criteria rather than by inspection. A wrong dispatcher name is a keybinding that does nothing, and the harness presses every keybinding it depends on.
 - The capture that carried both notifications is the first evidence in this repository that came from looking at the screen rather than from an assertion. D-021 argued for saving captures and having a person look at them. This is what that was for.
