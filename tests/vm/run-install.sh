@@ -27,6 +27,10 @@ REPEAT=1
 KEEP=false
 RECONCILE=false
 WORK_DIR=""
+# A kept work directory to boot again instead of installing into a new one.
+# Set by --resume, and never a source of evidence: see run_phases.
+RESUME_DIR=""
+PHASES="greeter,session,desktop,portals"
 HTTP_PORT="8000"
 # Long enough for a slow mirror, short enough that a wedged install fails the
 # run rather than holding it open indefinitely.
@@ -69,7 +73,14 @@ Options:
   --disk-size SIZE      default 24G
   --memory MB           default 4096
   --cpus N              default 4
-  --keep                keep the work directory for inspection
+  --keep                keep the work directory, disk image included, so that
+                        --resume has something to boot
+  --resume DIR          boot the disk in a kept work directory and run the
+                        phases again, instead of installing from scratch.
+                        Implies --keep and needs no --iso
+  --phases LIST         comma separated, for --resume. Default
+                        greeter,session,desktop,portals. Also accepts assert
+                        and recovery
   --captures DIR        copy the screen captures here, since D-021 has a
                         person judge appearance by looking at them
   --reconcile           run the M2 Ansible reconciliation twice and require
@@ -138,6 +149,15 @@ parse_args() {
 			KEEP=true
 			shift
 			;;
+		--resume)
+			RESUME_DIR="${2:-}"
+			KEEP=true
+			shift 2
+			;;
+		--phases)
+			PHASES="${2:-}"
+			shift 2
+			;;
 		--captures)
 			CAPTURE_DIR="${2:-}"
 			shift 2
@@ -153,6 +173,63 @@ parse_args() {
 		*)
 			die "unknown argument '$1'. Run --help."
 			;;
+		esac
+	done
+}
+
+# Take over a work directory a previous run kept, rather than building one.
+#
+# The machine in that image was installed by that earlier run, and nothing here
+# changes it: a resumed run re-runs the harness against a machine that already
+# exists. That makes it the right tool for a bug in the harness, which is what
+# four of the runs on 2026-08-29 were, and the wrong tool for a change to this
+# repository, which the machine's own clone knows nothing about.
+#
+# The credentials, the profile and the login come out of the kept directory
+# rather than from this script's defaults, because they belong to that machine.
+adopt_work_dir() {
+	WORK_DIR="$RESUME_DIR"
+	trap cleanup EXIT
+
+	log "Resuming in $WORK_DIR"
+
+	PROFILE="$(cat "$WORK_DIR/profile")"
+	LOGIN_USER="$(cat "$WORK_DIR/login-user")"
+	LOGIN_PASSWORD="$(cat "$WORK_DIR/login-password")"
+	PASSPHRASE="$(cat "$WORK_DIR/passphrase")"
+
+	local common_opts=(
+		-i "$WORK_DIR/id_test"
+		-o StrictHostKeyChecking=no
+		-o UserKnownHostsFile=/dev/null
+		-o LogLevel=ERROR
+		-o ConnectTimeout=5
+	)
+	SSH_OPTS=(-p "$SSH_PORT" "${common_opts[@]}")
+	SCP_OPTS=(-P "$SSH_PORT" "${common_opts[@]}")
+
+	# Not REPO_SHA. Nothing here was built from the checkout that is present
+	# now, and run_phases refuses to print an evidence line for that reason.
+	REPO_SHA=""
+}
+
+# The phases a resumed run is allowed to repeat, named rather than dispatched
+# by whatever string arrives.
+#
+# phase_install and phase_reconcile are deliberately absent. Installing is what
+# resuming skips, and reconciling would run the machine's own clone, which is
+# whatever the earlier run put there rather than what is checked out now.
+run_phases() {
+	local phase
+	for phase in ${PHASES//,/ }; do
+		case "$phase" in
+		assert) phase_assert ;;
+		greeter) phase_greeter ;;
+		session) phase_session ;;
+		desktop) phase_desktop ;;
+		portals) phase_portals ;;
+		recovery) phase_recovery ;;
+		*) die "'$phase' is not a phase that can be resumed. Try assert, greeter, session, desktop, portals or recovery." ;;
 		esac
 	done
 }
@@ -178,8 +255,17 @@ check_prerequisites() {
 		fi
 	done
 
-	[ -n "$ISO" ] || die "--iso is required and has no default"
-	[ -r "$ISO" ] || die "cannot read ISO '$ISO'"
+	if [ -n "$RESUME_DIR" ]; then
+		[ -d "$RESUME_DIR" ] || die "no such work directory '$RESUME_DIR'"
+		local needed
+		for needed in disk.qcow2 OVMF_VARS.fd passphrase id_test profile; do
+			[ -e "$RESUME_DIR/$needed" ] ||
+				die "'$RESUME_DIR' has no $needed, so it cannot be resumed. A run keeps its disk image only with --keep."
+		done
+	else
+		[ -n "$ISO" ] || die "--iso is required and has no default"
+		[ -r "$ISO" ] || die "cannot read ISO '$ISO'"
+	fi
 
 	case "$PROFILE" in
 	desktop | laptop) ;;
@@ -817,6 +903,18 @@ phase_recovery() {
 main() {
 	parse_args "$@"
 	check_prerequisites
+
+	if [ -n "$RESUME_DIR" ]; then
+		adopt_work_dir
+		phase_boot
+		run_phases
+
+		log "Resumed phases passed: $PHASES"
+		printf '\nThis was a resumed run against a machine an earlier run installed.\n'
+		printf 'It is not evidence for docs/STATUS.yml. Only a clean rebuild is.\n\n'
+		return 0
+	fi
+
 	prepare_work_dir
 	extract_iso_boot_files
 	start_http_server
@@ -841,13 +939,24 @@ main() {
 
 		kill_if_running "$QEMU_PID"
 		QEMU_PID=""
-		rm -f "$WORK_DIR/disk.qcow2" "$WORK_DIR/serial.sock" "$WORK_DIR/monitor.sock"
+		rm -f "$WORK_DIR/serial.sock" "$WORK_DIR/monitor.sock"
 
+		# Tear down between runs, and only between runs.
+		#
 		# The UEFI variable store outlives the disk, so run 2 would otherwise
 		# boot with run 1 boot entries pointing at a disk that no longer
 		# exists. Each run gets a fresh firmware environment.
-		cp "$OVMF_VARS" "$WORK_DIR/OVMF_VARS.fd"
-		chmod u+w "$WORK_DIR/OVMF_VARS.fd"
+		#
+		# After the last run both have to survive, or --keep keeps everything
+		# except the two things --resume needs: the disk to boot and the boot
+		# entry that finds it.
+		if [ "$run" -lt "$REPEAT" ]; then
+			rm -f "$WORK_DIR/disk.qcow2"
+			cp "$OVMF_VARS" "$WORK_DIR/OVMF_VARS.fd"
+			chmod u+w "$WORK_DIR/OVMF_VARS.fd"
+		elif [ "$KEEP" = false ]; then
+			rm -f "$WORK_DIR/disk.qcow2"
+		fi
 	done
 
 	log "All $REPEAT run(s) passed"

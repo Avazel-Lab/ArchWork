@@ -39,6 +39,35 @@ M1 needs `--repeat 2`, on both profiles. M3 needs `--reconcile`: greetd is
 configured by the session role, so a machine that has only been installed has
 no greeter to log in at.
 
+## Resuming, when the bug is in the harness
+
+A full run takes about forty minutes, nearly all of it installing. On
+2026-08-29 four of them were spent discovering one-line harness bugs: a check
+that asked the wrong question, a keypress sent before the lock screen existed,
+another sent before the shell reached a prompt, and an argument the remote
+shell expanded. Each cost a complete reinstall to find.
+
+So a kept run can be booted again and its later phases repeated:
+
+```bash
+tests/vm/run-install.sh --iso /path/to/archlinux.iso --reconcile --keep
+# ... it fails in phase 8, you fix the harness, then:
+tests/vm/run-install.sh --resume ~/.cache/archwork/archwork-vm.XXXXXX     --phases desktop,portals
+```
+
+`--resume` needs no `--iso`, implies `--keep`, and takes the profile, the login
+and the SSH key out of the kept directory rather than from its own defaults,
+because those belong to that machine.
+
+**What it does not do, and this is the whole caveat.** It re-runs the harness
+against a machine an earlier run installed. Nothing updates that machine's copy
+of this repository, so it proves a change to `tests/vm/`, and proves nothing at
+all about a change to `ansible/` or `dotfiles/`. `phase_install` and
+`phase_reconcile` are not resumable for that reason.
+
+**A resumed run is never evidence.** It prints no commit SHA and says so when
+it finishes. `docs/STATUS.yml` takes clean rebuilds only.
+
 ## What happens
 
 1. **Install.** QEMU boots the ISO with the kernel and initramfs extracted from
