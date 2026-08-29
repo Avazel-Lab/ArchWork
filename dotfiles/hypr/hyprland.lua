@@ -1,0 +1,127 @@
+-- Hyprland, the M3 desktop.
+--
+-- Managed by ArchWork. This file is the one in the repository: the dotfiles
+-- role links ~/.config/hypr at the clone, so an edit made on the machine is an
+-- edit to the repository, and Hyprland reloads it as soon as it is saved.
+--
+-- Lua rather than the older hyprland.conf. Hyprland deprecated hyprlang at
+-- 0.55 and removes it at 0.57, which is the next release after the 0.56.2 in
+-- extra, so on a rolling distribution the old format stops being read on an
+-- ordinary update rather than on a schedule of ours (D-026).
+--
+-- Deliberately plain. D-020 leaves the Kvantum theme and its GTK counterpart
+-- open, so nothing here picks a colour scheme: a desktop that looks half
+-- themed is harder to reason about than one that looks like the defaults.
+-- Keybindings, autostart and input are decided, so they are here.
+
+-- Whatever the machine has, at its preferred mode. Real monitor layout belongs
+-- to the physical machines at M8 and M9, not to a VM that has one virtual head.
+-- scale is a string here, not a number: Hyprland parses mode, position and
+-- scale as strings (MONITOR_FIELDS in LuaBindingsConfigRules.cpp), so the 1
+-- that the old hyprland.conf wrote as a bare number has to be quoted.
+hl.monitor({
+    output   = "",
+    mode     = "preferred",
+    position = "auto",
+    scale    = "1",
+})
+
+hl.config({
+    -- The installer sets KEYMAP=uk for the console
+    -- (scripts/archwork-install.sh). Hyprland defaults to us, so without this
+    -- the desktop and the greeter would disagree about where the punctuation
+    -- is.
+    input = {
+        kb_layout    = "gb",
+        follow_mouse = 1,
+
+        touchpad = {
+            natural_scroll = true,
+        },
+    },
+
+    general = {
+        gaps_in     = 4,
+        gaps_out    = 8,
+        border_size = 2,
+        layout      = "dwindle",
+    },
+
+    decoration = {
+        rounding = 4,
+    },
+
+    misc = {
+        -- A plain background rather than the Hyprland logo. Hyprpaper is
+        -- installed and unconfigured on purpose: no wallpaper is chosen
+        -- anywhere, and this grey is a placeholder for whatever the theme
+        -- decision picks (D-020).
+        disable_hyprland_logo    = true,
+        disable_splash_rendering = true,
+        background_color         = 0x1c1c1c,
+    },
+})
+
+hl.env("XCURSOR_SIZE", "24")
+-- Qt applications on Wayland, falling back to XWayland where a toolkit has no
+-- Wayland plugin.
+hl.env("QT_QPA_PLATFORM", "wayland;xcb")
+hl.env("QT_WAYLAND_DISABLE_WINDOWDECORATION", "1")
+-- Qt file dialogs come from the portal, Qt widgets come from Kvantum. These
+-- two settings look like they contradict each other and do not: the platform
+-- theme decides who draws a dialog, the style override decides who paints the
+-- widgets. Setting QT_QPA_PLATFORMTHEME to kvantum instead, which is the usual
+-- advice, gives Qt its own file chooser and takes the portal out of the path
+-- the M3 criteria test (D-023).
+hl.env("QT_QPA_PLATFORMTHEME", "xdgdesktopportal")
+hl.env("QT_STYLE_OVERRIDE", "kvantum")
+-- GTK asks the portal for a file chooser only when told to. Unset, a GTK
+-- application opens its own, which looks identical on screen and proves
+-- nothing about xdg-desktop-portal-gtk (D-023).
+hl.env("GTK_USE_PORTAL", "1")
+
+-- What the session starts.
+--
+-- The environment import comes first. xdg-desktop-portal and the polkit agent
+-- are activated by D-Bus, which starts them with whatever environment the bus
+-- knew about at the time: without this they come up unable to find the
+-- compositor, and every portal request fails in a way that looks like a
+-- portal bug rather than a missing variable.
+hl.on("hyprland.start", function()
+    hl.exec_cmd("dbus-update-activation-environment --systemd WAYLAND_DISPLAY XDG_CURRENT_DESKTOP HYPRLAND_INSTANCE_SIGNATURE XDG_SESSION_TYPE")
+    hl.exec_cmd("systemctl --user start hyprpolkitagent.service")
+
+    -- The fallback set (desktop-shell.md). Quickshell replaces the bar and the
+    -- notifications at M6 and these stay installed behind it, so that a broken
+    -- shell leaves an ugly desktop rather than an unusable machine. waybar runs
+    -- the configuration it ships, per D-020.
+    hl.exec_cmd("waybar")
+    hl.exec_cmd("mako")
+end)
+
+local mod = "SUPER"
+
+hl.bind(mod .. " + Return",   hl.dsp.exec_cmd("kitty"))
+hl.bind(mod .. " + D",        hl.dsp.exec_cmd("fuzzel"))
+hl.bind(mod .. " + Q",        hl.dsp.window.close())
+hl.bind(mod .. " + F",        hl.dsp.window.fullscreen())
+hl.bind(mod .. " + V",        hl.dsp.window.float({ action = "toggle" }))
+hl.bind(mod .. " + L",        hl.dsp.exec_cmd("hyprlock"))
+hl.bind(mod .. " + SHIFT + E", hl.dsp.exit())
+
+-- grim writes to a path that has to exist, and a screenshot that fails because
+-- a directory is missing is a poor first impression of a fresh machine.
+hl.bind("Print", hl.dsp.exec_cmd("mkdir -p ~/Pictures/screenshots && grim ~/Pictures/screenshots/$(date +%Y-%m-%d-%H%M%S).png"))
+
+hl.bind(mod .. " + left",  hl.dsp.focus({ direction = "left" }))
+hl.bind(mod .. " + right", hl.dsp.focus({ direction = "right" }))
+hl.bind(mod .. " + up",    hl.dsp.focus({ direction = "up" }))
+hl.bind(mod .. " + down",  hl.dsp.focus({ direction = "down" }))
+
+for i = 1, 9 do
+    hl.bind(mod .. " + " .. i,             hl.dsp.focus({ workspace = i }))
+    hl.bind(mod .. " + SHIFT + " .. i,     hl.dsp.window.move({ workspace = i }))
+end
+
+hl.bind(mod .. " + mouse:272", hl.dsp.window.drag(),   { mouse = true })
+hl.bind(mod .. " + mouse:273", hl.dsp.window.resize(), { mouse = true })

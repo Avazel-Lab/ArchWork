@@ -379,6 +379,12 @@ ArchWork takes a whole disk and owns the ESP on it. It does not share an ESP wit
 
 The desktop hardware dual boots three systems: Kubuntu on `nvme1n1`, Windows 11 on `sdb`, and ArchWork on `nvme0n1`. Each keeps its own bootloader on its own disk. The two NVMe drives are the same model and size, a Samsung 970 EVO Plus 2 TB each, so the kernel names alone do not identify them: the Kubuntu root is serial S6P1NS0T304068E and the disk ArchWork is to take is serial S4J4NX0R804138P. Address it as `/dev/disk/by-id/nvme-Samsung_SSD_970_EVO_Plus_2TB_S4J4NX0R804138P` and confirm the serial in the installer's own partition table printout before answering its prompt. The installer already behaves this way, because it writes a fresh GPT with its own ESP to the device it is given and `bootctl install` only ever scans the ESP it installed to.
 
+**What is on the target disk today, checked on 2026-08-29 rather than remembered.** `nvme0n1` is not empty. It carries five partitions: a 500 MB NTFS, a 1.8 TB NTFS, a 954 MB NTFS, a 100 MB EFI system partition and a 569 MB NTFS. That is a Windows installation with its own ESP and recovery partitions, plus the bulk of the data on the machine. Installing ArchWork there destroys all of it, which is the intent, and is the reason this paragraph exists rather than being left to the installer's confirmation prompt.
+
+One prerequisite followed from that, and it has now been met. Windows also lives on `sdb`, and until 2026-08-28 that disk had no ESP of its own: one was created at `sdb3` and holds `Boot0000`. Because the disk about to be wiped carries an ESP too, Windows booting from `sdb` had to be proven before the wipe rather than discovered after it. **Confirmed by the repository owner on 2026-08-29: Windows boots from `sdb`.** The wipe no longer takes anything with it that has not been accounted for.
+
+The NTFS data on the target disk was confirmed expendable the same day, so nothing needs pulling off it first. Worth stating plainly because it is the one irreversible step in a process that is otherwise repeatable: the first install destroys it and every install after that is free. The owner expects to reinstall several times, which is what this repository is for.
+
 Two facts make the separation worth writing down rather than leaving implicit.
 
 **A shared ESP is a shared failure.** The 1 GiB ESP the installer creates is sized for UKIs, and a UKI is large. An ESP that another installer also writes to is one Windows feature update away from a full filesystem or a rewritten boot entry, and the recovery UKI is exactly the thing that must still be there on the day something else has gone wrong.
@@ -459,7 +465,7 @@ One thing to carry into M3: D-002 has this repository mask `systemd-resolved`, a
 
 ## D-020 Three things M3 needs that no document names
 
-**Status:** open
+**Status:** accepted
 **Date:** 2026-08-28
 **Affects:** `desktop-shell.md`, M3, M6
 
@@ -483,7 +489,19 @@ Recommendation: `ttf-dejavu` as the general fallback, `noto-fonts` and `noto-fon
 
 A recommendation of `ttf-dejavu` briefly stood here and was wrong twice over: the baseline uses Liberation for that job, and it left out CJK and Inter entirely. It is recorded rather than quietly deleted because the lesson is about where the decision lived, not about a font. See D-024, which is about that document not being in this repository.
 
-The GTK theme remains the one part of this entry still open.
+**The GTK theme answered on 2026-08-29,** which closes this entry. `materia-gtk-theme` and `kvantum-theme-materia`, `Materia-dark` and `MateriaDark` respectively, both in `extra`.
+
+The recommendation had been to leave it until the Kvantum theme was chosen, because "matching" was the requirement and neither half was picked. Choosing a project that ships both settles the pair at once, which is why this is one answer rather than two. Neither is in the AUR, so neither takes the clean chroot path D-005 requires.
+
+What the choice actually consists of, since it is less obvious than it sounds. Qt and GTK share no theming machinery at all: Kvantum styles Qt through `QT_STYLE_OVERRIDE`, and GTK applications read a GTK theme that knows nothing about it. So "matching" means either two themes chosen to resemble each other or one project shipping both, and it governs GTK 3 far more than GTK 4, because libadwaita applications follow their own stylesheet and take only the dark preference.
+
+The visible consequence is the one the M3 captures kept showing: `xdg-desktop-portal-gtk` is a GTK 3 application, so the portal file chooser was coming up light against a dark desktop in every run. `dotfiles/gtk-3.0/settings.ini` is what fixes that.
+
+The forward-looking consequence is M6. A theme with a defined palette gives Quickshell colours to match rather than inventing them.
+
+**Judged and accepted by the repository owner on 2026-08-29,** from the captures saved against 0d20ddf. That is the verdict D-021 reserves for a person: the portal file chooser comes up dark and matching the desktop, where every run before it had that chooser light against a dark desktop. It is the only M3 criterion decided by looking rather than by asserting, and it is decided.
+
+**The icon theme answered the same day: `papirus-icon-theme`, using `Papirus-Dark`.** Materia ships no icons, so without this the desktop falls back to whatever a dependency dragged in, which is how the fonts nearly went wrong. Taken "for now": it is the conventional pairing with a dark Materia rather than a considered match, and it is the part of this entry most worth revisiting when M6 puts a real shell on the screen.
 
 None of these block the session manifest, which is complete without them. They block M3 looking finished.
 
@@ -580,7 +598,7 @@ The captures also show what the assertions cannot: the portal chooser comes up l
 
 ## D-024 The application baseline is not in this repository
 
-**Status:** open
+**Status:** accepted
 **Date:** 2026-08-29
 **Affects:** `applications-tooling.md`, `CLAUDE.md`, D-006, D-019, D-020, M8, M9
 
@@ -594,13 +612,31 @@ Three disagreements matter more than the fonts, and none should be settled by an
 
 **git-crypt.** The baseline lists it under Git. `CLAUDE.md` says repository secrets use age and nothing else, and that git-crypt is not used. D-006 decided that.
 
-Recommendation: keep D-006 and drop git-crypt from the baseline. `CLAUDE.md` states it as a rule rather than a preference, and nothing in the repository uses it. This looks like the baseline predating D-006 rather than a live disagreement, but it should be struck from one document or the other rather than left in both.
+Recommendation was to drop it from the baseline. **Answered on 2026-08-29: keep it.** It is not a contradiction, it is two different questions that were being read as one. git-crypt is installed on the workstation because other repositories the owner works on use it. Nothing about that makes it a mechanism for *this* repository's secrets, which remain age and nothing else. The wording in `CLAUDE.md` and here now says which of the two it means, so that a future reader finding `git-crypt` in a package manifest does not conclude the rule was broken.
+
+The owner added "perhaps I need to question it", about those other repositories. The comparison that matters there: git-crypt is transparent, so a pattern that does not match, or a file added before the filter was configured, commits plaintext, and history keeps it. It also encrypts deterministically, so identical content produces identical ciphertext and the history leaks when a secret reverts to an earlier value, and revoking access means rewriting history. Against that, its convenience is real when secrets are edited constantly by several people. That is a decision for those repositories rather than this one, and it is recorded here only because the question was asked.
 
 **SOPS.** The baseline lists it for encrypted configuration. D-006's "age only" was about repository secrets, and SOPS is a different job, so this may be no contradiction at all.
 
-Recommendation: decide whether SOPS is in scope for this workstation at all, and if it is, say in D-006 that "age only" governs secrets in this repository rather than every encryption tool installed on the machine. As written the two can be read as conflicting.
+Recommendation was to leave it out. **Answered on 2026-08-29: not in scope.** It stays off the workstation, and D-006 is unchanged beyond the wording clarification above. Worth reopening only if hand editing `.age` files becomes a real irritation, in which case SOPS with the age backend keeps the crypto and adds reviewable diffs, which is a smaller change than it sounds.
 
 Recommendation for the entry as a whole: bring the baseline into `docs/decisions/` as the applications document, with `applications-tooling.md` either replaced by it or reduced to the decisions that are genuinely about this repository rather than about which applications the owner wants. Where the two disagree, the baseline wins except on git-crypt.
+
+**Answered on 2026-08-29.** The baseline is now `docs/decisions/applications.md`, carried in whole. `applications-tooling.md` keeps only what is a decision about this repository rather than a list of what the owner wants installed, and points at the new file for the list. Where they disagreed, the baseline won, and git-crypt turned out not to be a disagreement at all.
+
+This entry stays open on one point, and reading the plan for it made it sharper rather than softer: **no milestone installs the bulk of the baseline.**
+
+M4 is power, M5 is update and rollback, M6 is Quickshell, M7 is the rebuild proving run, M8 and M9 are deployments to physical machines. M7's wording is "bare ISO to full desktop", which is the only place the applications could be implied, but its exit criteria are about three consecutive rebuilds and their timings, not about what is on the finished machine. M8 names Steam, OpenDeck and Xbox controller support because those are desktop-profile differences, not because it is the applications milestone.
+
+So a browser, an editor, an office suite and everything else in `applications.md` would arrive by nobody's decision, at no stated point, most likely as a scramble during M8 when the machine is meant to be in daily use.
+
+Recommendation, and this one is a change to the plan rather than to a document, so it needs the repository owner: add an applications milestone between M6 and M7, or widen M7 with an exit criterion that names the manifests as complete against `applications.md`. The second is cheaper and keeps the milestone count where it is. Either way M7 should not be able to pass while "full desktop" means a compositor and a terminal.
+
+**Answered on 2026-08-29: widen M7.** It now says what "full desktop" means, and carries two more criteria. The manifests must account for every application in `applications.md`, or name what is deliberately left out and why, because an entry that is deferred on purpose is fine and an entry nobody has looked at is not. And nothing needed to reach that desktop may have been installed by hand, checked the way M2 checks it: reconcile twice and require the second run to change nothing.
+
+This closes D-024.
+
+There is a reason to prefer doing it before M7 rather than during M8. M7 proves that three consecutive rebuilds land the same machine. If the applications are not in the manifests by then, M7 proves repeatability of something that is not the workstation, and the first thing installed by hand afterwards makes it untrue.
 
 ## D-025 Podman is the desktop container engine, and Docker is a client
 
@@ -624,7 +660,7 @@ Consequences:
 
 ## D-026 Hyprland says we start it the wrong way, and that our config format is going away
 
-**Status:** open
+**Status:** accepted
 **Date:** 2026-08-29
 **Affects:** `desktop-shell.md`, D-004, M3, M5, M6
 
@@ -642,6 +678,17 @@ Recommendation: switch the greeter's command to `start-hyprland` and re-run the 
 
 Recommendation: do not chase it before the first hardware install, and do not let it arrive unannounced either. What the replacement format is, and whether a converter ships, needs establishing before 0.57 lands. This also argues for the M5 update path surfacing deprecation warnings rather than discarding them, because this one was found by looking at a screenshot, which is not a process.
 
-Consequences either way:
+**Both answered by the repository owner on 2026-08-29.** Switch the launcher before the first hardware install if the M3 criteria still pass with it, and migrate the configuration format now rather than at M5.
 
+What the launcher change is: greetd's session command becomes `tuigreet --time --cmd start-hyprland`. The wrapper carries crash recovery and a safe mode that starts a default configuration when the user's own is broken, which is worth having on a machine whose configuration is a git clone that an edit at 23:00 can break. It needs no new package: `hyprland-guiutils`, which safe mode uses, is already a hard dependency of `hyprland`.
+
+What the format change is, and it is larger than it sounds: hyprlang is not being tweaked, it is being replaced by Lua. `~/.config/hypr/hyprland.lua` holds a script that calls into an `hl` API rather than a list of assignments. `hl.config({ general = { gaps_in = 4 } })` where the old file said `general { gaps_in = 4 }`, `hl.bind("SUPER + Q", hl.dsp.window.close())` where it said `bind = $mod, Q, killactive`, and `hl.on("hyprland.start", ...)` where it said `exec-once`. Upstream has already deleted `example/hyprland.conf` from its repository.
+
+The dispatcher names were taken from `src/config/lua/bindings/LuaBindingsDispatchers.cpp` and the shape of the file from upstream's `example/hyprland.lua`, rather than guessed from the old names. They do not map one to one: `killactive` is `hl.dsp.window.close()`, `togglefloating` is `hl.dsp.window.float({ action = "toggle" })`, and `movetoworkspace` is `hl.dsp.window.move({ workspace = n })`.
+
+Consequences:
+
+- `dotfiles/hypr/hyprland.conf` is gone and `dotfiles/hypr/hyprland.lua` replaces it. The dotfiles role links the directory rather than the file, so nothing else changes.
+- `hyprlock.conf` stays as it is. The deprecation notice came from Hyprland about its own configuration, and hyprlock is a separate program that still reads hyprlang. If that changes it will announce itself the same way, which is an argument for the M5 update path surfacing deprecation warnings rather than discarding them.
+- Both changes are tested by the M3 criteria rather than by inspection. A wrong dispatcher name is a keybinding that does nothing, and the harness presses every keybinding it depends on.
 - The capture that carried both notifications is the first evidence in this repository that came from looking at the screen rather than from an assertion. D-021 argued for saving captures and having a person look at them. This is what that was for.

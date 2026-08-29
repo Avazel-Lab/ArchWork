@@ -117,10 +117,14 @@ Exit criteria:
 
 The point of the whole project.
 
+"Full desktop" means the workstation, not a compositor with a terminal on it. Until D-024 that was implied and therefore not true: no milestone installed the bulk of `decisions/applications.md`, so the applications would have arrived by nobody's decision during M8, on a machine already meant to be in daily use. The manifest criterion below is where that gets caught, and it belongs here rather than later, because a rebuild that repeatably produces something short of the workstation proves repeatability of the wrong thing.
+
 Exit criteria:
 
 - Three consecutive clean-VM rebuilds, bare ISO to full desktop, zero manual steps.
 - Both profiles rebuilt at least once each.
+- The package manifests account for every application in `decisions/applications.md`, or name the ones deliberately left out and say why. An entry that is deferred is fine; an entry nobody has looked at is not.
+- Nothing needed to reach that desktop was installed by hand. The check is the same one M2 uses: reconcile twice, and require the second run to change nothing.
 - Wall-clock timings recorded in `docs/STATUS.yml` with the commit SHA.
 
 ### M8 Physical desktop

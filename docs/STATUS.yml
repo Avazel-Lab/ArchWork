@@ -43,35 +43,39 @@ milestones:
 # A rebuild claim without a commit SHA is rejected by the checker.
 # Clean install from the ISO, M1 assertions, the D-016 reconciliation twice
 # with the second run reporting zero changed tasks, and the recovery UKI.
-# Desktop profile on this commit. Both profiles passed on d16cf4c.
+# Both profiles on this commit, run separately: the desktop, then the laptop
+# with its @swap subvolume and swapfile that the desktop does not have. M3 had
+# only ever been shown on the desktop profile before this.
 #
-# This run also drove the M3 desktop from outside the guest: login at the real
-# greeter, all 21 session assertions including the eight for Tailscale,
-# terminal and launcher by keybinding, lock and unlock, and a portal file
-# picker from PDF Arranger and from Okular. The seven M2 service state
-# assertions passed with it, so the D-025 group and socket are watched rather
-# than assumed, and the second reconciliation reported changed=0.
+# Everything M3 asks of a machine, on a session greetd starts through
+# start-hyprland with its configuration in Lua (D-026): login at the real
+# greeter, all 21 session assertions including the eight for Tailscale, the
+# desktop driven by its own keybindings through lock and unlock, and a portal
+# file picker from PDF Arranger and from Okular. The seven M2 service state
+# assertions passed with it, and the second reconciliation reported changed=0.
 #
-# One M3 criterion is not in it. Kvantum and the GTK theme are judged from the
-# captures by a person (D-021), and the GTK half cannot pass while D-020
-# leaves that theme unchosen. Tailscale is asserted only as far as a logged
-# out machine allows: split DNS against a real tailnet waits on the D-006
-# auth key.
+# The theming criterion is judged and accepted, by the repository owner
+# looking at the captures from this commit (D-020, D-021). The portal file
+# chooser comes up dark and matching the desktop, where every earlier run had
+# it light against it. That is the one M3 criterion settled by looking rather
+# than by asserting.
+#
+# Tailscale is asserted only as far as a logged out machine allows. Split DNS
+# against a real tailnet waits on the D-006 auth key.
 last_rebuild:
   status: passed
-  commit: 58dc33205b8c443d032aadcfbdcba33234e12a70
+  commit: 0d20ddfa9b3592ef3740f6f25b402afdb9984537
   date: 2026-08-29
 
 next_actions:
-  - Look at the captures and judge the theming criterion, which is the last M3
-    criterion with no verdict. Kvantum reaches Qt applications, the portal
-    chooser comes up light against a dark desktop, and D-020 still has no GTK
-    theme chosen
-  - Answer D-024 and D-026, which are the application baseline moving into
-    docs/decisions/, git-crypt and SOPS against D-006, and what Hyprland
-    dropping the .conf format in 0.57 means for dotfiles/hypr/
-  - Correct the disk identity in D-017 before the first install on the desktop
-    hardware. The target is serial S4J4NX0R804138P, not the device name that
-    document records
+  - Give the harness a way to re-run the desktop and portal phases against a
+    kept disk image, instead of reinstalling to test a keypress. Four runs on
+    2026-08-29 were lost to one-line harness bugs, and M4 asks for timings
+    measured in tens of minutes
+  - Write the runbook for the first install on the desktop hardware, before
+    the attempt rather than at the keyboard during it (D-017)
+  - Fill the manifests against applications.md, which M7 now requires. Most of
+    that document is in no manifest, and an entry deferred on purpose is fine
+    where an entry nobody has looked at is not
 
 blockers: []

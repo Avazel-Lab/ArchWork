@@ -119,7 +119,9 @@ Both:
 
 Never commit a plaintext secret, key or password. Not in a variable file, not in a comment, not in a test fixture.
 
-Repository secrets use `age` and nothing else (D-006). `git-crypt` is not used.
+Repository secrets use `age` and nothing else (D-006). `git-crypt` is not a mechanism for them.
+
+`git-crypt` is installed on the workstation, because other repositories the owner works on use it (D-024). Finding it in a package manifest is not a sign this rule was broken. Nothing in *this* repository may be encrypted with it.
 
 The age private key is committed, wrapped with a diceware passphrase through `age -p`. Bootstrap prompts for that passphrase, unwraps the key in memory, and never writes the unwrapped key to the new system's disk outside its final destination.
 

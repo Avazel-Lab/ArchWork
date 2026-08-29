@@ -26,6 +26,7 @@ source "$SCRIPT_DIR/lib/checks.sh"
 ALLOWED=(
 	client_class_present
 	client_class_absent
+	client_title_present
 	compositor_answers
 	file_picker_open
 	graphical_session_open

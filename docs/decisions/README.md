@@ -19,7 +19,8 @@ review: 2027-02-27
 ## Topic documents
 
 - [Desktop shell](desktop-shell.md)
-- [Applications and tooling](applications-tooling.md)
+- [Applications](applications.md), the list of what a machine has on it
+- [Applications and tooling](applications-tooling.md), the decisions about those choices
 - [Storage and boot](storage-boot.md)
 - [Security and power](security-power.md)
 - [Desktop and laptop differences](desktop-laptop-differences.md)
