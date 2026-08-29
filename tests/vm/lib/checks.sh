@@ -356,6 +356,21 @@ client_class_present() {
 		jq -e --arg class "$2" 'any(.[]; .class == $class)' >/dev/null 2>&1
 }
 
+# A window with a particular title, which is how the harness waits for an
+# application to be ready rather than merely mapped.
+#
+# The case it exists for: kitty's shell integration sets the window title to
+# the working directory once bash reaches a prompt. Press the close binding
+# before that and kitty counts bash as a running command and puts up "Are you
+# sure you want to close this OS Window?" instead of closing, which is correct
+# behaviour on kitty's part and a race on the harness's. Seen on 2026-08-29,
+# having passed on the run before by timing alone.
+client_title_present() {
+	as_user_in_session "$1" hyprctl -j clients 2>/dev/null |
+		jq -e --arg class "$2" --arg title "$3" \
+			'any(.[]; .class == $class and .title == $title)' >/dev/null 2>&1
+}
+
 client_class_absent() {
 	! client_class_present "$1" "$2"
 }

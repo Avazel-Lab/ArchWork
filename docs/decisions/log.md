@@ -497,7 +497,7 @@ The visible consequence is the one the M3 captures kept showing: `xdg-desktop-po
 
 The forward-looking consequence is M6. A theme with a defined palette gives Quickshell colours to match rather than inventing them.
 
-Still not chosen, and deliberately out of scope here: an icon theme. Materia ships none, nothing in the baseline names one, and the M3 criteria do not test icons. It should be decided rather than discovered, like the fonts were.
+**The icon theme answered the same day: `papirus-icon-theme`, using `Papirus-Dark`.** Materia ships no icons, so without this the desktop falls back to whatever a dependency dragged in, which is how the fonts nearly went wrong. Taken "for now": it is the conventional pairing with a dark Materia rather than a considered match, and it is the part of this entry most worth revisiting when M6 puts a real shell on the screen.
 
 None of these block the session manifest, which is complete without them. They block M3 looking finished.
 

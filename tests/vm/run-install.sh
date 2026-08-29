@@ -501,6 +501,17 @@ phase_desktop() {
 		die "SUPER+Return opened no terminal. The screen is at $WORK_DIR/terminal-failed.ppm"
 	}
 
+	# Wait for the shell to reach a prompt, not just for the window to exist.
+	# kitty titles the window with the working directory once its shell
+	# integration sees a prompt; before that it treats bash as a running
+	# command and SUPER+Q raises a confirmation dialog rather than closing.
+	ask --wait 20 client_title_present "$LOGIN_USER" kitty "~" || {
+		capture terminal-not-ready
+		printf 'the terminal never reached a shell prompt. What the compositor had:\n' >&2
+		ask list_clients "$LOGIN_USER" >&2 || true
+		die "kitty did not reach a prompt. The screen is at $WORK_DIR/terminal-not-ready.ppm"
+	}
+
 	log "SUPER+Q closes it"
 	press --key meta_l-q
 	ask --wait 20 client_class_absent "$LOGIN_USER" kitty || {

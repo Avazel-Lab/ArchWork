@@ -85,6 +85,9 @@ archwork_packages_session:
   - kvantum
   - kvantum-theme-materia
   - materia-gtk-theme
+  # Icons, which Materia does not ship (D-020). Papirus-Dark is the
+  # conventional pairing and the only icon set either document names.
+  - papirus-icon-theme
   # Fonts, as the application baseline names them (D-020). The noto set covers
   # Unicode, emoji and CJK, Inter is the UI face, Liberation carries the metric
   # compatibility with the common Microsoft faces that documents rely on, and

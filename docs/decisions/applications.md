@@ -204,7 +204,7 @@ SOPS was considered and is out of scope (D-024).
 
 - **Kvantum** for Qt, with **kvantum-theme-materia** (`MateriaDark`).
 - **materia-gtk-theme** (`Materia-dark`) for GTK, the matching half (D-020).
-- No icon theme chosen yet. Materia ships none.
+- **papirus-icon-theme** (`Papirus-Dark`) for icons, which Materia does not ship (D-020).
 
 ## Diagrams and documentation
 
