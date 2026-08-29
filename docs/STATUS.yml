@@ -52,14 +52,25 @@ milestones:
 # assertions passed with it, so the D-025 group and socket are watched rather
 # than assumed, and the second reconciliation reported changed=0.
 #
+# It is the first run on the D-026 changes: greetd starting the session
+# through start-hyprland, and the configuration in Lua rather than hyprlang.
+# Every keybinding the harness presses fired, which is what proves the
+# dispatcher translations, and the capture shows both of the Hyprland warnings
+# that prompted D-026 are gone.
+#
 # One M3 criterion is not in it. Kvantum and the GTK theme are judged from the
 # captures by a person (D-021), and the GTK half cannot pass while D-020
 # leaves that theme unchosen. Tailscale is asserted only as far as a logged
 # out machine allows: split DNS against a real tailnet waits on the D-006
 # auth key.
+#
+# Two commits after this one are unproven: a documentation change, and quoting
+# the monitor scale in hyprland.lua. This run passed with it unquoted, so Lua
+# coerced the number; the quoted form matches the string parser Hyprland
+# actually uses and is what the next run should carry.
 last_rebuild:
   status: passed
-  commit: 58dc33205b8c443d032aadcfbdcba33234e12a70
+  commit: 25ebdf7038482ed95cc34313c89ff8ba8c637059
   date: 2026-08-29
 
 next_actions:
@@ -67,9 +78,9 @@ next_actions:
     criterion with no verdict. Kvantum reaches Qt applications, the portal
     chooser comes up light against a dark desktop, and D-020 still has no GTK
     theme chosen
-  - Answer D-024 and D-026, which are the application baseline moving into
-    docs/decisions/, git-crypt and SOPS against D-006, and what Hyprland
-    dropping the .conf format in 0.57 means for dotfiles/hypr/
+  - Choose the GTK theme, the last part of D-020 still open. materia-gtk-theme
+    and kvantum-theme-materia are both in extra and are a designed pair, which
+    is what desktop-shell.md means by matching
   - Correct the disk identity in D-017 before the first install on the desktop
     hardware. The target is serial S4J4NX0R804138P, not the device name that
     document records
