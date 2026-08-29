@@ -467,9 +467,18 @@ press() {
 }
 
 # Ask the machine one question about its session.
+#
+# The arguments are quoted for the remote shell rather than pasted into it.
+# ssh joins its arguments into one string and hands them to a shell on the
+# other end, so anything meaningful to a shell is interpreted there, whatever
+# quoting was used here. A check for kitty's window title, which is ~, went
+# over as a bare tilde and came back as a check for /home/gary.
 ask() {
-	# shellcheck disable=SC2029 # the arguments name the check and are meant to expand here, on the host
-	ssh "${SSH_OPTS[@]}" gary@127.0.0.1 "sudo /tmp/checks/check-session.sh $*"
+	local quoted
+	quoted="$(printf '%q ' "$@")"
+	# shellcheck disable=SC2029 # quoted is deliberately expanded here: it is
+	# the check and its arguments, already escaped for the shell that runs them.
+	ssh "${SSH_OPTS[@]}" gary@127.0.0.1 "sudo /tmp/checks/check-session.sh $quoted"
 }
 
 # Keep whatever is on screen, whether or not anything is drawn on it. Used
