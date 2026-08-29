@@ -28,6 +28,8 @@ HOSTNAME_VALUE=""
 USERNAME="gary"
 DRY_RUN=false
 ACKNOWLEDGED=false
+# What the operator typed, before symlink resolution. Messages only.
+TARGET_DEVICE_GIVEN=""
 AUTHORIZED_KEY=""
 PASSPHRASE_FILE=""
 REPO_URL=""
@@ -160,6 +162,41 @@ parse_args() {
 			;;
 		esac
 	done
+}
+
+# Resolve the target to its kernel name, keeping what the operator typed.
+#
+# D-017 says to address the disk as /dev/disk/by-id/nvme-...-SERIAL, because
+# the two NVMe drives in the desktop are the same model and size and the
+# nvme0n1 names can swap between boots. That instruction was right and this
+# script could not follow it.
+#
+# Two things were wrong with a by-id path, and the guards caught the second
+# before it mattered. partition_path appends 1 to a path ending in a letter,
+# so a by-id path produced ...SERIAL1 where udev makes ...SERIAL-part1. And
+# guard_is_whole_disk looks the device up in /sys/block under its own name,
+# which for a by-id path is a mangled string that is not there, so the install
+# refused to start rather than starting and failing halfway through.
+#
+# Refusing was the right failure and a confusing one: the message says the
+# path might be a partition, which it is not. Resolving the symlink first
+# makes the documented path work. Operations use the resolved name, messages
+# keep the given one, because a serial is what a person can check against the
+# label on a drive and nvme0n1 is not.
+resolve_target_device() {
+	[ -n "$TARGET_DEVICE" ] || return 0
+
+	TARGET_DEVICE_GIVEN="$TARGET_DEVICE"
+
+	# readlink -f resolves a path whose final component does not exist, so
+	# existence is checked rather than inferred from its exit status.
+	[ -e "$TARGET_DEVICE" ] || die "no such device '$TARGET_DEVICE'"
+
+	local resolved
+	resolved="$(readlink -f "$TARGET_DEVICE" 2>/dev/null || true)"
+	[ -n "$resolved" ] || die "cannot resolve '$TARGET_DEVICE' to a device"
+
+	TARGET_DEVICE="$resolved"
 }
 
 validate_args() {
@@ -637,6 +674,7 @@ SUMMARY
 
 main() {
 	parse_args "$@"
+	resolve_target_device
 	validate_args
 
 	guard_check_all "$TARGET_DEVICE" "$ACKNOWLEDGED" || exit 1
@@ -644,7 +682,7 @@ main() {
 	if [ "$DRY_RUN" = true ]; then
 		printf '\nDRY RUN. Nothing below is executed.\n'
 	else
-		guard_confirm_target "$TARGET_DEVICE" || exit 1
+		guard_confirm_target "$TARGET_DEVICE" "$TARGET_DEVICE_GIVEN" || exit 1
 	fi
 
 	partition_disk
