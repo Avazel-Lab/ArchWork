@@ -213,12 +213,19 @@ wayland_socket_present() {
 	wayland_display "$1" >/dev/null
 }
 
+# Reach the service the way an application does, which means activating it.
+#
+# This asked GetNameOwner until 2026-08-29 and failed a run that was working:
+# org.freedesktop.secrets is D-Bus activatable, GetNameOwner does not activate
+# anything, and nothing had yet asked for the Secret Service at that point in
+# the run. The name had no owner and the machine was fine. A method call on
+# the name starts it, which is what every real client does and what the check
+# next to this one was accidentally relying on.
 secret_service_present() {
-	as_user "$1" timeout 15 gdbus call --session \
-		--dest org.freedesktop.DBus \
-		--object-path /org/freedesktop/DBus \
-		--method org.freedesktop.DBus.GetNameOwner \
-		org.freedesktop.secrets >/dev/null 2>&1
+	as_user "$1" timeout 20 gdbus call --session \
+		--dest org.freedesktop.secrets \
+		--object-path /org/freedesktop/secrets \
+		--method org.freedesktop.DBus.Peer.Ping >/dev/null 2>&1
 }
 
 # D-012: the password typed at greetd unlocked the keyring through PAM. A

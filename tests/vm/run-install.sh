@@ -547,30 +547,40 @@ phase_desktop() {
 # these two applications actually binds it is the part no document settles, so
 # a failure here prints every window the compositor has rather than only
 # saying no: one run then names what to press instead (D-023).
+# Reports rather than dies, so that one run says something about both
+# applications. Dying on the first would mean a failure in the GTK half hides
+# whatever the Qt half would have shown, and each run costs a full install.
 open_picker() {
 	local label="$1" match="$2" app_class="$3"
 
 	log "$label opens a file picker through the portal"
 
 	press --key meta_l-d
-	ask --wait 20 user_process_running "$LOGIN_USER" fuzzel ||
-		die "the launcher did not open for $label"
+	if ! ask --wait 20 user_process_running "$LOGIN_USER" fuzzel; then
+		printf 'the launcher did not open for %s\n' "$label" >&2
+		return 1
+	fi
 
 	press --text "$match"
 	sleep 1
 	press --key ret
-	ask --wait 60 client_class_present "$LOGIN_USER" "$app_class" || {
+	if ! ask --wait 60 client_class_present "$LOGIN_USER" "$app_class"; then
 		capture "picker-$app_class-no-window"
-		ask list_clients "$LOGIN_USER" || true
-		die "$label never opened a window. The screen is at $WORK_DIR/picker-$app_class-no-window.ppm"
-	}
+		printf '%s never opened a window. What the compositor had:\n' "$label" >&2
+		ask list_clients "$LOGIN_USER" >&2 || true
+		press --key esc
+		return 1
+	fi
 
 	press --key ctrl-o
-	ask --wait 30 file_picker_open "$LOGIN_USER" "$app_class" || {
+	if ! ask --wait 30 file_picker_open "$LOGIN_USER" "$app_class"; then
 		capture "picker-$app_class-failed"
-		ask list_clients "$LOGIN_USER" || true
-		die "$label opened no file picker. The screen is at $WORK_DIR/picker-$app_class-failed.ppm"
-	}
+		printf '%s opened no file picker on ctrl-o. What the compositor had:\n' "$label" >&2
+		ask list_clients "$LOGIN_USER" >&2 || true
+		press --key esc
+		press --key meta_l-q
+		return 1
+	fi
 
 	# For the person who judges appearance, and because a picker that opens
 	# unthemed or unreadable still passes the assertion above (D-021).
@@ -591,8 +601,12 @@ open_picker() {
 phase_portals() {
 	log "Phase 9: the portal file picker, from GTK and from Qt"
 
-	open_picker "PDF Arranger (GTK)" pdf pdfarranger
-	open_picker "Kvantum Manager (Qt)" kvantum kvantummanager
+	local failures=0
+	open_picker "PDF Arranger (GTK)" pdf pdfarranger || failures=$((failures + 1))
+	open_picker "Kvantum Manager (Qt)" kvantum kvantummanager || failures=$((failures + 1))
+
+	[ "$failures" -eq 0 ] ||
+		die "$failures of 2 file picker criteria failed. The captures are in $WORK_DIR"
 }
 
 # D-021 judges appearance by looking at the captures, so a run that throws them
