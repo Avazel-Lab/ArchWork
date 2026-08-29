@@ -607,3 +607,27 @@ Consequences:
 - Docker's daemon is installed and never started. Arch ships no separate client package, so the CLI arrives with a dockerd that this machine does not run. Verified against the package repositories rather than assumed: there is no `docker-cli` in `extra`.
 - Reaching a local Docker daemon now needs sudo, deliberately. If something on this workstation ever genuinely needs one, reopen this decision rather than restoring the socket, because the group comes back with it.
 - D-019's Tailscale half stands unchanged.
+
+## D-026 Hyprland says we start it the wrong way, and that our config format is going away
+
+**Status:** open
+**Date:** 2026-08-29
+**Affects:** `desktop-shell.md`, D-004, M3, M5, M6
+
+Neither of these was looked for. Both were read off a screen capture the M3 run saved on 2026-08-29, in two notifications Hyprland drew on its own desktop.
+
+**"Hyprland was started without start-hyprland. This is strongly discouraged unless you are in a debugging environment."**
+
+D-004 has greetd run `tuigreet --time --cmd Hyprland`, which is what every Hyprland and greetd guide said when it was written. The package now ships `/usr/bin/start-hyprland` and a `hyprland-uwsm.desktop` session alongside `/usr/bin/Hyprland`, and the compositor tells anyone who starts it directly that they should not. Verified against the package file list rather than inferred from the message.
+
+Recommendation: switch the greeter's command to `start-hyprland` and re-run the M3 criteria. The reason to change it is that a wrapper the project tells you to use is where session setup will keep landing, and a workstation that skips it drifts further from the supported path every release. The reason to be careful is that the wrapper's job is precisely the session environment, so it can move the keyring, the portal and the D-Bus activation environment, which are three criteria that currently pass. That makes it a change to make deliberately and test, not one to slip in. M3's criteria are the test.
+
+**"You are using the .conf config format, support for which will be removed in Hyprland 0.57."**
+
+`extra` has 0.56.2 today, so the release that drops the format is the next one. Every file in `dotfiles/hypr/` is in it. On a rolling distribution this arrives on its own schedule rather than ours, and a desktop that stops reading its configuration on an ordinary update is exactly the failure this repository exists to prevent.
+
+Recommendation: do not chase it before the first hardware install, and do not let it arrive unannounced either. What the replacement format is, and whether a converter ships, needs establishing before 0.57 lands. This also argues for the M5 update path surfacing deprecation warnings rather than discarding them, because this one was found by looking at a screenshot, which is not a process.
+
+Consequences either way:
+
+- The capture that carried both notifications is the first evidence in this repository that came from looking at the screen rather than from an assertion. D-021 argued for saving captures and having a person look at them. This is what that was for.

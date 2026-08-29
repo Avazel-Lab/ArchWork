@@ -39,6 +39,10 @@ PASSPHRASE="archwork-test-passphrase"
 # that sendkey.py can type under both the uk and us keymaps.
 LOGIN_PASSWORD="archwork-test-login"
 LOGIN_USER="gary"
+# The background colour dotfiles/hypr/hyprlock.conf paints, which is how the
+# harness tells the lock screen from the desktop it covers. Change it there and
+# change it here.
+LOCK_BACKGROUND="28,28,28"
 CAPTURE_DIR=""
 
 HTTP_PID=""
@@ -529,14 +533,43 @@ phase_desktop() {
 		capture lock-failed
 		die "SUPER+L did not lock the session. The screen is at $WORK_DIR/lock-failed.ppm"
 	}
-	capture locked
+
+	# The process is not the lock screen. hyprlock appears in the process table
+	# well before its surface takes the display, and on 2026-08-29 the harness
+	# typed the password into that gap: the capture taken the moment the
+	# process check passed shows the desktop, waybar and a terminal, all still
+	# fully on screen. Every keystroke went to the terminal underneath.
+	#
+	# So wait for the screen itself. The background colour is the one
+	# dotfiles/hypr/hyprlock.conf sets, which the desktop does not have, and
+	# there must be something drawn on it as well, because hyprlock paints its
+	# background before it paints the clock and the field.
+	log "Waiting for the lock screen to take the display"
+	python3 "$SCRIPT_DIR/screendump.py" \
+		--monitor "$WORK_DIR/monitor.sock" \
+		--output "$WORK_DIR/locked.ppm" \
+		--expect-dominant "$LOCK_BACKGROUND" \
+		--wait 30 ||
+		die "the lock screen never reached the display. The screen is at $WORK_DIR/locked.ppm"
 
 	log "The login password unlocks it"
-	press --text "$LOGIN_PASSWORD" --enter
-	ask --wait 30 process_absent "$LOGIN_USER" hyprlock || {
-		capture unlock-failed
-		die "the session stayed locked after the password. The screen is at $WORK_DIR/unlock-failed.ppm"
-	}
+	# Two attempts, never more. Arch enables pam_faillock, which locks the
+	# account after three failures, so a harness that retried freely would turn
+	# a slow lock screen into a locked-out account and a much more confusing
+	# failure. A failed attempt clears hyprlock's buffer, so the second attempt
+	# starts clean without needing to flush anything.
+	local attempt
+	for attempt in 1 2; do
+		press --text "$LOGIN_PASSWORD" --enter
+		if ask --wait 20 process_absent "$LOGIN_USER" hyprlock; then
+			break
+		fi
+		if [ "$attempt" -eq 2 ]; then
+			capture unlock-failed
+			die "the session stayed locked after 2 password attempts. The screen is at $WORK_DIR/unlock-failed.ppm"
+		fi
+		log "No unlock on attempt $attempt, trying once more"
+	done
 	capture unlocked
 }
 

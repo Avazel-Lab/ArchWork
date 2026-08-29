@@ -51,15 +51,16 @@ last_rebuild:
   date: 2026-08-28
 
 next_actions:
-  - Prove the M3 session run end to end, greeter login through the portal
-    pickers. Two attempts on 2026-08-29 died downloading packages, with the
-    host link saturated rather than the mirrors down. This gates the first
-    install on the desktop hardware
+  - Prove the M3 session run end to end. The run of 2026-08-29 passed every
+    session criterion and the desktop criteria up to the lock screen, then
+    typed the password into a desktop hyprlock had not yet covered. The
+    harness now waits for the lock screen. The portal pickers are still
+    untested, and this gates the first install on the desktop hardware
   - Confirm from that run that Ctrl+O opens a picker in pdfarranger and
     kvantummanager, then tighten the loose window match in file_picker_open to
     the class the portal actually uses (D-023)
-  - Answer the rest of D-024: bring the application baseline into
-    docs/decisions/, and settle git-crypt and SOPS against D-006. The Docker
-    and Podman half is answered at D-025
+  - Answer the rest of D-024, which is the application baseline moving into
+    docs/decisions/ and git-crypt and SOPS being settled against D-006. The
+    Docker and Podman half is answered at D-025
 
 blockers: []
