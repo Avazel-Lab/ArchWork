@@ -576,9 +576,7 @@ The immediate cost was a font set invented on 2026-08-29 that named `ttf-dejavu`
 
 Three disagreements matter more than the fonts, and none should be settled by an agent picking whichever document it read last.
 
-**Docker and Podman.** The baseline makes Podman the desktop container engine, chosen over Docker partly to gain Podman experience, and says Docker is explicitly not the desktop engine, kept as tooling for remote systems such as the VPS. `applications-tooling.md` and D-019 read the other way round: Docker is the engine, `docker.socket` is enabled, and the administrator account joins the `docker` group. D-019 accepted that group knowingly as a real widening, because reaching the daemon means reaching root without a password prompt. If the baseline is current, that widening was accepted for an engine the workstation does not use as its engine.
-
-Recommendation: treat the baseline as authoritative and reopen D-019. Keep Docker installed as a client, drop the `docker` group and `docker.socket` unless something concrete needs a local Docker daemon, and add `podman-compose`, which the baseline names and no manifest has. The group is the part to remove first: it is the only one with a security consequence.
+**Docker and Podman.** Answered on 2026-08-29 and moved to D-025, which supersedes the container half of D-019. Podman is the engine, Docker is a client for remote systems, and the `docker` group is removed rather than merely no longer added.
 
 **git-crypt.** The baseline lists it under Git. `CLAUDE.md` says repository secrets use age and nothing else, and that git-crypt is not used. D-006 decided that.
 
@@ -589,3 +587,23 @@ Recommendation: keep D-006 and drop git-crypt from the baseline. `CLAUDE.md` sta
 Recommendation: decide whether SOPS is in scope for this workstation at all, and if it is, say in D-006 that "age only" governs secrets in this repository rather than every encryption tool installed on the machine. As written the two can be read as conflicting.
 
 Recommendation for the entry as a whole: bring the baseline into `docs/decisions/` as the applications document, with `applications-tooling.md` either replaced by it or reduced to the decisions that are genuinely about this repository rather than about which applications the owner wants. Where the two disagree, the baseline wins except on git-crypt.
+
+## D-025 Podman is the desktop container engine, and Docker is a client
+
+**Status:** accepted
+**Date:** 2026-08-29
+**Affects:** `applications-tooling.md`, D-019, M2
+
+Supersedes the container half of D-019, which read the application baseline backwards.
+
+Podman is the container engine on this workstation, chosen over Docker deliberately and partly to gain practical Podman experience. Docker stays installed as tooling for remote Docker systems such as the VPS. Confirmed by the repository owner on 2026-08-29, from the baseline D-024 raises.
+
+D-019 had it the other way round, and the consequence was not cosmetic. It enabled `docker.socket` and put the administrator account in the `docker` group, and wrote down that the group reaches a root daemon with no password prompt. That widening was accepted on the understanding that Docker was the engine the workstation used. It was not, so the machine carried a root-equivalent group for a daemon nothing was meant to talk to.
+
+Consequences:
+
+- No `docker.socket`, and nobody in the `docker` group. Reconciliation actively removes that group membership rather than only stopping adding it, because a machine built under D-019 already has it and would otherwise keep it for its life while every document said otherwise.
+- Rootless Podman needs no daemon and no group, so there is nothing to enable and nothing to widen. `podman-compose` joins the manifest, which the baseline names and no manifest had.
+- Docker's daemon is installed and never started. Arch ships no separate client package, so the CLI arrives with a dockerd that this machine does not run. Verified against the package repositories rather than assumed: there is no `docker-cli` in `extra`.
+- Reaching a local Docker daemon now needs sudo, deliberately. If something on this workstation ever genuinely needs one, reopen this decision rather than restoring the socket, because the group comes back with it.
+- D-019's Tailscale half stands unchanged.

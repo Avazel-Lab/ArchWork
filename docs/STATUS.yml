@@ -58,8 +58,8 @@ next_actions:
   - Confirm from that run that Ctrl+O opens a picker in pdfarranger and
     kvantummanager, then tighten the loose window match in file_picker_open to
     the class the portal actually uses (D-023)
-  - Answer D-024. The application baseline lives outside this repository and
-    disagrees with D-019 on whether Docker or Podman is the desktop engine,
-    which decided a root-equivalent group membership
+  - Answer the rest of D-024: bring the application baseline into
+    docs/decisions/, and settle git-crypt and SOPS against D-006. The Docker
+    and Podman half is answered at D-025
 
 blockers: []

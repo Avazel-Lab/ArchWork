@@ -21,13 +21,15 @@ review: 2027-02-27
 - age
 - jq
 - curl
-- Docker
-  - Required for managing existing Docker workloads, including the VPS.
-  - Starts on demand through `docker.socket`, not at boot (D-019). Nothing may depend on a container running before something asks for it.
-  - The administrator account is in the `docker` group, which reaches a root daemon without a password prompt (D-019).
 - Podman
-  - Install on the desktop as well so it can be learned and used alongside Docker.
-  - No system daemon and no group. Rootless Podman needs neither (D-019).
+  - The container engine on this workstation, chosen over Docker deliberately and partly to gain practical Podman experience (D-025).
+  - No system daemon and no group. Rootless Podman needs neither.
+- podman-compose
+  - Compose-style multi-container management.
+- Docker
+  - A client for managing Docker workloads on remote systems, including the VPS. Not the engine here (D-025).
+  - `docker.socket` is not enabled and nobody is in the `docker` group. That group reaches a root daemon without a password prompt, and this machine has no local daemon for it to reach.
+  - Arch ships no separate client package, so dockerd is installed and never started.
 - kubectl
 - OpenSSH client
 - ShellCheck

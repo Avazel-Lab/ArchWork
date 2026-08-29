@@ -29,39 +29,34 @@
     state: started
   become: true
 
-# Both of these need the docker package, which the packages role installs in
-# this same run. Under --check nothing was installed, so the unit and the
-# group do not exist and the tasks below would fail on a fresh machine. That
-# is a limit of dry-running a playbook that installs what it then configures,
-# not something to work around: --check reports them skipped instead.
-- name: Configure the Docker daemon
+# Containers: Podman is the engine here, so there is nothing to enable.
+#
+# Rootless Podman runs no system daemon and needs no group, which is the whole
+# point of D-025 choosing it. Docker stays installed as a client for the VPS
+# and other remote systems, and its daemon is neither enabled nor reachable
+# without one: no docker.socket, no docker group.
+#
+# D-019 enabled both and is superseded. If something on this workstation ever
+# needs a local Docker daemon, reopen D-025 rather than adding the socket back
+# here, because the group that comes with it reaches root without a password
+# prompt.
+- name: Take the administrator out of the docker group
+  # Reconciliation has to remove what an earlier reconciliation added. A
+  # machine built under D-019 has this group, and dropping the task alone
+  # would leave it there for the life of the machine while every document
+  # said otherwise.
+  #
+  # Group changes only reach a session at its next login.
   when: not ansible_check_mode
   become: true
-  block:
-    - name: Start the Docker daemon on demand rather than at boot
-      # D-019. The socket starts the daemon when something first talks to it,
-      # so interactive use feels the same as always-on without a root daemon
-      # listening through every boot that never touches a container.
-      #
-      # Podman is deliberately absent: rootless Podman has no system daemon,
-      # and that is most of why applications-tooling.md wants it learned
-      # alongside Docker.
-      ansible.builtin.systemd_service:
-        name: docker.socket
-        enabled: true
-        state: started
-
-    - name: Put the administrator in the docker group
-      # D-019, and the part with the real consequence: this group reaches the
-      # daemon, and the daemon is root without a password prompt. Accepted
-      # knowingly for a single-user workstation whose owner already holds
-      # sudo.
-      #
-      # Group changes only reach a session at its next login.
-      ansible.builtin.user:
-        name: "{{ archwork_admin_user }}"
-        groups: docker
-        append: true
+  ansible.builtin.command:
+    cmd: gpasswd --delete {{ archwork_admin_user | quote }} docker
+  register: services_docker_group
+  changed_when: services_docker_group.rc == 0
+  # Non-zero means the user was not in the group, or the group does not exist
+  # because Docker's daemon package never created it. Both are the wanted end
+  # state, so neither is a failure.
+  failed_when: false
 
 # Same limit as the block above: the package arrives in this run, so under
 # --check there is no unit to enable.

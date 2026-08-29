@@ -131,9 +131,14 @@ archwork_packages_shared:
   - pandoc-cli
   - libisoburn
   - mermaid-cli
-  # Containers and orchestration
-  - docker
+  # Containers and orchestration. Podman is the engine on this workstation and
+  # Docker is a client for remote systems such as the VPS, which is why
+  # nothing enables docker.socket and nobody is in the docker group (D-025).
+  # Arch ships no separate Docker client package, so the daemon arrives with
+  # the CLI and is simply never started.
   - podman
+  - podman-compose
+  - docker
   - kubectl
   # Audio, PipeWire with WirePlumber on both profiles (D-003)
   - pipewire
