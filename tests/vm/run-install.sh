@@ -219,6 +219,35 @@ adopt_work_dir() {
 # phase_install and phase_reconcile are deliberately absent. Installing is what
 # resuming skips, and reconciling would run the machine's own clone, which is
 # whatever the earlier run put there rather than what is checked out now.
+# Check the phase list before anything is booted.
+#
+# Both of these were found the hard way. An unknown phase name used to fail
+# after the machine had booted, and a desktop phase without a session failed
+# with "check-session.sh: command not found", which pointed at nothing useful.
+#
+# A resumed run boots from cold, so it arrives at the greeter with nobody
+# logged in and an empty /tmp. phase_session is what types the password and
+# what puts the check scripts on the machine, so every phase that asks the
+# session a question needs it in the list first.
+validate_phases() {
+	local phase
+	for phase in ${PHASES//,/ }; do
+		case "$phase" in
+		assert | greeter | session | desktop | portals | recovery) ;;
+		*) die "'$phase' is not a phase that can be resumed. Try assert, greeter, session, desktop, portals or recovery." ;;
+		esac
+
+		case "$phase" in
+		desktop | portals)
+			case ",$PHASES," in
+			*,session,*) ;;
+			*) die "'$phase' needs a logged in session, so 'session' has to come before it in --phases. A resumed run starts at the greeter." ;;
+			esac
+			;;
+		esac
+	done
+}
+
 run_phases() {
 	local phase
 	for phase in ${PHASES//,/ }; do
@@ -229,7 +258,6 @@ run_phases() {
 		desktop) phase_desktop ;;
 		portals) phase_portals ;;
 		recovery) phase_recovery ;;
-		*) die "'$phase' is not a phase that can be resumed. Try assert, greeter, session, desktop, portals or recovery." ;;
 		esac
 	done
 }
@@ -256,6 +284,7 @@ check_prerequisites() {
 	done
 
 	if [ -n "$RESUME_DIR" ]; then
+		validate_phases
 		[ -d "$RESUME_DIR" ] || die "no such work directory '$RESUME_DIR'"
 		local needed
 		for needed in disk.qcow2 OVMF_VARS.fd passphrase id_test profile; do
