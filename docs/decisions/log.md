@@ -499,6 +499,8 @@ The visible consequence is the one the M3 captures kept showing: `xdg-desktop-po
 
 The forward-looking consequence is M6. A theme with a defined palette gives Quickshell colours to match rather than inventing them.
 
+**Judged and accepted by the repository owner on 2026-08-29,** from the captures saved against 0d20ddf. That is the verdict D-021 reserves for a person: the portal file chooser comes up dark and matching the desktop, where every run before it had that chooser light against a dark desktop. It is the only M3 criterion decided by looking rather than by asserting, and it is decided.
+
 **The icon theme answered the same day: `papirus-icon-theme`, using `Papirus-Dark`.** Materia ships no icons, so without this the desktop falls back to whatever a dependency dragged in, which is how the fonts nearly went wrong. Taken "for now": it is the conventional pairing with a dark Materia rather than a considered match, and it is the part of this entry most worth revisiting when M6 puts a real shell on the screen.
 
 None of these block the session manifest, which is complete without them. They block M3 looking finished.
@@ -596,7 +598,7 @@ The captures also show what the assertions cannot: the portal chooser comes up l
 
 ## D-024 The application baseline is not in this repository
 
-**Status:** open
+**Status:** accepted
 **Date:** 2026-08-29
 **Affects:** `applications-tooling.md`, `CLAUDE.md`, D-006, D-019, D-020, M8, M9
 
@@ -629,6 +631,10 @@ M4 is power, M5 is update and rollback, M6 is Quickshell, M7 is the rebuild prov
 So a browser, an editor, an office suite and everything else in `applications.md` would arrive by nobody's decision, at no stated point, most likely as a scramble during M8 when the machine is meant to be in daily use.
 
 Recommendation, and this one is a change to the plan rather than to a document, so it needs the repository owner: add an applications milestone between M6 and M7, or widen M7 with an exit criterion that names the manifests as complete against `applications.md`. The second is cheaper and keeps the milestone count where it is. Either way M7 should not be able to pass while "full desktop" means a compositor and a terminal.
+
+**Answered on 2026-08-29: widen M7.** It now says what "full desktop" means, and carries two more criteria. The manifests must account for every application in `applications.md`, or name what is deliberately left out and why, because an entry that is deferred on purpose is fine and an entry nobody has looked at is not. And nothing needed to reach that desktop may have been installed by hand, checked the way M2 checks it: reconcile twice and require the second run to change nothing.
+
+This closes D-024.
 
 There is a reason to prefer doing it before M7 rather than during M8. M7 proves that three consecutive rebuilds land the same machine. If the applications are not in the manifests by then, M7 proves repeatability of something that is not the workstation, and the first thing installed by hand afterwards makes it untrue.
 

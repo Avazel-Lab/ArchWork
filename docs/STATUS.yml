@@ -52,10 +52,11 @@ milestones:
 # file picker from PDF Arranger and from Okular. The seven M2 service state
 # assertions passed with it, and the second reconciliation reported changed=0.
 #
-# The theming criterion has evidence for the first time rather than a verdict.
-# The captures show the portal file chooser dark and matching the desktop,
-# where every earlier run had it light against it. D-021 leaves the verdict to
-# a person looking at those captures, and that has not happened yet.
+# The theming criterion is judged and accepted, by the repository owner
+# looking at the captures from this commit (D-020, D-021). The portal file
+# chooser comes up dark and matching the desktop, where every earlier run had
+# it light against it. That is the one M3 criterion settled by looking rather
+# than by asserting.
 #
 # Tailscale is asserted only as far as a logged out machine allows. Split DNS
 # against a real tailnet waits on the D-006 auth key.
@@ -65,10 +66,10 @@ last_rebuild:
   date: 2026-08-29
 
 next_actions:
-  - Look at the captures from the next run and judge the theming criterion,
-    the last M3 criterion a machine cannot assert for itself. Materia and
-    Papirus are chosen and applied, so the portal chooser should now be dark
-    rather than light against the desktop
+  - Give the harness a way to re-run the desktop and portal phases against a
+    kept disk image, instead of reinstalling to test a keypress. Four runs on
+    2026-08-29 were lost to one-line harness bugs, and M4 asks for timings
+    measured in tens of minutes
   - Run the laptop profile against the M3 criteria. Every run so far has been
     the desktop profile, and the session set is shared between them, so it
     should hold and has never been shown
