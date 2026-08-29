@@ -85,6 +85,7 @@ These decision documents describe the intended state of the platform and should 
 - [`docs/plan.md`](docs/plan.md) defines the milestones and what proves each one, plus the test ladder.
 - [`docs/STATUS.yml`](docs/STATUS.yml) records where the project has got to. It is the only file that does.
 - [`docs/decisions/log.md`](docs/decisions/log.md) records dated decisions and the open questions that block milestones.
+- [`docs/first-install.md`](docs/first-install.md) is the runbook for the first install on physical hardware.
 - [`CLAUDE.md`](CLAUDE.md) holds the rules for AI-assisted changes.
 
 Run `make check` to lint and to prove the status file still agrees with the plan.
