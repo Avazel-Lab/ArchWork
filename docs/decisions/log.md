@@ -479,7 +479,11 @@ Recommendation: `ttf-dejavu` as the general fallback, `noto-fonts` and `noto-fon
 
 **Answered on 2026-08-28.** The bar is `waybar`, installed with the configuration it ships rather than a set of dotfiles: it is the fallback that M6 replaces, so effort spent styling it now is spent twice. The GTK theme stays open until the Kvantum theme it has to match is chosen.
 
-**Fonts answered on 2026-08-29.** `ttf-dejavu` as the general fallback, `noto-fonts` and `noto-fonts-emoji` for coverage, and `ttf-jetbrains-mono-nerd` as the monospace face. The nerd variant rather than plain `ttf-jetbrains-mono` for one reason: waybar ships a configuration that draws icons from a nerd font, and without one the fallback bar renders them as boxes, which is the sort of thing that gets blamed on the bar rather than on the font set. All four are in `extra`. The GTK theme remains the one part of this entry still open.
+**Fonts answered on 2026-08-29,** and the premise of the question was wrong. A document did name them: the application baseline the repository owner holds has a Fonts section, and this entry was written without it. The answer is that document's, not a recommendation: `noto-fonts`, `noto-fonts-emoji` and `noto-fonts-cjk` for Unicode, emoji and CJK coverage, `inter-font` as the UI face, `ttf-liberation` for metric compatibility with the common Microsoft faces, and `ttf-jetbrains-mono-nerd` as the terminal and editor face. All six are in `extra`.
+
+A recommendation of `ttf-dejavu` briefly stood here and was wrong twice over: the baseline uses Liberation for that job, and it left out CJK and Inter entirely. It is recorded rather than quietly deleted because the lesson is about where the decision lived, not about a font. See D-024, which is about that document not being in this repository.
+
+The GTK theme remains the one part of this entry still open.
 
 None of these block the session manifest, which is complete without them. They block M3 looking finished.
 
@@ -559,3 +563,29 @@ Consequences:
 - `phase_portals` in the harness opens each application from the launcher, presses Ctrl+O, and asserts a window appears that does not belong to the application that asked for it. That last part is what distinguishes a portal dialog from an application's own.
 - Ctrl+O is a convention rather than a documented binding for either application, and whether each honours it is unverified until a run says so. The check therefore prints every window the compositor has when it fails, so one run names the right key instead of leaving the next to guess.
 - The window match is loose, on class and title. It can be tightened once a run has shown what the portal actually calls its chooser. Guessing the exact string now would fail a run for the wrong reason.
+
+## D-024 The application baseline is not in this repository
+
+**Status:** open
+**Date:** 2026-08-29
+**Affects:** `applications-tooling.md`, `CLAUDE.md`, D-006, D-019, D-020, M8, M9
+
+D-020 asked which fonts to install and said "nothing names any". That was wrong. The repository owner holds an application baseline with a Fonts section, and this repository does not contain it. `docs/decisions/applications-tooling.md` is a much shorter document that overlaps it in places and disagrees with it in others.
+
+The immediate cost was a font set invented on 2026-08-29 that named `ttf-dejavu`, which the baseline does not use, and omitted CJK coverage and the UI face entirely. That is now corrected. The cost worth preventing is the next one: an agent reading only what is in this repository cannot tell that a fuller document exists, and `CLAUDE.md` tells it not to add a package no decision document lists. It will keep inventing answers that already have them.
+
+Three disagreements matter more than the fonts, and none should be settled by an agent picking whichever document it read last.
+
+**Docker and Podman.** The baseline makes Podman the desktop container engine, chosen over Docker partly to gain Podman experience, and says Docker is explicitly not the desktop engine, kept as tooling for remote systems such as the VPS. `applications-tooling.md` and D-019 read the other way round: Docker is the engine, `docker.socket` is enabled, and the administrator account joins the `docker` group. D-019 accepted that group knowingly as a real widening, because reaching the daemon means reaching root without a password prompt. If the baseline is current, that widening was accepted for an engine the workstation does not use as its engine.
+
+Recommendation: treat the baseline as authoritative and reopen D-019. Keep Docker installed as a client, drop the `docker` group and `docker.socket` unless something concrete needs a local Docker daemon, and add `podman-compose`, which the baseline names and no manifest has. The group is the part to remove first: it is the only one with a security consequence.
+
+**git-crypt.** The baseline lists it under Git. `CLAUDE.md` says repository secrets use age and nothing else, and that git-crypt is not used. D-006 decided that.
+
+Recommendation: keep D-006 and drop git-crypt from the baseline. `CLAUDE.md` states it as a rule rather than a preference, and nothing in the repository uses it. This looks like the baseline predating D-006 rather than a live disagreement, but it should be struck from one document or the other rather than left in both.
+
+**SOPS.** The baseline lists it for encrypted configuration. D-006's "age only" was about repository secrets, and SOPS is a different job, so this may be no contradiction at all.
+
+Recommendation: decide whether SOPS is in scope for this workstation at all, and if it is, say in D-006 that "age only" governs secrets in this repository rather than every encryption tool installed on the machine. As written the two can be read as conflicting.
+
+Recommendation for the entry as a whole: bring the baseline into `docs/decisions/` as the applications document, with `applications-tooling.md` either replaced by it or reduced to the decisions that are genuinely about this repository rather than about which applications the owner wants. Where the two disagree, the baseline wins except on git-crypt.

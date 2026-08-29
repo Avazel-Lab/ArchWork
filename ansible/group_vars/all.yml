@@ -75,13 +75,16 @@ archwork_packages_session:
   # which is the Qt application the portal criterion opens a file picker from
   # (D-023), so the Qt half of that criterion costs no extra package.
   - kvantum
-  # Fonts (D-020). Nothing named any until now, which leaves a session running
-  # on whatever arrived as a dependency: dejavu is the general fallback, the
-  # noto pair covers scripts and emoji, and the nerd variant of JetBrains Mono
-  # is what stops waybar's packaged configuration drawing its icons as boxes.
-  - ttf-dejavu
+  # Fonts, as the application baseline names them (D-020). The noto set covers
+  # Unicode, emoji and CJK, Inter is the UI face, Liberation carries the metric
+  # compatibility with the common Microsoft faces that documents rely on, and
+  # the nerd variant of JetBrains Mono is the terminal face. That last one also
+  # stops waybar's packaged configuration drawing its icons as boxes.
   - noto-fonts
   - noto-fonts-emoji
+  - noto-fonts-cjk
+  - inter-font
+  - ttf-liberation
   - ttf-jetbrains-mono-nerd
   # The GTK application the portal criterion opens a file picker from (D-023).
   # applications-tooling.md already lists PDF Arranger, so this is where it

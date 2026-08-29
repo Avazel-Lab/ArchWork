@@ -58,7 +58,8 @@ next_actions:
   - Confirm from that run that Ctrl+O opens a picker in pdfarranger and
     kvantummanager, then tighten the loose window match in file_picker_open to
     the class the portal actually uses (D-023)
-  - Choose the Kvantum theme, which is the last part of D-020 still open and
-    what the matching GTK theme waits on
+  - Answer D-024. The application baseline lives outside this repository and
+    disagrees with D-019 on whether Docker or Podman is the desktop engine,
+    which decided a root-equivalent group membership
 
 blockers: []
