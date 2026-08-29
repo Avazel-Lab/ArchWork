@@ -74,15 +74,15 @@ last_rebuild:
   date: 2026-08-29
 
 next_actions:
-  - Look at the captures and judge the theming criterion, which is the last M3
-    criterion with no verdict. Kvantum reaches Qt applications, the portal
-    chooser comes up light against a dark desktop, and D-020 still has no GTK
-    theme chosen
-  - Choose the GTK theme, the last part of D-020 still open. materia-gtk-theme
-    and kvantum-theme-materia are both in extra and are a designed pair, which
-    is what desktop-shell.md means by matching
-  - Correct the disk identity in D-017 before the first install on the desktop
-    hardware. The target is serial S4J4NX0R804138P, not the device name that
-    document records
+  - Look at the captures from the next run and judge the theming criterion,
+    the last M3 criterion a machine cannot assert for itself. Materia and
+    Papirus are chosen and applied, so the portal chooser should now be dark
+    rather than light against the desktop
+  - Run the laptop profile against the M3 criteria. Every run so far has been
+    the desktop profile, and the session set is shared between them, so it
+    should hold and has never been shown
+  - Answer the plan gap in D-024. No milestone installs the bulk of
+    applications.md, and M7 could pass today with "full desktop" meaning a
+    compositor and a terminal
 
 blockers: []

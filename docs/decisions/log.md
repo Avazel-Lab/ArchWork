@@ -383,6 +383,8 @@ The desktop hardware dual boots three systems: Kubuntu on `nvme1n1`, Windows 11 
 
 One prerequisite followed from that, and it has now been met. Windows also lives on `sdb`, and until 2026-08-28 that disk had no ESP of its own: one was created at `sdb3` and holds `Boot0000`. Because the disk about to be wiped carries an ESP too, Windows booting from `sdb` had to be proven before the wipe rather than discovered after it. **Confirmed by the repository owner on 2026-08-29: Windows boots from `sdb`.** The wipe no longer takes anything with it that has not been accounted for.
 
+The NTFS data on the target disk was confirmed expendable the same day, so nothing needs pulling off it first. Worth stating plainly because it is the one irreversible step in a process that is otherwise repeatable: the first install destroys it and every install after that is free. The owner expects to reinstall several times, which is what this repository is for.
+
 Two facts make the separation worth writing down rather than leaving implicit.
 
 **A shared ESP is a shared failure.** The 1 GiB ESP the installer creates is sized for UKIs, and a UKI is large. An ESP that another installer also writes to is one Windows feature update away from a full filesystem or a rewritten boot entry, and the recovery UKI is exactly the thing that must still be there on the day something else has gone wrong.
@@ -620,7 +622,15 @@ Recommendation for the entry as a whole: bring the baseline into `docs/decisions
 
 **Answered on 2026-08-29.** The baseline is now `docs/decisions/applications.md`, carried in whole. `applications-tooling.md` keeps only what is a decision about this repository rather than a list of what the owner wants installed, and points at the new file for the list. Where they disagreed, the baseline won, and git-crypt turned out not to be a disagreement at all.
 
-This entry stays open on one point: most of what the baseline names is in no package manifest, and the milestones that would install it are M8 and M9. Nothing is lost by that, since the manifests are meant to grow milestone by milestone, but the gap between the two documents should be closed deliberately rather than discovered.
+This entry stays open on one point, and reading the plan for it made it sharper rather than softer: **no milestone installs the bulk of the baseline.**
+
+M4 is power, M5 is update and rollback, M6 is Quickshell, M7 is the rebuild proving run, M8 and M9 are deployments to physical machines. M7's wording is "bare ISO to full desktop", which is the only place the applications could be implied, but its exit criteria are about three consecutive rebuilds and their timings, not about what is on the finished machine. M8 names Steam, OpenDeck and Xbox controller support because those are desktop-profile differences, not because it is the applications milestone.
+
+So a browser, an editor, an office suite and everything else in `applications.md` would arrive by nobody's decision, at no stated point, most likely as a scramble during M8 when the machine is meant to be in daily use.
+
+Recommendation, and this one is a change to the plan rather than to a document, so it needs the repository owner: add an applications milestone between M6 and M7, or widen M7 with an exit criterion that names the manifests as complete against `applications.md`. The second is cheaper and keeps the milestone count where it is. Either way M7 should not be able to pass while "full desktop" means a compositor and a terminal.
+
+There is a reason to prefer doing it before M7 rather than during M8. M7 proves that three consecutive rebuilds land the same machine. If the applications are not in the manifests by then, M7 proves repeatability of something that is not the workstation, and the first thing installed by hand afterwards makes it untrue.
 
 ## D-025 Podman is the desktop container engine, and Docker is a client
 
