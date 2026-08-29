@@ -165,9 +165,17 @@ guard_is_removable_or_acknowledged() {
 # Reading a device path back is deliberate: y/n is too easy to answer wrongly.
 guard_confirm_target() {
 	local device="${1:-}"
+	# What the operator typed, when that differs from what it resolved to.
+	# A by-id path names the serial, and the serial is what can be checked
+	# against the label on a drive. nvme0n1 cannot be checked against anything.
+	local given="${2:-}"
 	local answer=""
 
-	printf '\nAbout to destroy every byte on %s\n\n' "$device"
+	printf '\nAbout to destroy every byte on %s\n' "$device"
+	if [ -n "$given" ] && [ "$given" != "$device" ]; then
+		printf 'given as %s\n' "$given"
+	fi
+	printf '\n'
 	lsblk --nodeps --output NAME,SIZE,MODEL,SERIAL "$device" 2>/dev/null || true
 	printf '\nCurrent partition table:\n'
 	sfdisk --dump "$device" 2>/dev/null || printf '  (none, or unreadable)\n'
@@ -175,7 +183,10 @@ guard_confirm_target() {
 
 	read -r answer
 
-	if [ "$answer" != "$device" ]; then
+	# Either name is accepted. Making someone retype 60 characters of by-id
+	# path invites a copy and paste, and a pasted confirmation confirms
+	# nothing.
+	if [ "$answer" != "$device" ] && { [ -z "$given" ] || [ "$answer" != "$given" ]; }; then
 		guard_err "confirmation did not match. Nothing was written."
 		return 1
 	fi
