@@ -40,6 +40,12 @@ archwork_dotfile_links:
   - gtk-4.0
   - Kvantum
 
+# Whether this profile's GPU needs the driver stack the packages role
+# configures below (D-027). False by default, and set true in a profile file
+# rather than read here, so nothing in the packages role asks which machine
+# it is running on.
+archwork_nvidia_gpu: false
+
 # The graphical session (M3). Separate from archwork_packages_shared, which is
 # base tooling, because M6 has to install exactly this set with Quickshell
 # removed and prove the desktop still works. A named list makes that test mean
