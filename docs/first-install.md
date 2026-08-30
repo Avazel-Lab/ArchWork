@@ -51,6 +51,7 @@ The ISO does not ship `git`, and the installer refuses to run without it, becaus
 
 ```bash
 ./scripts/archwork-install.sh --profile desktop --dry-run \
+    --expect-serial S4J4NX0R804138P \
     /dev/disk/by-id/nvme-Samsung_SSD_970_EVO_Plus_2TB_S4J4NX0R804138P
 ```
 
@@ -63,10 +64,15 @@ Address the disk by that `by-id` path rather than `/dev/nvme0n1`. The serial is 
 ```bash
 ./scripts/archwork-install.sh --profile desktop \
     --i-know-this-wipes-my-disk \
+    --expect-serial S4J4NX0R804138P \
     /dev/disk/by-id/nvme-Samsung_SSD_970_EVO_Plus_2TB_S4J4NX0R804138P
 ```
 
 `--i-know-this-wipes-my-disk` is required because this is not a virtual machine. That flag is the whole difference between a test and the real thing.
+
+`--expect-serial` is optional, and is the guard that matters most here, so give it. The installer reads the target's serial and refuses unless it matches, so a mistyped device path becomes a refusal rather than a wipe. The serial appears twice on that command line, in the path and in the check, and they have to agree with the disk.
+
+The two drives are the same model and size and their `nvme0n1` names can swap between boots, so the serial is the only thing that tells them apart. `S6P1NS0T304068E` is the Kubuntu root. If you see that serial anywhere in what you are about to run, stop.
 
 You will be asked for:
 

@@ -92,3 +92,62 @@ partition_path_for() {
 	run resolve_target_device
 	[ "$status" -ne 0 ]
 }
+
+# --- The serial guard (D-017) -----------------------------------------------
+#
+# The desktop holds two identical 2 TB drives and one of them is the Kubuntu
+# root. These prove the guard refuses, because a test that only showed a
+# matching serial passing would pass against a script with no guard at all.
+
+serial_guard() {
+	EXPECT_SERIAL="$1"
+	ACKNOWLEDGED="$2"
+	TARGET_DEVICE="$3"
+	die() {
+		printf '%s\n' "$1" >&2
+		exit 1
+	}
+	# A stand-in for lsblk, so the guard can be exercised without a disk.
+	lsblk() { printf '%s\n' "${FAKE_SERIAL:-}"; }
+	eval "$(sed -n '/^guard_expected_serial()/,/^}/p' "$INSTALLER")"
+	guard_expected_serial
+}
+
+@test "the check is optional, on bare metal as anywhere else" {
+	# Deliberate. Requiring it would mean looking a serial up before every
+	# install on every machine, and the target does not always have a
+	# neighbour worth protecting.
+	run serial_guard "" true /dev/sdz
+	[ "$status" -eq 0 ]
+}
+
+@test "and optional in a virtual machine" {
+	run serial_guard "" false /dev/vda
+	[ "$status" -eq 0 ]
+}
+
+@test "a serial that does not match is refused, and says both" {
+	FAKE_SERIAL="S6P1NS0T304068E"
+	export FAKE_SERIAL
+	run serial_guard "S4J4NX0R804138P" true /dev/sdz
+	[ "$status" -ne 0 ]
+	[[ "$output" == *"S6P1NS0T304068E"* ]]
+	[[ "$output" == *"S4J4NX0R804138P"* ]]
+	[[ "$output" == *"Nothing was written"* ]]
+}
+
+@test "a matching serial passes" {
+	FAKE_SERIAL="S4J4NX0R804138P"
+	export FAKE_SERIAL
+	run serial_guard "S4J4NX0R804138P" true /dev/sdz
+	[ "$status" -eq 0 ]
+	[[ "$output" == *"matches"* ]]
+}
+
+@test "a disk reporting no serial cannot satisfy the check" {
+	FAKE_SERIAL=""
+	export FAKE_SERIAL
+	run serial_guard "S4J4NX0R804138P" true /dev/sdz
+	[ "$status" -ne 0 ]
+	[[ "$output" == *"no serial"* ]]
+}

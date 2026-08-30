@@ -32,6 +32,7 @@ ACKNOWLEDGED=false
 TARGET_DEVICE_GIVEN=""
 AUTHORIZED_KEY=""
 PASSPHRASE_FILE=""
+EXPECT_SERIAL=""
 REPO_URL=""
 REPO_PATH="src/ArchWork"
 TIMEZONE="Europe/London"
@@ -57,6 +58,10 @@ Options:
   --user NAME                     administrator account, default 'gary'
   --dry-run                       print every command, write nothing
   --i-know-this-wipes-my-disk     permit running outside a virtual machine
+  --expect-serial SERIAL          refuse unless the target reports this serial.
+                                  Optional, and worth giving where the machine
+                                  holds another disk you care about: a device
+                                  path is not proof of which disk you meant
   --authorized-key FILE           install an SSH key and enable sshd.
                                   VM only. Used by the M1 test harness.
   --repo-url URL                  upstream remote for the cloned repository.
@@ -130,6 +135,10 @@ parse_args() {
 			AUTHORIZED_KEY="${2:-}"
 			shift 2
 			;;
+		--expect-serial)
+			EXPECT_SERIAL="${2:-}"
+			shift 2
+			;;
 		--repo-url)
 			REPO_URL="${2:-}"
 			shift 2
@@ -197,6 +206,37 @@ resolve_target_device() {
 	[ -n "$resolved" ] || die "cannot resolve '$TARGET_DEVICE' to a device"
 
 	TARGET_DEVICE="$resolved"
+}
+
+# Let the operator name the disk, not just point at it.
+#
+# The desktop holds two Samsung 970 EVO Plus 2 TB drives. One is the ArchWork
+# target and one is the Kubuntu root, they are the same model and size, and
+# their nvme0n1 names can swap between boots. A device path is therefore not
+# proof of which disk was meant, and the only other thing separating them is a
+# serial read off a confirmation prompt by a person who has been awake too
+# long.
+#
+# Offered rather than required, deliberately. Requiring it would mean looking
+# up a serial before every install on every machine, and the target is not
+# always a disk with a neighbour worth protecting. Where it is, this turns
+# reading carefully into a check the machine makes.
+guard_expected_serial() {
+	local actual
+
+	[ -n "$EXPECT_SERIAL" ] || return 0
+
+	actual="$(lsblk --nodeps --noheadings --output SERIAL "$TARGET_DEVICE" 2>/dev/null | tr -d '[:space:]')"
+
+	if [ -z "$actual" ]; then
+		die "'$TARGET_DEVICE' reports no serial, so --expect-serial cannot be checked against it"
+	fi
+
+	if [ "$actual" != "$EXPECT_SERIAL" ]; then
+		die "'$TARGET_DEVICE' has serial $actual, not $EXPECT_SERIAL. Nothing was written."
+	fi
+
+	printf 'target serial %s matches\n' "$actual"
 }
 
 validate_args() {
@@ -678,6 +718,7 @@ main() {
 	validate_args
 
 	guard_check_all "$TARGET_DEVICE" "$ACKNOWLEDGED" || exit 1
+	guard_expected_serial
 
 	if [ "$DRY_RUN" = true ]; then
 		printf '\nDRY RUN. Nothing below is executed.\n'
