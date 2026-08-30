@@ -3,7 +3,7 @@
 # Validated by scripts/check-plan-status.py.
 ---
 schema: 1
-updated: 2026-08-29
+updated: 2026-08-30
 
 phase: M4
 
@@ -71,13 +71,17 @@ last_rebuild:
   date: 2026-08-29
 
 next_actions:
-  - Do the first install on the desktop hardware, following
-    docs/first-install.md. Everything it needs is proven in a VM and nothing
-    in it has met real firmware, two monitors, an AMD GPU or a speaker
+  - Rerun the playbook on hmlxdesktop02 for D-027's NVIDIA driver, reboot,
+    and confirm login reaches a Hyprland session. Record the outcome with a
+    commit SHA once it does
   - Have the installer run loadkeys itself, so the ISO and the installed
     system agree on the keyboard before a LUKS passphrase is set. D-017
     records the trap; docs/first-install.md currently documents around it
-  - Start M4, the power and sleep timings. The resume mode landed for these,
-    since the criteria are measured in tens of minutes
+  - Once login is confirmed, start M4, the power and sleep timings
 
-blockers: []
+blockers:
+  - hmlxdesktop02 has not rebooted since D-027 added the NVIDIA driver stack.
+    The desktop's GPU turned out to be an NVIDIA RTX 3060, not AMD, and
+    nouveau cannot run the M3 session on it. Until the machine reboots and
+    someone confirms Hyprland actually starts, the first hardware install
+    has no evidence that login works.

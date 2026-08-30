@@ -1,6 +1,18 @@
 ---
 archwork_profile: desktop
 
+# The desktop hardware carries a discrete NVIDIA GPU (an RTX 3060, confirmed
+# on hmlxdesktop02 on 2026-08-30), which no earlier VM run ever exercised
+# (D-027). nouveau claims it by default and falls back to legacy KMS, which
+# left Hyprland unable to get a working render context.
+archwork_nvidia_gpu: true
+
 # Desktop runs an AMD CPU (desktop-laptop-differences.md).
 archwork_packages_profile:
   - amd-ucode
+  # The NVIDIA driver (D-027). nvidia-open rather than the proprietary
+  # nvidia package: Ampere is on NVIDIA's supported list for the open kernel
+  # modules, and nvidia-utils carries the userspace libraries, the Vulkan
+  # ICD and nvidia-smi that nvidia-open does not.
+  - nvidia-open
+  - nvidia-utils
