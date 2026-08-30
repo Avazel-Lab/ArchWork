@@ -389,6 +389,8 @@ One prerequisite followed from that, and it has now been met. Windows also lives
 
 The NTFS data on the target disk was confirmed expendable the same day, so nothing needs pulling off it first. Worth stating plainly because it is the one irreversible step in a process that is otherwise repeatable: the first install destroys it and every install after that is free. The owner expects to reinstall several times, which is what this repository is for.
 
+**The keyboard layout is a trap on the first install.** The installer writes `KEYMAP=uk` and puts `sd-vconsole` in the initramfs, so the LUKS prompt at every boot uses a UK layout. The Arch ISO boots US. A passphrase set on the ISO and typed back at the boot prompt therefore disagrees on `@ " # \ | ~`, which is an encrypted disk that cannot be opened by the person who just encrypted it. `docs/first-install.md` runs `loadkeys uk` before the installer for that reason. Making the installer do it would remove the trap rather than document it, and is worth doing.
+
 Two facts make the separation worth writing down rather than leaving implicit.
 
 **A shared ESP is a shared failure.** The 1 GiB ESP the installer creates is sized for UKIs, and a UKI is large. An ESP that another installer also writes to is one Windows feature update away from a full filesystem or a rewritten boot entry, and the recovery UKI is exactly the thing that must still be there on the day something else has gone wrong.
