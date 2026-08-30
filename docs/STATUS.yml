@@ -29,7 +29,7 @@ milestones:
       commit: 0d20ddfa9b3592ef3740f6f25b402afdb9984537
       date: 2026-08-29
   M4:
-    status: not-started
+    status: in-progress
   M5:
     status: not-started
   M6:
@@ -76,11 +76,25 @@ last_rebuild:
 # open kernel module driving backend drm. That is Hyprland actually
 # rendering through the real GPU, not just a session that came up: this is
 # the desktop's first confirmed login on real hardware.
+#
+# M4 started the same day (D-028): hypridle and brightnessctl added to the
+# session package set, the dim/display-off/sleep listeners written to
+# dotfiles/hypr/hypridle.conf, and scripts/archwork-inhibit installed by a new
+# power role for the sleep inhibit control. lint, ansible-lint and the new
+# archwork-inhibit.bats unit tests all pass. Not yet proven against the M4
+# exit criteria themselves, which is VM harness work needing nested
+# virtualisation this was written without.
 next_actions:
+  - Run the M4 exit criteria against a VM rebuild, proving the three
+    timings and systemd-inhibit --list showing the expected lock during an
+    inhibit window. Needs nested virtualisation, so this is local-machine
+    work. Record the outcome with a commit SHA
   - Have the installer run loadkeys itself, so the ISO and the installed
     system agree on the keyboard before a LUKS passphrase is set. D-017
     records the trap; docs/first-install.md currently documents around it
-  - Start M4, the power and sleep timings, now that hmlxdesktop02 reaches a
-    working desktop
 
-blockers: []
+blockers:
+  - M4 has no VM evidence yet. The config and the inhibit control are
+    written and unit-tested, but nobody has watched the three timings fire
+    or the inhibit lock hold on a real rebuild, and this session has no
+    nested virtualisation to do that itself.
