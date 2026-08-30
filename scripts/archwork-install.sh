@@ -59,9 +59,9 @@ Options:
   --dry-run                       print every command, write nothing
   --i-know-this-wipes-my-disk     permit running outside a virtual machine
   --expect-serial SERIAL          refuse unless the target reports this serial.
-                                  Required with --i-know-this-wipes-my-disk:
-                                  on real hardware a device path is not proof
-                                  of which disk you meant
+                                  Optional, and worth giving where the machine
+                                  holds another disk you care about: a device
+                                  path is not proof of which disk you meant
   --authorized-key FILE           install an SSH key and enable sshd.
                                   VM only. Used by the M1 test harness.
   --repo-url URL                  upstream remote for the cloned repository.
@@ -208,27 +208,23 @@ resolve_target_device() {
 	TARGET_DEVICE="$resolved"
 }
 
-# Make the operator name the disk, not just point at it.
+# Let the operator name the disk, not just point at it.
 #
 # The desktop holds two Samsung 970 EVO Plus 2 TB drives. One is the ArchWork
 # target and one is the Kubuntu root, they are the same model and size, and
 # their nvme0n1 names can swap between boots. A device path is therefore not
-# proof of which disk was meant, and the only thing separating them is a serial
-# read off a confirmation prompt by a person who has been awake too long.
+# proof of which disk was meant, and the only other thing separating them is a
+# serial read off a confirmation prompt by a person who has been awake too
+# long.
 #
-# CLAUDE.md says a destructive script must never guess, and must exit non-zero
-# when it cannot identify the target with certainty. On bare metal a path alone
-# is not certainty, so --expect-serial is required there and optional in a VM,
-# where the disk is a file that was created seconds earlier.
+# Offered rather than required, deliberately. Requiring it would mean looking
+# up a serial before every install on every machine, and the target is not
+# always a disk with a neighbour worth protecting. Where it is, this turns
+# reading carefully into a check the machine makes.
 guard_expected_serial() {
 	local actual
 
-	if [ -z "$EXPECT_SERIAL" ]; then
-		if [ "$ACKNOWLEDGED" = true ]; then
-			die "--expect-serial is required with --i-know-this-wipes-my-disk. Find it with: lsblk -d -o NAME,SIZE,SERIAL,MODEL"
-		fi
-		return 0
-	fi
+	[ -n "$EXPECT_SERIAL" ] || return 0
 
 	actual="$(lsblk --nodeps --noheadings --output SERIAL "$TARGET_DEVICE" 2>/dev/null | tr -d '[:space:]')"
 

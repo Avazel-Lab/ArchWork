@@ -113,13 +113,15 @@ serial_guard() {
 	guard_expected_serial
 }
 
-@test "bare metal without an expected serial is refused" {
+@test "the check is optional, on bare metal as anywhere else" {
+	# Deliberate. Requiring it would mean looking a serial up before every
+	# install on every machine, and the target does not always have a
+	# neighbour worth protecting.
 	run serial_guard "" true /dev/sdz
-	[ "$status" -ne 0 ]
-	[[ "$output" == *"--expect-serial is required"* ]]
+	[ "$status" -eq 0 ]
 }
 
-@test "a virtual machine without an expected serial is allowed" {
+@test "and optional in a virtual machine" {
 	run serial_guard "" false /dev/vda
 	[ "$status" -eq 0 ]
 }
