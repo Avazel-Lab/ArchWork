@@ -1,43 +1,86 @@
-# First install on the desktop hardware
+# Installing ArchWork on the desktop
 
-A runbook for the first physical ArchWork install, on `hmlxdesktop02`. Written before the attempt rather than reconstructed at the keyboard during it.
+A step by step guide for the first install on real hardware. Follow it in order.
 
-This is exploration, not M8. M8 asks for thirty days of daily use with health checks green; this is the first time the thing runs on metal, and the expectation is several attempts. Everything after the first wipe is repeatable, so the only step that costs anything is the one that destroys the NTFS data, and that data is confirmed expendable (D-017).
+Expect about an hour, most of it waiting for packages. Expect to do it more than once: this is the first time any of it runs outside a virtual machine, and the point of the exercise is to find what a VM could not show.
 
-## Before you start
+---
 
-**Boot Windows from `sdb` once.** Prerequisite met and recorded in D-017 on 2026-08-29, but this runbook is what gets followed on the day: the disk about to be wiped carries an ESP of its own, and Windows must already be reaching its own one on `sdb` before that goes.
+## The two disks
 
-**Know which disk is which.** The desktop has two Samsung 970 EVO Plus 2 TB drives. The kernel names can swap between boots, so they are not identification.
+The desktop has two identical Samsung 970 EVO Plus 2 TB drives. Same model, same size, and their `/dev/nvme0n1` and `/dev/nvme1n1` names **can swap between boots**. Only the serial identifies them.
 
-| Disk | Serial | Holds | Do |
-|---|---|---|---|
-| Kubuntu root | `S6P1NS0T304068E` | the development install, this repository | leave alone |
-| ArchWork target | `S4J4NX0R804138P` | Windows, NTFS data, its own ESP | destroy |
+| | Serial | What is on it |
+|---|---|---|
+| ✅ **Install here** | `S4J4NX0R804138P` | Windows and NTFS data. All of it goes. |
+| ⛔ **Never touch** | `S6P1NS0T304068E` | Kubuntu, the machine you develop on. |
 
-Check with `lsblk -d -o NAME,SIZE,SERIAL,MODEL`, and check the serial again at the installer's own confirmation prompt.
+The short version: **the target ends `138P`, Kubuntu ends `068E`.**
 
-## 1. Write the installation medium
+Windows also lives on the small SATA SSD (`sdb`) and boots from its own EFI partition there, so it survives this. Kubuntu is untouched. Both stay reachable from the firmware boot menu.
 
-From the Kubuntu side, with a USB stick in:
+---
+
+## Before you begin
+
+- A USB stick, 2 GB or more. Its contents are destroyed.
+- The Arch ISO. There is one at `~/.cache/archwork/archlinux-x86_64.iso`, 1.5 GB, from 2026-08-27. Download a fresh one from an Arch mirror if you would rather.
+- Ethernet plugged in. The installer fetches packages.
+
+---
+
+## Step 1. Write the USB stick
+
+On Kubuntu, with the stick plugged in:
 
 ```bash
-lsblk -d -o NAME,SIZE,SERIAL,MODEL,TRAN     # find the stick, note the device
-sudo scripts/make-install-usb.sh --iso ~/.cache/archwork/archlinux-x86_64.iso \
-    --sha256 <sum from the Arch mirror> /dev/sdX
+lsblk -d -o NAME,SIZE,SERIAL,MODEL,TRAN
 ```
 
-The stick is stock Arch. Nothing of ArchWork is on it: appending a partition to an isohybrid image means moving the backup GPT header, and a stick that boots is worth more than one that saves a `git clone`.
+Find the row whose size matches your stick and whose `TRAN` says `usb`. Then:
 
-The script refuses a device that reports `removable=0`. If your enclosure lies about that, `--i-know-this-wipes-my-disk` overrides it, and at that point you are the guard.
+```bash
+cd ~/src/ArchWork
+sudo scripts/make-install-usb.sh --iso ~/.cache/archwork/archlinux-x86_64.iso /dev/sdX
+```
 
-## 2. Boot it
+Replace `/dev/sdX` with the stick. The script refuses anything that is not removable, prints what it is about to destroy, and makes you type the device path back.
 
-Firmware boot menu, choose the stick. Not the boot order: leave that alone, because it is what gets you back to Kubuntu if you stop here.
+A couple of minutes.
 
-Ethernet is already up on the desktop, so networking needs nothing.
+---
 
-## 3. Get the repository onto the ISO
+## Step 2. Boot the stick
+
+Reboot. As the ASUS logo appears, press **F8** for the boot menu, and choose the USB stick.
+
+Do not change the boot order in the firmware. Leaving it alone is what gets you back to Kubuntu if you stop here.
+
+**What you should see:** a plain Arch Linux boot menu, a lot of scrolling text, then:
+
+```
+root@archiso ~ #
+```
+
+You are running Arch from the stick. Nothing on any disk has changed yet.
+
+---
+
+## Step 3. Fix the keyboard, before anything else
+
+```bash
+loadkeys uk
+```
+
+**Do not skip this.** The ISO starts with a US keyboard layout. The system you are about to install uses a UK one, and it asks for your disk passphrase at every boot from now on.
+
+Set a passphrase on US and type it back on UK, and `@ " # \ | ~` all land somewhere else. That is an encrypted disk you cannot open and no way back into it.
+
+`loadkeys uk` makes both match. Belt and braces: use only letters and digits in the passphrase, which sit in the same place on both layouts.
+
+---
+
+## Step 4. Get the repository
 
 ```bash
 pacman -Sy git
@@ -45,9 +88,13 @@ git clone https://github.com/Avazel-Lab/ArchWork
 cd ArchWork
 ```
 
-The ISO does not ship `git`, and the installer refuses to run without it, because D-016 has it clone the checkout it runs from onto the target. That clone is how the installed machine carries the commit that built it.
+The ISO does not ship `git`, and the installer needs it: it clones this checkout onto the new machine, which is how the installed system records the commit that built it.
 
-## 4. Dry run first
+---
+
+## Step 5. Dry run
+
+Writes nothing. Prints everything it would do.
 
 ```bash
 ./scripts/archwork-install.sh --profile desktop --dry-run \
@@ -55,11 +102,15 @@ The ISO does not ship `git`, and the installer refuses to run without it, becaus
     /dev/disk/by-id/nvme-Samsung_SSD_970_EVO_Plus_2TB_S4J4NX0R804138P
 ```
 
-Writes nothing, prints every command. Read the device line in the summary and confirm it resolved to the disk you meant.
+**What you should see:** `DRY RUN. Nothing below is executed.`, the list of steps, and a summary naming the device, profile `desktop`, hostname `hmlxdesktop02` and user `gary`.
 
-Address the disk by that `by-id` path rather than `/dev/nvme0n1`. The serial is in the path, and the serial is the only thing that separates the two identical drives. The installer resolves the symlink itself and shows both names at the prompt.
+If it objects to the serial, stop and find out why. That is the guard working.
 
-## 5. Install
+---
+
+## Step 6. Install
+
+The same command without `--dry-run`, plus the flag that permits it on real hardware:
 
 ```bash
 ./scripts/archwork-install.sh --profile desktop \
@@ -68,67 +119,119 @@ Address the disk by that `by-id` path rather than `/dev/nvme0n1`. The serial is 
     /dev/disk/by-id/nvme-Samsung_SSD_970_EVO_Plus_2TB_S4J4NX0R804138P
 ```
 
-`--i-know-this-wipes-my-disk` is required because this is not a virtual machine. That flag is the whole difference between a test and the real thing.
+The serial appears twice, in the path and in the check. Both must agree with the disk, or it stops before writing anything.
 
-`--expect-serial` is optional, and is the guard that matters most here, so give it. The installer reads the target's serial and refuses unless it matches, so a mistyped device path becomes a refusal rather than a wipe. The serial appears twice on that command line, in the path and in the check, and they have to agree with the disk.
+It asks for two things.
 
-The two drives are the same model and size and their `nvme0n1` names can swap between boots, so the serial is the only thing that tells them apart. `S6P1NS0T304068E` is the Kubuntu root. If you see that serial anywhere in what you are about to run, stop.
+**A disk passphrase, three times.** Twice to set it, once to open the container. You type this at every boot, on a UK layout, before anything graphical exists. Choose something you can type in the dark.
 
-You will be asked for:
+**Confirmation of the target.** It prints the device, size, model and **serial**, and the current partition table, then asks you to type the device path back.
 
-1. **A LUKS passphrase**, twice. This is typed at every boot, before any keyboard layout beyond the console default exists.
-2. **Confirmation of the target.** It prints the device, its size, model and serial, and its current partition table, then asks you to type the device path back. Either the `by-id` path or `/dev/nvme0n1` is accepted. **Check the serial here.** It is the last point at which the Windows disk is still there.
+> **This is the last moment the Windows disk still exists.** Read the serial. It must end `138P`. If it ends `068E` that is Kubuntu: type anything else and it aborts.
 
-Then it partitions, encrypts, installs the base system, clones this repository to `/home/gary/src/ArchWork`, builds the recovery UKI and installs the bootloader.
+Then it runs for a while: partition, encrypt, base packages, repository clone, recovery image, bootloader.
 
-## 6. Set a password, then reboot
+**What you should see at the end:** a summary of device, profile, hostname and user, and an instruction to set a password.
 
-The installer says this too:
+---
+
+## Step 7. Set your password
 
 ```bash
 arch-chroot /mnt passwd gary
 ```
 
-Do not skip it. greetd will ask for that password, and D-012 has it unlock the keyring through PAM.
+Do not skip this one either. It is the password you log in with, and it is what unlocks your keyring, so the desktop does not ask a second time.
 
-Reboot, remove the stick, and answer the LUKS prompt.
+---
 
-## 7. Bootstrap
+## Step 8. Reboot
 
-Log in at the text console as `gary`:
+```bash
+reboot
+```
+
+Pull the stick out as it restarts.
+
+**What you should see:** a boot menu offering `Arch Linux` and a recovery entry, then:
+
+```
+Please enter passphrase for disk cryptroot:
+```
+
+Type the passphrase from step 6. Nothing appears as you type. Then a text login. Log in as `gary`.
+
+No desktop yet. That is expected.
+
+---
+
+## Step 9. Build the desktop
 
 ```bash
 cd ~/src/ArchWork
 ./bootstrap.sh
 ```
 
-It prompts for the age passphrase, unwraps the private key in memory, brings up NetworkManager, and runs the playbook with a local connection. Nothing here needs a second machine (D-016).
+It asks for the age passphrase, unwraps the secrets key in memory, brings up networking, and runs the playbook. This is the long part.
 
-`./bootstrap.sh --dry-run` runs the playbook with `--check` first if you want to see it before it acts.
+All of it happens on this machine. No other computer is involved at any point.
 
-Reboot again, or `systemctl start greetd`, and you should land at the greeter.
+When it finishes:
 
-## 8. What to check
+```bash
+reboot
+```
 
-The VM criteria that M3 proved, on hardware this time, and the things a VM could not show:
+**What you should see:** the passphrase prompt, then a graphical login screen showing the time. Log in with the password from step 7.
 
-- Log in at the greeter. A terminal on `SUPER+Return`, the launcher on `SUPER+D`, lock on `SUPER+L`, and the password unlocks it.
-- `secret-tool store --label=test a b` prompts for nothing. That is D-012 holding.
-- Open a file picker from PDF Arranger and from Okular. Both should be the portal's chooser, dark, matching the desktop.
-- `tailscale status` answers. It will say logged out, which is correct until the auth key arrives.
-- **Both monitors, at their real resolutions and refresh rates.** No VM has ever shown this. `dotfiles/hypr/hyprland.lua` names no monitor layout, which is fine for one virtual head and probably not for the real desk.
-- **Audio, actual sound out of the actual speakers.** PipeWire is installed and has never been asked to make a noise.
-- **The AMD GPU.** Hardware acceleration, and whether the desktop is smooth.
-- **Suspend and resume**, which M4 is about but which you will hit by accident first.
+---
 
-Anything you fix by hand here goes into the repository before the next rebuild. That is the capture rule, and it is the whole reason this is worth doing more than once.
+## Step 10. Look around
 
-## Getting back
+A dark desktop with a bar across the top.
 
-Kubuntu and Windows both keep their own bootloaders on their own disks (D-017). `bootctl install` makes systemd-boot the first EFI entry and systemd-boot only scans its own ESP, so it will not offer either of them. Use the firmware boot menu, or reorder with `efibootmgr`.
+| Keys | What happens |
+|---|---|
+| `Super` + `Return` | terminal |
+| `Super` + `D` | application launcher |
+| `Super` + `Q` | close the window |
+| `Super` + `L` | lock the screen |
+| `Print` | screenshot into `~/Pictures/screenshots` |
 
-## If it goes wrong
+Worth checking, because no virtual machine could show any of it:
 
-The install is not the risky part; the wipe is, and after the first attempt there is nothing left to lose. Reinstalling is the same procedure from step 4.
+- **Both monitors**, at their real resolutions and refresh rates. Nothing in the configuration names a monitor layout yet, so this is the likeliest thing to need fixing.
+- **Sound**, actually out of the speakers.
+- **The graphics card**, and whether the desktop feels smooth.
+- **Suspend and resume.**
+- Open a file from PDF Arranger and from Okular. Both pickers should be dark and match the desktop.
+- `tailscale status` should answer. It will say logged out, which is right for now.
 
-The recovery UKI is on the ESP as a second boot entry, and `scripts/archwork-rollback` is on the installed system. Neither has been exercised on hardware.
+**Anything you fix by hand, tell me, and it goes into the repository before the next rebuild.** A fix that lives only on the machine disappears the next time it is rebuilt, and rebuilding is the entire point.
+
+---
+
+## Getting back to Kubuntu or Windows
+
+The install makes Arch the first boot entry. It does not touch the other two bootloaders, which sit on their own disks.
+
+Press **F8** at the ASUS logo and pick the one you want. To make one of them the default again, reorder the entries with `efibootmgr` from any of the three systems.
+
+---
+
+## If something goes wrong
+
+Nothing after step 6 is dangerous, and the wiped disk has nothing left to lose, so reinstalling is steps 5 and 6 again.
+
+- **The passphrase is refused at the boot prompt.** Almost certainly the keyboard layout in step 3, especially if the passphrase used `@ " # \ | ~`. Reinstalling is the fix.
+- **No desktop after step 9.** Log in at the text console and run `journalctl -b -u greetd`.
+- **A broken desktop configuration.** The compositor has a safe mode that starts with defaults, and the boot menu has a recovery entry.
+- **Anything else.** The work is in git, and the machine can be reinstalled from the stick in an hour.
+
+---
+
+## What this is and is not
+
+This is exploration, not milestone M8. M8 wants thirty days of daily use with health checks green.
+
+Everything here is proven in a virtual machine and none of it has met real firmware, two monitors, an AMD graphics card or a speaker. The only step that costs anything is the first wipe, and that data is confirmed expendable (D-017). Everything after it is repeatable.
