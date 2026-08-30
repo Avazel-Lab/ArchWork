@@ -71,16 +71,13 @@ last_rebuild:
   date: 2026-08-29
 
 next_actions:
-  - Give the harness a way to re-run the desktop and portal phases against a
-    kept disk image, instead of reinstalling to test a keypress. Four runs on
-    2026-08-29 were lost to one-line harness bugs, and M4 asks for timings
-    measured in tens of minutes, which a full reinstall per iteration cannot
-    carry
   - Do the first install on the desktop hardware, following
     docs/first-install.md. Everything it needs is proven in a VM and nothing
     in it has met real firmware, two monitors, an AMD GPU or a speaker
-  - Fill the manifests against applications.md, which M7 now requires. Most of
-    that document is in no manifest, and an entry deferred on purpose is fine
-    where an entry nobody has looked at is not
+  - Have the installer run loadkeys itself, so the ISO and the installed
+    system agree on the keyboard before a LUKS passphrase is set. D-017
+    records the trap; docs/first-install.md currently documents around it
+  - Start M4, the power and sleep timings. The resume mode landed for these,
+    since the criteria are measured in tens of minutes
 
 blockers: []
