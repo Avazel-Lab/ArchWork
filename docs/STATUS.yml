@@ -70,18 +70,17 @@ last_rebuild:
   commit: 0d20ddfa9b3592ef3740f6f25b402afdb9984537
   date: 2026-08-29
 
+# D-027 confirmed on hmlxdesktop02 at commit 85f8972, 2026-08-30. nvidia_drm,
+# nvidia_modeset, nvidia_uvm and nvidia are the modules loaded, no nouveau,
+# and hyprctl systeminfo names the GA104 [GeForce RTX 3060] with the NVIDIA
+# open kernel module driving backend drm. That is Hyprland actually
+# rendering through the real GPU, not just a session that came up: this is
+# the desktop's first confirmed login on real hardware.
 next_actions:
-  - Rerun the playbook on hmlxdesktop02 for D-027's NVIDIA driver, reboot,
-    and confirm login reaches a Hyprland session. Record the outcome with a
-    commit SHA once it does
   - Have the installer run loadkeys itself, so the ISO and the installed
     system agree on the keyboard before a LUKS passphrase is set. D-017
     records the trap; docs/first-install.md currently documents around it
-  - Once login is confirmed, start M4, the power and sleep timings
+  - Start M4, the power and sleep timings, now that hmlxdesktop02 reaches a
+    working desktop
 
-blockers:
-  - hmlxdesktop02 has not rebooted since D-027 added the NVIDIA driver stack.
-    The desktop's GPU turned out to be an NVIDIA RTX 3060, not AMD, and
-    nouveau cannot run the M3 session on it. Until the machine reboots and
-    someone confirms Hyprland actually starts, the first hardware install
-    has no evidence that login works.
+blockers: []
