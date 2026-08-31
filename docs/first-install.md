@@ -66,17 +66,15 @@ You are running Arch from the stick. Nothing on any disk has changed yet.
 
 ---
 
-## Step 3. Fix the keyboard, before anything else
+## Step 3. The keyboard, which the installer sorts out
 
-```bash
-loadkeys uk
-```
+Nothing to type here. Read it anyway, because this is the one mistake with no way back from it.
 
-**Do not skip this.** The ISO starts with a US keyboard layout. The system you are about to install uses a UK one, and it asks for your disk passphrase at every boot from now on.
+The ISO starts on a US keyboard layout. The system you are about to install uses a UK one, and it asks for your disk passphrase at every boot from now on. Set a passphrase on US, type it back on UK, and `@ " # \ | ~` all land somewhere else. That is an encrypted disk you cannot open.
 
-Set a passphrase on US and type it back on UK, and `@ " # \ | ~` all land somewhere else. That is an encrypted disk you cannot open and no way back into it.
+The installer runs `loadkeys uk` itself, before it touches the disk and before it asks for the passphrase, so the layout you set it on is the layout you will type it on. If `loadkeys` is missing or fails, it stops rather than carrying on.
 
-`loadkeys uk` makes both match. Belt and braces: use only letters and digits in the passphrase, which sit in the same place on both layouts.
+Belt and braces: use only letters and digits in the passphrase. Those sit in the same place on both layouts.
 
 ---
 

@@ -321,6 +321,29 @@ SFDISK
 	udevadm settle
 }
 
+# The ISO boots a US console layout. configure_system writes KEYMAP=uk and
+# configure_initramfs puts sd-vconsole in the image, so the LUKS prompt at
+# every boot from now on is UK. A passphrase set here and typed back there
+# would disagree on @ " # \ | ~, which is an encrypted disk that cannot be
+# opened by the person who just encrypted it (D-017). Loading the installed
+# system's keymap before the passphrase is set removes the trap instead of
+# documenting it.
+#
+# It fails the install rather than warning. Continuing past it is how the
+# passphrase gets set on the wrong layout, and that is discovered at the
+# first reboot, after the disk has been written.
+set_console_keymap() {
+	log "Loading the $KEYMAP console keymap, the layout the installed system will use"
+
+	if [ "$DRY_RUN" != true ] && ! command -v loadkeys >/dev/null 2>&1; then
+		die "loadkeys is not present, so the console cannot be put on the $KEYMAP layout the installed system boots with. It ships with the Arch ISO in the kbd package. Install kbd and run this again."
+	fi
+
+	if ! run_cmd loadkeys "$KEYMAP"; then
+		die "loadkeys $KEYMAP failed, so the console layout does not match the $KEYMAP layout the installed system boots with. Fix that before setting a passphrase: a passphrase typed on the wrong layout cannot open the disk afterwards."
+	fi
+}
+
 encrypt_root() {
 	local part
 	part="$(partition_path 2)"
@@ -726,6 +749,7 @@ main() {
 		guard_confirm_target "$TARGET_DEVICE" "$TARGET_DEVICE_GIVEN" || exit 1
 	fi
 
+	set_console_keymap
 	partition_disk
 	encrypt_root
 	create_filesystems
