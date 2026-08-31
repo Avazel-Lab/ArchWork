@@ -8,9 +8,30 @@
 
 CHECK_FAILURES=0
 
+# A predicate that does not exist is not a criterion that failed: it is a
+# criterion nobody tested. Output is discarded here, so bash's 127 and a
+# command-not-found message look exactly like an honest no.
+#
+# This is not hypothetical. assert-m4.sh called hypridle_running, which was
+# never defined, and a 65 minute VM run reported "FAIL hypridle is running as
+# the user" against a machine where hypridle was running perfectly. An hour
+# went into chasing the machine rather than the check.
+#
+# check_not is the worse half: there, a missing predicate "fails", so the
+# absence it asserts looks proven and the run goes green on nothing at all.
+check_exists() {
+	command -v "$1" >/dev/null 2>&1
+}
+
 check() {
 	local description="$1"
 	shift
+
+	if ! check_exists "$1"; then
+		printf '  FAIL  %s\n        no such check: %s\n' "$description" "$1"
+		CHECK_FAILURES=$((CHECK_FAILURES + 1))
+		return 1
+	fi
 
 	if "$@" >/dev/null 2>&1; then
 		printf '  ok    %s\n' "$description"
@@ -24,6 +45,12 @@ check() {
 check_not() {
 	local description="$1"
 	shift
+
+	if ! check_exists "$1"; then
+		printf '  FAIL  %s\n        no such check: %s\n' "$description" "$1"
+		CHECK_FAILURES=$((CHECK_FAILURES + 1))
+		return 1
+	fi
 
 	if "$@" >/dev/null 2>&1; then
 		printf '  FAIL  %s\n' "$description"
@@ -400,6 +427,10 @@ CHECK_SKIPS=0
 skip() {
 	printf '  skip  %s\n        %s\n' "$1" "$2"
 	CHECK_SKIPS=$((CHECK_SKIPS + 1))
+}
+
+hypridle_running() {
+	user_process_running "$1" hypridle
 }
 
 # One listener block in hypridle.conf, by its timeout and the command it runs.

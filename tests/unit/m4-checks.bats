@@ -120,3 +120,38 @@ CONF
 	: >"$home/.config/hypr/hypridle.conf"
 	! config_is_repo_dotfile "$home/.config/hypr/hypridle.conf" someone
 }
+
+@test "a check whose predicate does not exist fails, and says so" {
+	CHECK_FAILURES=0
+	run check "something nobody defined" no_such_predicate_anywhere
+	[ "$status" -ne 0 ]
+	[[ "$output" == *"no such check: no_such_predicate_anywhere"* ]]
+}
+
+@test "check_not refuses a predicate that does not exist rather than passing it" {
+	# The dangerous half. A missing command "fails", so an absence check would
+	# report ok and prove nothing. A typo would go green.
+	CHECK_FAILURES=0
+	run check_not "an absence nobody can test" no_such_predicate_anywhere
+	[ "$status" -ne 0 ]
+	[[ "$output" != *"  ok "* ]]
+}
+
+@test "the M4 script only calls predicates that exist" {
+	# The bug this file exists to stop coming back: assert-m4.sh called
+	# hypridle_running, nothing defined it, and a 65 minute run blamed the
+	# machine. Every predicate the script names has to be real.
+	local script="$REPO_ROOT/tests/vm/assert-m4.sh"
+	local name
+	while read -r name; do
+		[ -n "$name" ] || continue
+		command -v "$name" >/dev/null 2>&1 || {
+			echo "assert-m4.sh calls $name, which nothing defines"
+			return 1
+		}
+	# Continuation lines are joined first: a check whose predicate sits on
+	# the next line is exactly the shape this would otherwise miss.
+	done < <(sed -e :a -e '/\\$/N; s/\\\n//; ta' "$script" |
+		grep -oE 'check(_timing|_not)? "[^"]*"( [0-9]+)*[[:space:]]+[a-z_]+' |
+		sed -E 's/.*"([ 0-9]+)?[[:space:]]*//' | grep -vE '^(test|systemctl)$')
+}
