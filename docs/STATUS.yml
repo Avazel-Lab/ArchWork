@@ -97,10 +97,11 @@ first_install:
     status: never-run
 
 next_actions:
-  - Have the installer run loadkeys itself, so the ISO and the installed
-    system agree on the keyboard before a LUKS passphrase is set. D-017
-    records the trap; docs/first-install.md currently documents around it
   - Start M4, the power and sleep timings, now that hmlxdesktop02 reaches a
     working desktop
+  - Prove the timings on feat/m4-power-timings in a VM. The hypridle
+    listeners and the inhibit control are written, and nothing has yet
+    asserted them against M4's exit criteria, which need nested
+    virtualisation
 
 blockers: []
