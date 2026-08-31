@@ -94,7 +94,9 @@ next_actions:
     records the trap; docs/first-install.md currently documents around it
 
 blockers:
-  - M4 has no VM evidence yet. The config and the inhibit control are
-    written and unit-tested, but nobody has watched the three timings fire
-    or the inhibit lock hold on a real rebuild, and this session has no
-    nested virtualisation to do that itself.
+  - M4 has no VM evidence yet. The configuration, the inhibit control and
+    now the automated check its last exit criterion asks for are all
+    written and unit-tested, and nobody has yet watched the three timings
+    fire or the inhibit lock hold on a real machine. The run is
+    make vm-power ISO=..., and it takes about 65 minutes because the
+    criteria are two idle windows of half an hour.

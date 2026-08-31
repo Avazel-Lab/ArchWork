@@ -58,7 +58,32 @@ tests/vm/run-install.sh --resume ~/.cache/archwork/archwork-vm.XXXXXX \
 
 That took 38 seconds, against the 40 minutes a full run costs.
 
-`session` has to come before `desktop` or `portals`. A resumed run boots the
+## The power phase
+
+M4's criteria are wall clock timings, so measuring them costs wall clock time.
+`--power` on a reconciled run, or `--phases session,power` on a resumed one,
+adds about 65 minutes: two idle windows of half an hour, one with a sleep
+inhibitor held and one without.
+
+```bash
+make vm-power ISO=/path/to/archlinux.iso
+```
+
+Nothing can shorten it. The compositor's idle counter only resets on real
+input, which is why each window starts with a keystroke sent through QEMU, and
+there is no way to wind it forward.
+
+Two of the three timings are observed from inside the session, by
+`assert-m4.sh`. The third cannot be: a machine that suspends stops being able
+to report anything, so `suspend-watch.py` measures that one from out here
+against the monitor socket, and wakes the guest afterwards.
+
+The dim at five minutes is the criterion a VM cannot show you. There is no
+backlight device, `brightnessctl` no-ops, and nothing observable changes
+(D-028). `assert-m4.sh` prints that as a skip rather than a pass, and says so
+in its summary. Only the laptop panel can settle it.
+
+`session` has to come before `desktop`, `portals` or `power`. A resumed run boots the
 machine from cold, so it arrives at the greeter with nobody logged in and an
 empty `/tmp`, and `phase_session` is both what types the password at that
 greeter and what puts the check scripts on the machine. Leaving it out is

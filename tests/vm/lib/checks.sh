@@ -382,3 +382,150 @@ process_absent() {
 user_unit_active() {
 	as_user "$1" systemctl --user is-active --quiet "$2"
 }
+
+# --- Power and sleep (M4, D-028) --------------------------------------------
+#
+# M4's criteria are timings, so most of what follows measures when something
+# happened rather than whether it did. A check that only waited long enough
+# and then looked would pass on a machine whose display switched off after
+# four minutes or forty, which is why each observation records its elapsed
+# time and the caller asserts a window around the number the configuration
+# claims.
+
+CHECK_SKIPS=0
+
+# For a criterion this machine cannot observe, as opposed to one that passed.
+# Counted separately and reported separately: a skip folded into a pass is how
+# a run comes to look like proof of something nobody measured.
+skip() {
+	printf '  skip  %s\n        %s\n' "$1" "$2"
+	CHECK_SKIPS=$((CHECK_SKIPS + 1))
+}
+
+# One listener block in hypridle.conf, by its timeout and the command it runs.
+#
+# The behavioural checks below cannot tell 900 seconds configured from 900
+# seconds by luck of the polling interval, and this cannot tell a listener
+# that is present from one that fires. Neither is worth much alone.
+hypridle_listener_has() {
+	local conf="$1" want="$2" needle="$3"
+	awk -v want="$want" -v needle="$needle" '
+		/^listener[[:space:]]*\{/ { timeout=""; hascmd=0; next }
+		/^\}/ {
+			if (timeout == want && hascmd) { ok = 1 }
+			timeout=""; hascmd=0; next
+		}
+		/^[[:space:]]*timeout[[:space:]]*=/ {
+			value=$0
+			gsub(/[^0-9]/, "", value)
+			timeout=value
+			next
+		}
+		index($0, needle) { hascmd=1 }
+		END { exit ok ? 0 : 1 }
+	' "$conf"
+}
+
+# The daemon reads the file in the repository clone, not a copy that has
+# drifted from it. The dotfiles role links the whole hypr directory, so the
+# file itself is not a symlink and `test -L` on it is false: where it resolves
+# to is the question. Getting that wrong is how a machine ends up running
+# timings nobody can see in `git status`.
+# Like BACKLIGHT_ROOT: a variable so the tests can call this function itself
+# rather than a copy of its logic. On a machine it is always /home.
+HOME_ROOT="${HOME_ROOT:-/home}"
+
+config_is_repo_dotfile() {
+	local path="$1" user="$2"
+	[ "$(readlink -f "$path")" = "$HOME_ROOT/$user/src/ArchWork/dotfiles/hypr/$(basename "$path")" ]
+}
+
+# The lock the M4 criterion names, read the way the criterion states it.
+sleep_inhibitor_held() {
+	systemd-inhibit --list 2>/dev/null |
+		awk '$0 ~ /sleep/ && $0 ~ /block/ { found=1 } END { exit found ? 0 : 1 }'
+}
+
+sleep_inhibitor_absent() {
+	! sleep_inhibitor_held
+}
+
+# The inhibitor is the one archwork-inhibit holds, not some other process's.
+sleep_inhibitor_is_ours() {
+	systemd-inhibit --list 2>/dev/null | grep -q archwork-inhibit
+}
+
+# Every monitor, not any monitor: a second display still lit is the criterion
+# failing on the machine profile that has two of them.
+all_monitors_dpms() {
+	local user="$1" want="$2" monitors
+	monitors="$(as_user_in_session "$user" hyprctl -j monitors 2>/dev/null)" || return 1
+	printf '%s' "$monitors" |
+		jq -e --argjson want "$want" 'length > 0 and all(.[]; .dpmsStatus == $want)' >/dev/null 2>&1
+}
+
+# Poll a predicate and print how many seconds it took to become true, counted
+# from the epoch second the caller passes rather than from when polling
+# started. The caller owns the clock: idle time runs from the keystroke the
+# harness sent, which happened before this script was even copied over.
+#
+# Prints the elapsed seconds on success. Fails after the deadline.
+seconds_until() {
+	local since="$1" deadline="$2"
+	shift 2
+
+	local now
+	while :; do
+		now="$(date +%s)"
+		if "$@" >/dev/null 2>&1; then
+			printf '%d' "$((now - since))"
+			return 0
+		fi
+		if [ "$((now - since))" -ge "$deadline" ]; then
+			return 1
+		fi
+		sleep 5
+	done
+}
+
+# Assert an observed time against the timing the configuration claims. The
+# lower bound is the point of it: firing early is as wrong as never firing,
+# and only the lower bound catches a listener that fires on the wrong clock.
+within_window() {
+	local observed="$1" lower="$2" upper="$3"
+	[ "$observed" -ge "$lower" ] && [ "$observed" -le "$upper" ]
+}
+
+# logind's own record of a sleep, whatever wording the running version uses.
+suspend_logged_since() {
+	journalctl --since "@$1" -u systemd-logind --no-pager 2>/dev/null |
+		grep -qE 'Suspending system|Entering sleep state|Performing sleep operation'
+}
+
+no_suspend_logged_since() {
+	! suspend_logged_since "$1"
+}
+
+# A backlight to dim. The desktop's external monitors have none and the VM has
+# none, so the dim criterion is observable on the laptop panel and nowhere
+# else. D-028 accepted that brightnessctl no-ops there.
+# The path is a variable so the tests can point it at a directory they made.
+# On a machine it is always the real one.
+BACKLIGHT_ROOT="${BACKLIGHT_ROOT:-/sys/class/backlight}"
+
+backlight_present() {
+	compgen -G "$BACKLIGHT_ROOT/*" >/dev/null
+}
+
+backlight_at_or_below() {
+	local percent="$1" device current max
+	for device in "$BACKLIGHT_ROOT"/*; do
+		[ -d "$device" ] || continue
+		current="$(cat "$device/brightness")"
+		max="$(cat "$device/max_brightness")"
+		[ "$max" -gt 0 ] || return 1
+		[ "$((current * 100 / max))" -le "$percent" ] || return 1
+		return 0
+	done
+	return 1
+}

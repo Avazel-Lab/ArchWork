@@ -26,6 +26,7 @@ CPUS="4"
 REPEAT=1
 KEEP=false
 RECONCILE=false
+POWER=false
 WORK_DIR=""
 # A kept work directory to boot again instead of installing into a new one.
 # Set by --resume, and never a source of evidence: see run_phases.
@@ -79,12 +80,16 @@ Options:
                         phases again, instead of installing from scratch.
                         Implies --keep and needs no --iso
   --phases LIST         comma separated, for --resume. Default
-                        greeter,session,desktop,portals. Also accepts assert
-                        and recovery
+                        greeter,session,desktop,portals. Also accepts assert,
+                        recovery and power. The power phase measures the M4
+                        timings and takes just over an hour on its own
   --captures DIR        copy the screen captures here, since D-021 has a
                         person judge appearance by looking at them
   --reconcile           run the M2 Ansible reconciliation twice and require
                         the second run to change nothing
+  --power               measure the M4 timings after the desktop phases.
+                        Needs --reconcile, and adds about 65 minutes: the
+                        criteria are two idle windows of half an hour
   -h, --help            this text
 
 Needs qemu-system-x86_64, an OVMF firmware image and nested virtualisation.
@@ -166,6 +171,10 @@ parse_args() {
 			RECONCILE=true
 			shift
 			;;
+		--power)
+			POWER=true
+			shift
+			;;
 		-h | --help)
 			usage
 			exit 0
@@ -204,6 +213,10 @@ adopt_work_dir() {
 		-o UserKnownHostsFile=/dev/null
 		-o LogLevel=ERROR
 		-o ConnectTimeout=5
+		# The power phase holds one connection open across a 30 minute
+		# idle window, on a guest that is deliberately doing nothing.
+		-o ServerAliveInterval=30
+		-o ServerAliveCountMax=10
 	)
 	SSH_OPTS=(-p "$SSH_PORT" "${common_opts[@]}")
 	SCP_OPTS=(-P "$SSH_PORT" "${common_opts[@]}")
@@ -233,12 +246,12 @@ validate_phases() {
 	local phase
 	for phase in ${PHASES//,/ }; do
 		case "$phase" in
-		assert | greeter | session | desktop | portals | recovery) ;;
-		*) die "'$phase' is not a phase that can be resumed. Try assert, greeter, session, desktop, portals or recovery." ;;
+		assert | greeter | session | desktop | portals | power | recovery) ;;
+		*) die "'$phase' is not a phase that can be resumed. Try assert, greeter, session, desktop, portals, power or recovery." ;;
 		esac
 
 		case "$phase" in
-		desktop | portals)
+		desktop | portals | power)
 			case ",$PHASES," in
 			*,session,*) ;;
 			*) die "'$phase' needs a logged in session, so 'session' has to come before it in --phases. A resumed run starts at the greeter." ;;
@@ -257,6 +270,7 @@ run_phases() {
 		session) phase_session ;;
 		desktop) phase_desktop ;;
 		portals) phase_portals ;;
+		power) phase_power ;;
 		recovery) phase_recovery ;;
 		esac
 	done
@@ -294,6 +308,12 @@ check_prerequisites() {
 	else
 		[ -n "$ISO" ] || die "--iso is required and has no default"
 		[ -r "$ISO" ] || die "cannot read ISO '$ISO'"
+	fi
+
+	# The power phase asks a logged in session about its idle behaviour, and
+	# a machine that has only been installed has no session at all.
+	if [ "$POWER" = true ] && [ "$RECONCILE" = false ] && [ -z "$RESUME_DIR" ]; then
+		die "--power needs --reconcile: the timings are measured in a logged in session, and only a reconciled machine has a greeter to log in at"
 	fi
 
 	case "$PROFILE" in
@@ -789,6 +809,89 @@ phase_portals() {
 		die "$failures of 2 file picker criteria failed. The captures are in $WORK_DIR"
 }
 
+# M4: dim at 5 minutes, display off at 15, sleep at 30, and a sleep inhibitor
+# that suppresses the last of those and neither of the first two.
+#
+# Just over an hour, in two idle windows of half an hour each, because the
+# criteria are wall clock times and nothing can fast-forward the compositor's
+# idle counter. Both windows start with a keystroke from out here: real input
+# is the only thing that resets that counter, and a guest cannot produce it
+# for itself.
+#
+# The inhibited window comes first. If it ran second, a machine that had just
+# suspended and woken would be answering questions about a session that had
+# been through S3, and a failure would not say which of the two caused it.
+phase_power() {
+	log "Phase 10: the M4 power and sleep timings, about 65 minutes"
+
+	ssh "${SSH_OPTS[@]}" gary@127.0.0.1 "mkdir -p /tmp/checks/lib"
+	scp "${SCP_OPTS[@]}" -q "$SCRIPT_DIR/assert-m4.sh" gary@127.0.0.1:/tmp/checks/
+	scp "${SCP_OPTS[@]}" -q "$SCRIPT_DIR/lib/checks.sh" gary@127.0.0.1:/tmp/checks/lib/
+	ssh "${SSH_OPTS[@]}" gary@127.0.0.1 "chmod +x /tmp/checks/assert-m4.sh"
+
+	# The user name and, later, T0 go over as files and expand on the guest,
+	# the same way phase_assert hands over the profile. A remote command
+	# built by expanding here is a remote command the local shell has
+	# already had an opinion about.
+	printf '%s\n' "$LOGIN_USER" | ssh "${SSH_OPTS[@]}" gary@127.0.0.1 "cat > /tmp/checks/user"
+
+	ssh "${SSH_OPTS[@]}" gary@127.0.0.1 \
+		'sudo /tmp/checks/assert-m4.sh config "$(cat /tmp/checks/user)"' ||
+		die "the M4 configuration is wrong on the machine, so the timings below would measure something else"
+
+	log "Holding a one hour sleep inhibitor, then going idle for 30 minutes"
+	ssh "${SSH_OPTS[@]}" gary@127.0.0.1 "archwork-inhibit 1h" ||
+		die "archwork-inhibit would not start"
+
+	# The keystroke resets the idle clock, and the guest's own clock records
+	# when. Reading T0 on the guest keeps the assertions free of any skew
+	# between the two machines.
+	press --key shift
+	ssh "${SSH_OPTS[@]}" gary@127.0.0.1 "date +%s > /tmp/checks/t0"
+
+	ssh "${SSH_OPTS[@]}" gary@127.0.0.1 \
+		'sudo /tmp/checks/assert-m4.sh inhibited "$(cat /tmp/checks/user)" "$(cat /tmp/checks/t0)"' ||
+		die "the M4 criteria failed under a held inhibitor"
+
+	log "Releasing the inhibitor and going idle again, this time to sleep"
+	ssh "${SSH_OPTS[@]}" gary@127.0.0.1 "archwork-inhibit --cancel"
+
+	press --key shift
+	ssh "${SSH_OPTS[@]}" gary@127.0.0.1 "date +%s > /tmp/checks/t0"
+
+	# Measured out here: see suspend-watch.py. The window is the same one
+	# assert-m4.sh applies to the other two timings.
+	local slept
+	slept="$(python3 "$SCRIPT_DIR/suspend-watch.py" \
+		--monitor "$WORK_DIR/monitor.sock" --wait "$((1800 + 60))")" ||
+		die "the machine never suspended, with nothing inhibiting it"
+
+	if [ "$slept" -lt 1800 ]; then
+		die "the machine suspended after ${slept}s, before the 1800s the configuration asks for"
+	fi
+	printf '  ok    the machine suspended\n        at %ss, wanted 1800 to 1860\n' "$slept"
+
+	log "Waking it, the way a key on a sleeping machine would"
+	python3 "$SCRIPT_DIR/suspend-watch.py" \
+		--monitor "$WORK_DIR/monitor.sock" --wake ||
+		die "the machine did not come back from suspend"
+
+	# S3 takes the network with it, so the connection has to be remade rather
+	# than reused.
+	local attempt
+	for attempt in $(seq 1 30); do
+		ssh "${SSH_OPTS[@]}" gary@127.0.0.1 true 2>/dev/null && break
+		[ "$attempt" -eq 30 ] && die "the machine woke but never answered SSH again"
+		sleep 2
+	done
+
+	ssh "${SSH_OPTS[@]}" gary@127.0.0.1 \
+		'sudo /tmp/checks/assert-m4.sh woke "$(cat /tmp/checks/user)" "$(cat /tmp/checks/t0)"' ||
+		die "the machine slept and woke, but not the way M4 describes"
+
+	capture after-wake
+}
+
 # D-021 judges appearance by looking at the captures, so a run that throws them
 # away leaves that criterion unprovable.
 save_captures() {
@@ -963,6 +1066,9 @@ main() {
 			phase_session
 			phase_desktop
 			phase_portals
+			if [ "$POWER" = true ]; then
+				phase_power
+			fi
 		fi
 		phase_recovery
 
