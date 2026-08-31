@@ -97,6 +97,12 @@ def named_key(spec: str) -> str:
         return spec
     if len(key) == 1 and key.isascii() and (key.isalpha() or key.isdigit()):
         return spec
+    # A modifier on its own. The guest counts it as input, which is what
+    # resets the compositor's idle clock, and nothing acts on it: no
+    # character is typed, no keybinding fires, no dialog is dismissed. The
+    # M4 phase starts each idle window with one for exactly that reason.
+    if not modifiers and key in MODIFIERS:
+        return spec
     raise ValueError(f"unknown key name: {spec!r}")
 
 

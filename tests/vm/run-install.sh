@@ -846,7 +846,7 @@ phase_power() {
 	# The keystroke resets the idle clock, and the guest's own clock records
 	# when. Reading T0 on the guest keeps the assertions free of any skew
 	# between the two machines.
-	press --key shift
+	press --key shift || die "could not send the keystroke that starts the idle window"
 	ssh "${SSH_OPTS[@]}" gary@127.0.0.1 "date +%s > /tmp/checks/t0"
 
 	ssh "${SSH_OPTS[@]}" gary@127.0.0.1 \
@@ -856,7 +856,7 @@ phase_power() {
 	log "Releasing the inhibitor and going idle again, this time to sleep"
 	ssh "${SSH_OPTS[@]}" gary@127.0.0.1 "archwork-inhibit --cancel"
 
-	press --key shift
+	press --key shift || die "could not send the keystroke that starts the idle window"
 	ssh "${SSH_OPTS[@]}" gary@127.0.0.1 "date +%s > /tmp/checks/t0"
 
 	# Measured out here: see suspend-watch.py. The window is the same one
