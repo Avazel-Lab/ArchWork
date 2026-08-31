@@ -27,6 +27,10 @@ VALID_STATUS = {"not-started", "blocked", "in-progress", "complete"}
 # replaced. Deleting the record would erase a real event; calling it
 # "never-run" would be false.
 VALID_REBUILD = {"never-run", "passed", "failed", "superseded"}
+# A machine is installed or it is not. Nothing supersedes a first install:
+# the next one replaces the record outright.
+VALID_INSTALL = {"never-run", "passed", "failed"}
+PROFILES = {"desktop", "laptop"}
 
 MILESTONE_HEADING = re.compile(r"^### (M\d+) ", re.MULTILINE)
 DECISION_HEADING = re.compile(r"^## (D-\d+) ", re.MULTILINE)
@@ -137,6 +141,45 @@ def check_next_actions(status: dict) -> None:
         fail(f"next_actions has {len(actions)} entries, the limit is {MAX_NEXT_ACTIONS}")
 
 
+def require_evidence(label: str, state: str, record: dict) -> None:
+    """A run claimed as anything but never-run names the commit it ran from."""
+    if not record.get("commit"):
+        fail(f"{label} claims {state!r} but records no commit SHA. Without a SHA it did not happen.")
+    if not record.get("date"):
+        fail(f"{label} claims {state!r} but records no date")
+
+
+def check_first_install(status: dict) -> None:
+    """The first install of each machine, on the same evidence terms as a rebuild.
+
+    This is the first exit criterion of M8 and M9. A VM rebuild does not
+    stand in for it, so it gets its own record rather than sharing
+    last_rebuild's.
+    """
+    installs = status.get("first_install")
+    if installs is None:
+        return
+    if not isinstance(installs, dict):
+        fail("first_install must be a mapping of profile to record")
+        return
+
+    unknown = sorted(set(installs) - PROFILES)
+    if unknown:
+        fail(f"first_install names profiles that are not machine profiles: {unknown}")
+
+    for profile, record in installs.items():
+        if not isinstance(record, dict):
+            fail(f"first_install.{profile} must be a mapping")
+            continue
+        state = record.get("status")
+        if state not in VALID_INSTALL:
+            fail(f"first_install.{profile}.status is {state!r}, expected one of {sorted(VALID_INSTALL)}")
+            continue
+        if state == "never-run":
+            continue
+        require_evidence(f"first_install.{profile}", state, record)
+
+
 def check_rebuild(status: dict) -> None:
     rebuild = status.get("last_rebuild")
     if not isinstance(rebuild, dict):
@@ -149,10 +192,7 @@ def check_rebuild(status: dict) -> None:
     if state == "never-run":
         return
     # A superseded record still has to say which run it was.
-    if not rebuild.get("commit"):
-        fail(f"last_rebuild claims {state!r} but records no commit SHA. Without a SHA it did not happen.")
-    if not rebuild.get("date"):
-        fail(f"last_rebuild claims {state!r} but records no date")
+    require_evidence("last_rebuild", state, rebuild)
 
 
 def main() -> int:
@@ -170,6 +210,7 @@ def main() -> int:
     check_phase(status, planned)
     check_next_actions(status)
     check_rebuild(status)
+    check_first_install(status)
 
     if errors:
         for error in errors:

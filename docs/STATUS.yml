@@ -3,7 +3,7 @@
 # Validated by scripts/check-plan-status.py.
 ---
 schema: 1
-updated: 2026-08-29
+updated: 2026-08-31
 
 phase: M4
 
@@ -37,7 +37,7 @@ milestones:
   M7:
     status: not-started
   M8:
-    status: not-started
+    status: in-progress
   M9:
     status: not-started
   M10:
@@ -70,14 +70,31 @@ last_rebuild:
   commit: 0d20ddfa9b3592ef3740f6f25b402afdb9984537
   date: 2026-08-29
 
+# One record per machine, replaced rather than appended to. The checker
+# rejects an install claimed as passed without a commit SHA and a date, on
+# the same terms as last_rebuild. This is the first exit criterion of M8 and
+# M9: deployed from the same bootstrap as the VMs.
+#
+# The desktop: bare metal, real firmware, and the installer run by hand from
+# docs/first-install.md at this commit. It reached a Hyprland session, with
+# the plain background hyprland.lua sets on purpose and waybar's packaged
+# configuration, and took a DHCP lease on the LAN. That is what was seen. It
+# is not evidence for anything else M8 asks: no Steam, no controller, no
+# @ai_models restore, no thirty days.
+first_install:
+  desktop:
+    status: passed
+    commit: f87cc05b4000304f951df920590097791b0f6b0b
+    date: 2026-08-30
+  laptop:
+    status: never-run
+
 next_actions:
-  - Do the first install on the desktop hardware, following
-    docs/first-install.md. Everything it needs is proven in a VM and nothing
-    in it has met real firmware, two monitors, an AMD GPU or a speaker
   - Have the installer run loadkeys itself, so the ISO and the installed
     system agree on the keyboard before a LUKS passphrase is set. D-017
     records the trap; docs/first-install.md currently documents around it
-  - Start M4, the power and sleep timings. The resume mode landed for these,
-    since the criteria are measured in tens of minutes
+  - Start M4, the power and sleep timings, on the desktop now that it exists.
+    The resume mode landed for these, since the criteria are measured in tens
+    of minutes
 
 blockers: []
