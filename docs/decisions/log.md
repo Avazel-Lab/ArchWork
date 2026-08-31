@@ -698,3 +698,26 @@ Consequences:
 - `hyprlock.conf` stays as it is. The deprecation notice came from Hyprland about its own configuration, and hyprlock is a separate program that still reads hyprlang. If that changes it will announce itself the same way, which is an argument for the M5 update path surfacing deprecation warnings rather than discarding them.
 - Both changes are tested by the M3 criteria rather than by inspection. A wrong dispatcher name is a keybinding that does nothing, and the harness presses every keybinding it depends on.
 - The capture that carried both notifications is the first evidence in this repository that came from looking at the screen rather than from an assertion. D-021 argued for saving captures and having a person look at them. This is what that was for.
+
+## D-027 The desktop's GPU is NVIDIA, and nouveau cannot run the M3 session on it
+
+**Status:** accepted
+**Date:** 2026-08-30
+**Affects:** `desktop-laptop-differences.md`, M3, M8
+
+The first login attempt on `hmlxdesktop02` failed: greetd accepted the password, Hyprland started, and tuigreet redrew the username prompt, which looked exactly like a rejected password. `journalctl` from a text console told a different story: `start-hyprland` reported `Hyprland exit cleanly` after Aquamarine logged `drm: Starting backend for /dev/dri/card0, with driver nouveau` and `WARN drm: failed to set DRM_CLIENT_CAP_ATOMIC, falling back to legacy`.
+
+Every M3 run before this one was against a VM's virtual head, so nothing in this repository had ever asked what GPU the desktop hardware carries. It carries a discrete NVIDIA GeForce RTX 3060 (12 GB, confirmed by the machine's owner), driven by `nouveau` because no package here installs anything else. `nouveau` falls back to legacy (non-atomic) KMS on this card, and Hyprland cannot get a working render context from that: it starts, fails to render, and exits cleanly, which is indistinguishable at the greeter from a rejected login.
+
+Two driver families were weighed. `nvidia-open`, NVIDIA's open-source kernel modules, only supports Turing and later; the proprietary `nvidia` package is required on anything older. Confirmed against NVIDIA's own compatibility list: Ampere, which the RTX 3060 is, is on the open-modules side of that line. The repository owner chose `nvidia-open` on 2026-08-30, once the GPU model was known.
+
+What the fix is, and what it deliberately does not touch: `nvidia-open` and `nvidia-utils` join `archwork_packages_profile` on the desktop, gated behind a new `archwork_nvidia_gpu` group variable (`CLAUDE.md` bars hostname conditionals in roles, so the packages role reads a variable rather than asking which machine it is). The packages role then writes `/etc/modprobe.d/nvidia.conf`, blacklisting `nouveau` and setting `nvidia_drm modeset=1`, and regenerates the initramfs so the blacklist reaches the `modconf` hook there too. That gets NVIDIA modesetting working at the normal (post-initramfs) point in boot, which is all M3 needs.
+
+Deliberately not done: adding the NVIDIA modules to `mkinitcpio.conf`'s `MODULES=` for truly early KMS, and adding an `nvidia-drm.modeset=1` kernel parameter to `/etc/kernel/cmdline`. Both files are written once by `scripts/archwork-install.sh` at install time and never touched by Ansible reconciliation afterwards (`configure_initramfs()`), which is a real gap in what reconciliation can reach on an already-installed machine. Late KMS through `modprobe.d` sidesteps that gap rather than closing it, and is enough to get login working. Whether reconciliation ever needs to manage `mkinitcpio.conf` and the kernel command line is an open question this decision does not answer, and is left for whoever next needs early KMS for a real reason.
+
+Consequences:
+
+- `archwork_nvidia_gpu: true` on the desktop profile, `false` by default in `group_vars/all.yml`. A second desktop with a different GPU would need its own value; nothing here assumes only one ever exists.
+- The change needs a reboot to take effect: `nouveau` already holds the card, and blacklisting it does nothing until the kernel starts fresh without loading it.
+- Not yet run on `hmlxdesktop02` as this is written. `docs/STATUS.yml` carries the blocker until someone reruns the playbook, reboots, and confirms Hyprland actually reaches a session, per the evidence rule in `CLAUDE.md`.
+- `desktop-laptop-differences.md` does not gain a GPU row for this. Its table tracks profile-level differences already expressed as group variables and package lists, which is what `archwork_nvidia_gpu` and the two packages above already are.

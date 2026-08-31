@@ -31,3 +31,22 @@
     # be slow.
     extra_args: --disable-download-timeout
   become: true
+
+- name: Configure the NVIDIA driver
+  # D-027. nouveau claims an NVIDIA GPU by default, so keeping it off the
+  # card and telling nvidia_drm to do its own modesetting is what the driver
+  # package above needs to actually be used.
+  when: archwork_nvidia_gpu | default(false)
+  become: true
+  block:
+    - name: Blacklist nouveau and enable nvidia_drm modesetting
+      ansible.builtin.copy:
+        dest: /etc/modprobe.d/nvidia.conf
+        content: |
+          # Managed by ArchWork. See ansible/roles/packages (D-027).
+          blacklist nouveau
+          options nvidia_drm modeset=1
+        owner: root
+        group: root
+        mode: "0644"
+      notify: Regenerate the initramfs

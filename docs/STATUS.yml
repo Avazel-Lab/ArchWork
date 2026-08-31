@@ -70,17 +70,24 @@ last_rebuild:
   commit: 0d20ddfa9b3592ef3740f6f25b402afdb9984537
   date: 2026-08-29
 
+# D-027 confirmed on hmlxdesktop02 at commit 85f8972, 2026-08-30. nvidia_drm,
+# nvidia_modeset, nvidia_uvm and nvidia are the modules loaded, no nouveau,
+# and hyprctl systeminfo names the GA104 [GeForce RTX 3060] with the NVIDIA
+# open kernel module driving backend drm. That is Hyprland actually
+# rendering through the real GPU, not just a session that came up: this is
+# the desktop's first confirmed login on real hardware.
+
 # One record per machine, replaced rather than appended to. The checker
 # rejects an install claimed as passed without a commit SHA and a date, on
 # the same terms as last_rebuild. This is the first exit criterion of M8 and
 # M9: deployed from the same bootstrap as the VMs.
 #
 # The desktop: bare metal, real firmware, and the installer run by hand from
-# docs/first-install.md at this commit. It reached a Hyprland session, with
-# the plain background hyprland.lua sets on purpose and waybar's packaged
-# configuration, and took a DHCP lease on the LAN. That is what was seen. It
-# is not evidence for anything else M8 asks: no Steam, no controller, no
-# @ai_models restore, no thirty days.
+# docs/first-install.md at this commit. It installed and it booted. The
+# desktop it booted into did not render until the NVIDIA driver above, so
+# the commit here is what the installer ran from, not a commit that reaches
+# a working session. It is not evidence for anything else M8 asks: no Steam,
+# no controller, no @ai_models restore, no thirty days.
 first_install:
   desktop:
     status: passed
@@ -93,8 +100,7 @@ next_actions:
   - Have the installer run loadkeys itself, so the ISO and the installed
     system agree on the keyboard before a LUKS passphrase is set. D-017
     records the trap; docs/first-install.md currently documents around it
-  - Start M4, the power and sleep timings, on the desktop now that it exists.
-    The resume mode landed for these, since the criteria are measured in tens
-    of minutes
+  - Start M4, the power and sleep timings, now that hmlxdesktop02 reaches a
+    working desktop
 
 blockers: []
