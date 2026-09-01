@@ -490,6 +490,15 @@ configure_multilib() {
 
 	grep -q '^\[multilib\]' "$conf" ||
 		die "could not enable multilib in $conf. Its [multilib] section is not the stock one."
+
+	# Sync the new repository's database, or the machine arrives knowing the
+	# repository exists and nothing that is in it. That is not a cosmetic
+	# difference: `ansible-playbook --check` does not refresh the database,
+	# because a dry run changes nothing, so the first thing it does on a fresh
+	# machine is fail to find steam. A run on 2026-09-02 got exactly that far
+	# twice, once before this function existed and once after, because the
+	# first version enabled the repository and left the database alone.
+	in_chroot pacman -Sy --noconfirm
 }
 
 install_base() {

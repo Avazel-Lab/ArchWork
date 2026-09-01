@@ -37,6 +37,9 @@ multilib_function() {
 		printf 'died: %s\n' "$1"
 		exit 1
 	}
+	in_chroot() {
+		printf 'chroot: %s\n' "$*"
+	}
 	eval "$(sed -n '/^configure_multilib()/,/^}/p' "$INSTALLER")"
 }
 
@@ -112,4 +115,32 @@ multilib_function() {
 	"
 	[ "$status" -ne 0 ]
 	[[ "$output" == *"died:"* ]]
+}
+
+@test "the new repository's database is synced, or the machine knows nothing in it" {
+	# The second half of the same bug. Enabling the repository and leaving the
+	# database alone gets a machine that knows multilib exists and nothing
+	# that is in it, and `ansible-playbook --check` never refreshes it,
+	# because a dry run changes nothing. Two runs on 2026-09-02 died on
+	# "could not find or read package steam", the second one after the
+	# repository was already being enabled.
+	run bash -c "
+		$(declare -f multilib_function)
+		INSTALLER='$INSTALLER'
+		multilib_function desktop false '$MOUNT_ROOT'
+		configure_multilib
+	"
+	[ "$status" -eq 0 ]
+	[[ "$output" == *"chroot: pacman -Sy"* ]]
+}
+
+@test "the laptop syncs nothing, having changed nothing" {
+	run bash -c "
+		$(declare -f multilib_function)
+		INSTALLER='$INSTALLER'
+		multilib_function laptop false '$MOUNT_ROOT'
+		configure_multilib
+	"
+	[ "$status" -eq 0 ]
+	[[ "$output" != *"chroot:"* ]]
 }
