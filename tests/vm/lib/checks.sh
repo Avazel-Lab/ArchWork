@@ -471,6 +471,18 @@ config_is_repo_dotfile() {
 	[ "$(readlink -f "$path")" = "$HOME_ROOT/$user/src/ArchWork/dotfiles/hypr/$(basename "$path")" ]
 }
 
+# The wallpaper hyprpaper actually has loaded, not the one its file asks for.
+#
+# `hyprctl hyprpaper listloaded` answers with the paths in memory. A running
+# hyprpaper that failed to read its image is still a running hyprpaper, and the
+# whole point of this wallpaper is that somebody can read it, so asking the
+# process list would prove the wrong thing.
+hyprpaper_loaded() {
+	local user="$1" name="$2"
+	as_user_in_session "$user" hyprctl hyprpaper listloaded 2>/dev/null |
+		grep -q -- "$name"
+}
+
 # The lock the M4 criterion names, read the way the criterion states it.
 sleep_inhibitor_held() {
 	systemd-inhibit --list 2>/dev/null |

@@ -30,6 +30,15 @@ check "Hyprland is running as the user" user_process_running "$USER_NAME" Hyprla
 check "the compositor answers hyprctl" compositor_answers "$USER_NAME"
 check "a wayland socket exists in the runtime directory" wayland_socket_present "$USER_NAME"
 
+printf '\nThe wallpaper, which is the keybinding cheat sheet\n'
+check "hyprpaper is running as the user" user_process_running "$USER_NAME" hyprpaper
+check "hyprpaper.conf is the one in the repository clone" \
+	config_is_repo_dotfile "/home/$USER_NAME/.config/hypr/hyprpaper.conf" "$USER_NAME"
+# Loaded, not merely configured. A hyprpaper that could not read its image is
+# still a running hyprpaper, and an unreadable cheat sheet helps nobody.
+check "the sheet is loaded and not just named in the config" \
+	hyprpaper_loaded "$USER_NAME" wallpaper-keybindings.png
+
 printf '\nSecret Service (D-004, D-012)\n'
 check "gnome-keyring-daemon is running as the user" user_process_running "$USER_NAME" gnome-keyring-d
 check "the Secret Service is on the session bus" secret_service_present "$USER_NAME"
