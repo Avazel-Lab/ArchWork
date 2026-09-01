@@ -44,20 +44,33 @@ unit:
 	@if [ -n "$$(ls tests/unit/*.bats 2>/dev/null)" ]; then bats tests/unit; \
 	else echo "unit: no bats tests yet"; fi
 
+# Where a run puts the guest disk. run-install.sh takes this from TMPDIR, and
+# TMPDIR is /tmp, and /tmp is a tmpfs on an ordinary desktop: that is RAM, and
+# on this project's development machine it is 16 GiB against a guest disk that
+# reaches 9.8. A run went in there on 2026-09-01 and QEMU paused the guest on
+# ENOSPC for nine and a half hours. run-install.sh now refuses such a directory
+# outright; this is the other half, so that refusing is not the common case.
+#
+# Override if somewhere else suits: VM_TMPDIR=/mnt/scratch make vm-power ...
+VM_TMPDIR ?= $(HOME)/.cache/archwork/vm-tmp
+
 ## vm-rebuild: L3, needs QEMU and nested virtualisation. Pass ISO=/path/to.iso
 vm-rebuild:
 	@test -n "$(ISO)" || { echo "vm-rebuild needs ISO=/path/to/archlinux.iso"; exit 1; }
-	tests/vm/run-install.sh --iso "$(ISO)" $(VM_ARGS)
+	@mkdir -p "$(VM_TMPDIR)"
+	TMPDIR="$(VM_TMPDIR)" tests/vm/run-install.sh --iso "$(ISO)" $(VM_ARGS)
 
 ## vm-idempotence: L2, install then reconcile twice. Pass ISO=/path/to.iso
 vm-idempotence:
 	@test -n "$(ISO)" || { echo "vm-idempotence needs ISO=/path/to/archlinux.iso"; exit 1; }
-	tests/vm/run-install.sh --iso "$(ISO)" --reconcile $(VM_ARGS)
+	@mkdir -p "$(VM_TMPDIR)"
+	TMPDIR="$(VM_TMPDIR)" tests/vm/run-install.sh --iso "$(ISO)" --reconcile $(VM_ARGS)
 
 ## vm-power: the M4 timings, about 65 minutes on top of a run. Pass ISO=/path/to.iso
 vm-power:
 	@test -n "$(ISO)" || { echo "vm-power needs ISO=/path/to/archlinux.iso"; exit 1; }
-	tests/vm/run-install.sh --iso "$(ISO)" --reconcile --power $(VM_ARGS)
+	@mkdir -p "$(VM_TMPDIR)"
+	TMPDIR="$(VM_TMPDIR)" tests/vm/run-install.sh --iso "$(ISO)" --reconcile --power $(VM_ARGS)
 
 ## vm-rollback: L4, break a machine on purpose and roll it back. Pass ISO=/path/to.iso
 vm-rollback:

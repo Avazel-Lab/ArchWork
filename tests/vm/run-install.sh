@@ -16,6 +16,11 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Host-side, and the only library this script sources. lib/checks.sh is the
+# guest's and is copied there rather than read here.
+# shellcheck source-path=SCRIPTDIR source=lib/workdir.sh
+source "$SCRIPT_DIR/lib/workdir.sh"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
 ISO=""
@@ -349,10 +354,19 @@ check_prerequisites() {
 
 prepare_work_dir() {
 	# Respect TMPDIR. The work directory holds the disk image, which reached
-	# 4.4G once M2 started installing real packages. On a machine where /tmp is
-	# a tmpfs that image lives in RAM, so a disk-backed TMPDIR is the difference
-	# between a slow run and an out-of-memory one.
-	WORK_DIR="$(mktemp -d "${TMPDIR:-/tmp}/archwork-vm.XXXXXX")"
+	# 9.8G on the M4 runs. On a machine where /tmp is a tmpfs that image lives
+	# in RAM, so a disk-backed TMPDIR is the difference between a slow run and
+	# one that stops when the filesystem fills.
+	#
+	# Checked rather than only described. That comment was here, in those
+	# words, on the day a run went into a 16 GiB tmpfs and QEMU paused the
+	# guest on ENOSPC for nine and a half hours.
+	local root="${TMPDIR:-/tmp}" refusal
+	if ! refusal="$(work_dir_refusal "$root")"; then
+		die "$refusal. Set TMPDIR to somewhere with room: TMPDIR=~/.cache/archwork/vm-tmp make ..."
+	fi
+
+	WORK_DIR="$(mktemp -d "$root/archwork-vm.XXXXXX")"
 	trap cleanup EXIT
 
 	log "Work directory $WORK_DIR"
