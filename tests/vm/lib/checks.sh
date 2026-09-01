@@ -528,9 +528,27 @@ within_window() {
 }
 
 # logind's own record of a sleep, whatever wording the running version uses.
+# Two units report a suspend between them, and the interesting half is not
+# logind's. logind announces the decision ("The system will suspend now!") and
+# systemd-suspend.service, which is where systemd-sleep runs, announces the act
+# ("Performing sleep operation 'suspend'..."). Reading only logind and grepping
+# for strings it does not emit is how this returned false on a machine that had
+# demonstrably slept: the QEMU monitor had already timed it into S3.
+#
+# The older wordings stay in the pattern. This has to keep working across a
+# systemd upgrade, and the failure mode when it stops is silent in the
+# dangerous direction: no_suspend_logged_since below is the negation, and a
+# predicate that can never match makes an absence check pass without testing
+# anything.
+#
+# JOURNALCTL is a variable so the unit tests can hand it a fixture. On a
+# machine it is always the real one.
+JOURNALCTL="${JOURNALCTL:-journalctl}"
+
 suspend_logged_since() {
-	journalctl --since "@$1" -u systemd-logind --no-pager 2>/dev/null |
-		grep -qE 'Suspending system|Entering sleep state|Performing sleep operation'
+	"$JOURNALCTL" --since "@$1" -u systemd-logind -u systemd-suspend.service \
+		--no-pager 2>/dev/null |
+		grep -qE 'Suspending system|Entering sleep state|Performing sleep operation|The system will suspend now'
 }
 
 no_suspend_logged_since() {

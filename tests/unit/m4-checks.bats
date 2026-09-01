@@ -175,3 +175,81 @@ CONF
 		return 1
 	fi
 }
+
+# A journalctl that honours -u, because the unit filter is half of what went
+# wrong: the message the old predicate looked for does exist, in a unit it was
+# not reading. A fake that ignored -u would let the broken version pass.
+fake_journalctl() {
+	local fake="$BATS_TEST_TMPDIR/journalctl"
+	cat >"$fake" <<-'SH'
+		#!/usr/bin/env bash
+		units=()
+		while [ $# -gt 0 ]; do
+			case "$1" in
+			-u) units+=("$2"); shift 2 ;;
+			*) shift ;;
+			esac
+		done
+		while IFS='|' read -r unit message; do
+			[ -n "$unit" ] || continue
+			for want in "${units[@]}"; do
+				# journalctl -u systemd-logind matches
+				# systemd-logind.service, so the suffix is optional on
+				# the way in, as it is for the real one.
+				if [ "${want%.service}" = "${unit%.service}" ]; then
+					printf '%s\n' "$message"
+					break
+				fi
+			done
+		done < "$FIXTURE"
+	SH
+	chmod +x "$fake"
+	JOURNALCTL="$fake"
+}
+
+@test "a suspend is recognised from the units that actually report one" {
+	# The run on 2026-09-01 reported "FAIL logind recorded a sleep" against a
+	# machine the QEMU monitor had timed into S3 at 1805s. The predicate read
+	# only systemd-logind and grepped for three strings it does not emit.
+	#
+	# Both lines below are verbatim from that guest's journal, with the unit
+	# each came from: logind announces the decision, systemd-suspend.service
+	# announces the act. Neither unit alone is enough to rely on.
+	fake_journalctl
+
+	FIXTURE="$BATS_TEST_TMPDIR/slept"
+	cat >"$FIXTURE" <<'LOG'
+systemd-logind.service|Sep 01 11:44:16 h systemd-logind[585]: The system will suspend now!
+systemd-suspend.service|Sep 01 11:44:18 h systemd-sleep[40357]: Performing sleep operation 'suspend'...
+LOG
+	export FIXTURE
+	suspend_logged_since 0
+	! no_suspend_logged_since 0
+
+	# Each half on its own still counts, so a systemd that drops one wording
+	# or moves one message does not silently stop this working.
+	FIXTURE="$BATS_TEST_TMPDIR/logind-only"
+	printf 'systemd-logind.service|Sep 01 h systemd-logind[585]: The system will suspend now!\n' >"$FIXTURE"
+	suspend_logged_since 0
+
+	FIXTURE="$BATS_TEST_TMPDIR/sleep-only"
+	printf "systemd-suspend.service|Sep 01 h systemd-sleep[1]: Performing sleep operation 'suspend'...\n" >"$FIXTURE"
+	suspend_logged_since 0
+}
+
+@test "a machine that did not sleep is not reported as having slept" {
+	# The dangerous direction. no_suspend_logged_since is what asserts the
+	# inhibitor held, so a predicate that can never match makes that check
+	# pass while testing nothing, which is what it did on the run above: the
+	# inhibited window reported ok on a grep that could not have matched.
+	fake_journalctl
+
+	FIXTURE="$BATS_TEST_TMPDIR/awake"
+	cat >"$FIXTURE" <<'LOG'
+systemd-logind.service|Sep 01 11:14:16 h systemd-logind[585]: New session '53' of user 'gary'.
+systemd-logind.service|Sep 01 11:14:16 h systemd-logind[585]: Removed session 53.
+LOG
+	export FIXTURE
+	! suspend_logged_since 0
+	no_suspend_logged_since 0
+}
