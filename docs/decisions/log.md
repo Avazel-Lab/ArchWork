@@ -721,3 +721,54 @@ Consequences:
 - The change needs a reboot to take effect: `nouveau` already holds the card, and blacklisting it does nothing until the kernel starts fresh without loading it.
 - Not yet run on `hmlxdesktop02` as this is written. `docs/STATUS.yml` carries the blocker until someone reruns the playbook, reboots, and confirms Hyprland actually reaches a session, per the evidence rule in `CLAUDE.md`.
 - `desktop-laptop-differences.md` does not gain a GPU row for this. Its table tracks profile-level differences already expressed as group variables and package lists, which is what `archwork_nvidia_gpu` and the two packages above already are.
+
+## D-029 The application baseline reaches the manifests
+
+**Status:** accepted
+**Date:** 2026-09-01
+**Affects:** `applications.md`, `desktop-laptop-differences.md`, D-024, M7
+
+D-024 closed by widening M7: the manifests must account for every application in `applications.md`, or name what is left out and why. This entry is that accounting, done now rather than at M7.
+
+The reason for doing it early is the one D-024 already gave, sharpened by using the machine. `hmlxdesktop02` logged in for the first time on 2026-08-30 and the desktop on it was a compositor, a terminal, a launcher, a bar, a lock screen, a notifier, and the two applications M3 needed to open a portal file picker from. There was nothing to do with it. M7 proves three consecutive rebuilds land the same machine, and until the applications are in the manifests that would prove repeatability of something that is not the workstation.
+
+Every package name here was checked against the official repository search API and the AUR RPC on 2026-09-01, rather than recalled. Four names that would have been wrong from memory: `bind` carries `dig` rather than a `bind-tools` package, `kubectx` ships `kubens` too, `memtest86+-efi` is the build a UEFI machine with systemd-boot can launch, and Mission Center is in `extra` as `mission-center` rather than in the AUR.
+
+What the lists are, and why there is a new one:
+
+- `archwork_packages_applications` in `group_vars/all.yml`, 84 packages from the official repositories, on both profiles. It is separate from `archwork_packages_shared` for the same reason `archwork_packages_session` is: the two answer different questions. `shared` is the tooling the platform needs to build and maintain itself, and a rebuild that dropped `applications` would still be a working machine, just not the workstation.
+- `archwork_packages_aur`, 9 packages, shared. The `-bin` variants are deliberate where upstream ships a binary: building Chromium or VS Code from source in the D-005 chroot costs hours and produces the same program.
+- `archwork_packages_gaming` and `archwork_packages_ai` on the desktop, empty on the laptop, plus `archwork_packages_aur_profile`. These are the two application rows in `desktop-laptop-differences.md`. The laptop file sets them to `[]` rather than omitting them, so the difference is visible in the file rather than implied by an absent variable.
+
+**Multilib, which no document had to name until now.** Steam is a `multilib` package and the stock `pacman.conf` ships that repository commented out, so the gaming profile could not install the one application the differences table names for it. The packages role now uncomments the pair, gated on `archwork_multilib`, which is true on the desktop and false everywhere else. It runs before the database refresh, because a cache refreshed without multilib does not know about the packages the install then asks for. The laptop does not get a 32-bit repository it would never use.
+
+**Deliberately left out, which the M7 criterion asks for by name.**
+
+- **Odysseus.** `applications.md` says the exact project or package still needs identifying. Nothing to install.
+- **The personal applications**, AI Agent Manager, Game-on-itor and Kitchen Sync. `applications.md` already separates them and says they need reworking, packaging and an ArchWork-specific installation mechanism. None exists, so there is nothing a manifest could name.
+- **Spotify, WhatsApp, email and calendar.** Web or PWA by decision, so no package is the correct answer rather than a gap.
+- **Everything under "Explicitly not included by default".** Honoured as written; nothing from that list was added.
+- **Quickshell and Satty.** M6 installs them, and installing a shell a milestone early proves nothing, which is the reasoning the manifests already carry for Tailscale arriving at M3 rather than sooner.
+- **Codex CLI, Python 3.13's explicit management, the Epson scanner driver and libvirt's own dependencies.** These are four open questions rather than four decisions, and they are below rather than answered here.
+
+**What this does not prove.** Nothing in this entry has been run. It is 93 new packages across two profiles, and the things that could go wrong with it are a name that resolves to a different program than intended, a build that fails in the chroot, an AUR package that needs an interactive prompt paru cannot answer, and a reconcile that is no longer idempotent because one of these writes to its own configuration on first run. The M2 test is the one that catches the last of those: reconcile twice, and require the second run to change nothing. `docs/STATUS.yml` carries this as unproven until a VM run says otherwise.
+
+Also unproven and worth saying plainly: the HP LaserJet Pro MFP M28w has its whole stack in the manifests now, CUPS, HPLIP, SANE and sane-airscan, and none of it has been tested against the printer. `applications.md` only says the stack is *expected* to provide the integration. The Epson has no driver in the manifests at all, for the reason in question 4 below.
+
+**Four questions this entry raises and does not answer.** Each is a genuine fork rather than an obvious pick, so none was decided here (`CLAUDE.md`: raise it, recommend, stop).
+
+1. **Codex CLI has no official package.** `applications.md` names it alongside Claude Code. Claude Code is in the AUR as `claude-code` with 91 votes; Codex has no equivalent. The candidates are `openai-codex-bin` (25 votes, described as auto-updated) and `codex-app-unofficial` (8 votes). Both are unofficial repackagings of a binary, and an auto-updating AUR package is a build script that fetches whatever upstream published, on a workstation, as part of an unattended reconcile.
+
+   Recommendation: leave it out of the manifest and install Codex through npm in the user's own environment, the way its upstream documents. The reason is not the vote count, it is that `paru --chroot` on an auto-updated PKGBUILD makes an unattended rebuild depend on an unpinned third party, and D-005 routed AUR builds through a clean chroot precisely to bound what a package build can touch. If it should be in the manifest anyway, `openai-codex-bin` is the one.
+
+2. **Python 3.13, "managed explicitly rather than depending on Arch's rolling system Python staying at 3.13".** `applications.md` asks for this and names no mechanism. The system `python` package is whatever Arch has moved to, which is exactly what the line is written against. The options are an AUR `python313` alongside the system interpreter, or a version manager such as `uv`, `mise` or `pyenv` owning it in the user's home.
+
+   Recommendation: `uv`, which is in `extra`. It pins and fetches interpreters per project rather than installing a second system-wide Python that pacman would then also want to upgrade, and it is the option that does not put two interpreters on `PATH` and hope the right one wins. This is a real choice about how the workstation does Python, though, not a package name, which is why it is here.
+
+3. **libvirt needs two packages `applications.md` does not name.** `virt-manager` is listed and called out as useful for clean ArchWork rebuild VMs, and that is the use that breaks: libvirt's default NAT network needs `dnsmasq`, and booting a UEFI guest needs `edk2-ovmf`. Neither is a hard dependency, so the stack installs and then cannot do the thing it was installed for. `CLAUDE.md` bars adding a package no decision document lists, which is why they are not in the manifest.
+
+   Recommendation: add both, and treat this as `applications.md` naming a capability rather than a package list. Every ArchWork test VM in this repository is a UEFI guest, so a virt-manager that cannot boot one is not the tool that was asked for.
+
+4. **The Epson FastFoto FF-680W driver.** `epsonscan2` is in the AUR (26 votes) and is the obvious candidate, but `applications.md` is explicit that driver-level support is not sufficient: the FastFoto-style workflow, batch ADF scanning, duplex, mixed photo sizes, automatic filenames, has to be tested before scanning counts as solved.
+
+   Recommendation: add `epsonscan2` when the scanner is next to the machine and the workflow can actually be tried, rather than now. Adding it now puts a scanner driver on the laptop for hardware it may never meet, and would let a manifest entry stand in for a test that has not happened, which is the thing the evidence rule in `CLAUDE.md` exists to stop.

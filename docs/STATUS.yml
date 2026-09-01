@@ -3,7 +3,7 @@
 # Validated by scripts/check-plan-status.py.
 ---
 schema: 1
-updated: 2026-08-31
+updated: 2026-09-01
 
 phase: M4
 
@@ -96,12 +96,41 @@ first_install:
   laptop:
     status: never-run
 
+# The application baseline reached the manifests on 2026-09-01 (D-029),
+# ahead of M7 rather than during it. 84 packages from the official
+# repositories in archwork_packages_applications, 9 shared AUR packages, and
+# gaming, local AI and OpenDeck on the desktop profile only. Every name was
+# checked against the Arch package API and the AUR RPC rather than recalled.
+# multilib is enabled on the desktop, because Steam cannot install without
+# it.
+#
+# The reason for doing it early is that the first login on hmlxdesktop02
+# reached a desktop with nothing on it to work with, and M7 proves three
+# rebuilds land the same machine: until the applications are in the
+# manifests, that would prove repeatability of something short of the
+# workstation.
+#
+# Not run. make check passes and both profiles resolve their lists with no
+# duplicates, and no VM has installed any of it. The M2 idempotence test is
+# what catches the likeliest failure, which is one of these packages writing
+# its own configuration on first run and never reporting changed=0 again.
+# D-029 also raises four questions the repository owner has to answer:
+# Codex CLI, how Python 3.13 is pinned, libvirt's two unnamed dependencies,
+# and the Epson scanner driver.
 next_actions:
-  - Start M4, the power and sleep timings, now that hmlxdesktop02 reaches a
-    working desktop
   - Prove the timings on feat/m4-power-timings in a VM. The hypridle
     listeners and the inhibit control are written, and nothing has yet
     asserted them against M4's exit criteria, which need nested
     virtualisation
+  - Run a VM rebuild against the application manifests on
+    feat/application-manifests, reconciling twice and requiring the second
+    run to report zero changed tasks. 93 new packages, most of which no
+    machine here has installed. Record the outcome with a commit SHA
+  - Answer D-029's four questions, or say which of them can wait
 
-blockers: []
+blockers:
+  - The application manifests are unproven. D-029 puts 93 packages across
+    two profiles into the lists on the strength of the package APIs
+    confirming the names exist, which is not the same as a machine
+    installing them, and the AUR half builds in a chroot that has never
+    built anything.

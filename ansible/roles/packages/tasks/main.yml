@@ -1,6 +1,21 @@
 ---
 # Reconcile the package set. The profile difference arrives as a group
 # variable, so this file never asks which machine it is running on.
+- name: Enable the multilib repository
+  # Steam is a multilib package, so the gaming profile cannot install it with
+  # the repository commented out, which is how the stock pacman.conf ships.
+  # This runs before the refresh below on purpose: a cache refreshed without
+  # multilib does not know the packages the install then asks for.
+  #
+  # The replace is anchored on the commented pair the stock file carries, so a
+  # second run finds nothing to change and reports no change.
+  ansible.builtin.replace:
+    path: /etc/pacman.conf
+    regexp: '^#\[multilib\]\n#Include = (.*)$'
+    replace: '[multilib]\nInclude = \1'
+  when: archwork_multilib | default(false)
+  become: true
+
 - name: Refresh the package database
   # Separate from the install, and never reported as a change. The module
   # marks update_cache changed whenever the repository contents moved, which
@@ -21,7 +36,10 @@
     name: >-
       {{ archwork_packages_shared
          + archwork_packages_session
-         + archwork_packages_profile }}
+         + archwork_packages_applications
+         + archwork_packages_profile
+         + archwork_packages_gaming
+         + archwork_packages_ai }}
     state: present
     # pacman aborts a download that moves slower than one byte for ten
     # seconds. On a mirror having a bad minute that ends the whole

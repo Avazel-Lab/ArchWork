@@ -137,10 +137,14 @@
 
 - name: Install the AUR package set
   # paru builds through the same chroot, so this never leaves make dependencies
-  # on the workstation (D-005). The list is empty until M3 needs it.
+  # on the workstation (D-005). The shared list and the profile list are
+  # concatenated here rather than in a profile file, so that neither this task
+  # nor any group_vars file has to know what the other profile installs.
   ansible.builtin.command:
-    cmd: paru --sync --noconfirm --chroot --needed {{ archwork_packages_aur | join(' ') }}
+    cmd: >-
+      paru --sync --noconfirm --chroot --needed
+      {{ (archwork_packages_aur + archwork_packages_aur_profile) | join(' ') }}
   register: aur_paru_sync
-  when: archwork_packages_aur | length > 0
+  when: (archwork_packages_aur + archwork_packages_aur_profile) | length > 0
   changed_when: "'there is nothing to do' not in aur_paru_sync.stdout | lower"
   become: true

@@ -4,3 +4,10 @@ archwork_profile: laptop
 # Laptop runs an Intel CPU (desktop-laptop-differences.md).
 archwork_packages_profile:
   - intel-ucode
+
+# No gaming and no local AI. Both lists are empty here rather than absent, so
+# that the packages role can concatenate them without asking which profile it
+# is on, and so that the difference is visible in the file rather than implied
+# by a missing variable (desktop-laptop-differences.md).
+archwork_packages_gaming: []
+archwork_packages_ai: []

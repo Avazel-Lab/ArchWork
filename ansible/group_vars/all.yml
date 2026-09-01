@@ -40,6 +40,13 @@ archwork_dotfile_links:
   - gtk-4.0
   - Kvantum
 
+# Whether this profile enables the multilib repository. Steam is a multilib
+# package and cannot be installed without it, so the profile that games needs
+# it and the profile that does not should not carry a 32-bit repository it
+# never uses. Read by the packages role, set in a profile file, so nothing in
+# the role asks which machine it is on.
+archwork_multilib: false
+
 # Whether this profile's GPU needs the driver stack the packages role
 # configures below (D-027). False by default, and set true in a profile file
 # rather than read here, so nothing in the packages role asks which machine
@@ -113,10 +120,40 @@ archwork_packages_session:
   - pdfarranger
   - okular
 
-# AUR packages, pinned by name like everything else (D-005). Empty until a
-# decision document names one that is needed: Quickshell and Satty arrive at
-# M6, OpenDeck at M8.
-archwork_packages_aur: []
+# AUR packages, pinned by name like everything else (D-005). Every one builds
+# in the clean chroot the aur role makes, so none of them leaves make
+# dependencies on the workstation.
+#
+# Shared across both profiles. The profile-only AUR packages are in
+# archwork_packages_aur_profile, which is where gaming and local AI land,
+# because desktop-laptop-differences.md excludes both from the laptop.
+#
+# The -bin variants are deliberate where upstream ships a binary: building
+# Chromium or VS Code from source in a chroot costs hours and produces the same
+# program. Quickshell and Satty are absent because they arrive at M6.
+archwork_packages_aur:
+  # Browsers (applications.md). Zen is primary, Ungoogled Chromium secondary.
+  - zen-browser-bin
+  - ungoogled-chromium-bin
+  # The primary IDE. visual-studio-code-bin is Microsoft's own build, which is
+  # what the baseline names; the `code` package in extra is the OSS build
+  # without the Marketplace, so it is a different program.
+  - visual-studio-code-bin
+  # Notes
+  - joplin-desktop
+  # Password managers. NordPass is primary, Bitwarden is in extra below.
+  - nordpass-bin
+  # Media library management
+  - tinymediamanager-bin
+  # Indexed file search, the closest fit to Everything (applications.md)
+  - fsearch
+  # Graphical API client
+  - bruno-bin
+  # AI coding CLI. Codex is not here: see docs/decisions/log.md D-029.
+  - claude-code
+
+# AUR packages for one profile only. Empty here, set in group_vars/desktop.yml.
+archwork_packages_aur_profile: []
 
 # Packages required on both profiles.
 #
@@ -175,3 +212,143 @@ archwork_packages_shared:
   # NetworkManager, and installing a VPN daemon a milestone early proves
   # nothing.
   - tailscale
+
+# The application baseline, from docs/decisions/applications.md, on both
+# profiles. Everything here is in the official repositories; the AUR half is
+# archwork_packages_aur above.
+#
+# Separate from archwork_packages_shared, which is the tooling the platform
+# itself needs, for the same reason archwork_packages_session is separate: the
+# lists answer different questions and a rebuild that dropped this one would
+# still be a working machine, just not the workstation. M7's exit criteria ask
+# that this list account for applications.md, and D-029 records what is
+# deliberately left out of it and why.
+#
+# Entries the platform already installs elsewhere are not repeated: okular and
+# pdfarranger are in the session set for the M3 portal criterion, pandoc-cli,
+# jq, shellcheck, curl, nodejs, npm, python, podman, docker, kubectl, ansible,
+# age, btrbk, tailscale and mermaid-cli are in the shared set, and git, vim,
+# openssh and openssl come from the base install.
+archwork_packages_applications:
+  # Editors. The terminal half; VS Code is the AUR half.
+  - neovim
+  # Documents and office. Fresh rather than still: this is a rolling
+  # workstation and there is no reason to hold the office suite back.
+  - libreoffice-fresh
+  # Images
+  - gwenview
+  - pinta
+  # Archives
+  - peazip
+  # Password managers, the secondary. NordPass is the AUR half.
+  - bitwarden
+  # Media. Spotify is a PWA by decision and has no package here.
+  - vlc
+  - handbrake
+  # Communication. WhatsApp is a PWA and has no package here.
+  - discord
+  # Torrenting
+  - qbittorrent
+  # Remote access. freerdp is what gives remmina its RDP backend, which is the
+  # protocol the estate actually uses.
+  - remmina
+  - freerdp
+  # Virtualisation. qemu-desktop rather than qemu-full: the full set pulls
+  # every architecture's firmware and emulator, and this workstation runs
+  # x86_64 guests, including the ArchWork rebuild VMs virt-manager is named
+  # for.
+  - qemu-desktop
+  - libvirt
+  - virt-manager
+  # Kubernetes. The kubectx package ships kubens too.
+  - helm
+  - k9s
+  - kubectx
+  - stern
+  # DevOps and infrastructure as code. Terraform rather than OpenTofu, which
+  # applications.md chooses explicitly.
+  - ansible-lint
+  - terraform
+  - packer
+  - vault
+  - github-cli
+  - glab
+  - pre-commit
+  # Git. git-crypt is here for other repositories that use it, and is not a
+  # mechanism for this one's secrets (D-006, D-024).
+  - git-crypt
+  - lazygit
+  - meld
+  # General CLI and developer utilities
+  - ripgrep
+  - fd
+  - fzf
+  - bat
+  - eza
+  - zoxide
+  - tree
+  - tmux
+  - rsync
+  - shfmt
+  - make
+  - just
+  - yq
+  # API and network diagnostics. bind is the package that carries dig: Arch
+  # has no separate bind-tools, and bind provides it. That brings named
+  # along with it, which nothing here enables and nothing should.
+  - httpie
+  - nmap
+  - mtr
+  - iperf3
+  - bind
+  - whois
+  - openbsd-netcat
+  - tcpdump
+  - wireshark-qt
+  # Game development. Not gaming: desktop-laptop-differences.md excludes
+  # gaming from the laptop and says nothing about building games, and an
+  # engine is a development tool.
+  - godot
+  # Security and secrets
+  - lynis
+  - yubikey-manager
+  - libfido2
+  - gnupg
+  # Backup and sync. btrbk is the Btrfs snapshot half and is already shared.
+  - restic
+  - rclone
+  # System monitoring
+  - btop
+  - mission-center
+  - nvtop
+  # Disk and storage. xorriso arrives as libisoburn in the shared set.
+  - gparted
+  - gnome-disk-utility
+  - baobab
+  - ncdu
+  - duf
+  - parted
+  # Hardware diagnostics and testing. The -efi build of memtest86+ is the one
+  # a UEFI machine with systemd-boot can actually launch.
+  - smartmontools
+  - nvme-cli
+  - lm_sensors
+  - lshw
+  - pciutils
+  - usbutils
+  - dmidecode
+  - memtest86+-efi
+  - stress-ng
+  - fio
+  # Audio, for troubleshooting the PipeWire stack in the shared set
+  - pavucontrol
+  # Phone integration
+  - kdeconnect
+  # Peripheral management. OpenDeck is desktop only and sits in the profile.
+  - solaar
+  # Printing and scanning. The hardware behind these two is not proven yet:
+  # D-029 records what still has to be tested on the real printer and scanner.
+  - cups
+  - hplip
+  - sane
+  - sane-airscan
