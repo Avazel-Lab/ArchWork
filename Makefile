@@ -12,7 +12,7 @@ SHELL := /usr/bin/env bash
 SHELL_SCRIPTS := $(shell find . -name '*.sh' -not -path './.git/*' 2>/dev/null) \
                  $(shell grep -rl '^#!/usr/bin/env bash' scripts tests 2>/dev/null | grep -v '\.sh$$')
 
-.PHONY: check lint tracking shellcheck yamllint ansible-lint unit vm-idempotence vm-rebuild vm-health vm-recovery help
+.PHONY: check lint tracking shellcheck yamllint ansible-lint unit vm-idempotence vm-rebuild vm-power vm-health vm-recovery help
 
 ## check: L0 lint plus the plan/status cross-check
 check: tracking lint unit
@@ -53,6 +53,11 @@ vm-rebuild:
 vm-idempotence:
 	@test -n "$(ISO)" || { echo "vm-idempotence needs ISO=/path/to/archlinux.iso"; exit 1; }
 	tests/vm/run-install.sh --iso "$(ISO)" --reconcile $(VM_ARGS)
+
+## vm-power: the M4 timings, about 65 minutes on top of a run. Pass ISO=/path/to.iso
+vm-power:
+	@test -n "$(ISO)" || { echo "vm-power needs ISO=/path/to/archlinux.iso"; exit 1; }
+	tests/vm/run-install.sh --iso "$(ISO)" --reconcile --power $(VM_ARGS)
 
 # L4 and L5 arrive with M5. CI cannot run these, and no CI job should pretend to.
 vm-health vm-recovery:

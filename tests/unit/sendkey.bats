@@ -41,6 +41,21 @@ teardown() {
 	[ "${lines[1]}" = "sendkey ret" ]
 }
 
+@test "a modifier on its own is a keypress" {
+	# What the M4 phase sends to reset the compositor's idle clock. It has to
+	# reach the guest as input and do nothing else: no character typed, no
+	# keybinding fired, nothing dismissed.
+	run python3 "$SENDKEY" --print --key shift
+	[ "$status" -eq 0 ]
+	[ "${lines[0]}" = "sendkey shift" ]
+}
+
+@test "a modifier stacked on nothing is still refused when it is not a modifier" {
+	run python3 "$SENDKEY" --print --key hyper
+	[ "$status" -eq 2 ]
+	[[ "$output" == *"unknown key name"* ]]
+}
+
 @test "refuses a character whose key moves between the uk and us layouts" {
 	# The trap this guards against: the installer sets KEYMAP=uk, where this
 	# key types " rather than @. A password holding one would be typed wrongly

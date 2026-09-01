@@ -1,0 +1,109 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Temporary sleep inhibition (security-power.md, desktop-shell.md, D-028).
+#
+# Quickshell owns this control from M6 onward (desktop-shell.md). Until then
+# this is M4's own interim control, the same way M3 needed its own launcher
+# before Quickshell existed (fuzzel, D-001).
+#
+# A transient systemd --user unit holds the lock rather than a PID file this
+# script tracks itself: systemctl already knows how to start, stop and
+# describe one, and --collect means a finished run leaves nothing behind to
+# clean up by hand.
+#
+# Only --what=sleep is ever held. Dim and display-off are hypridle listeners
+# that never look at an inhibitor, so they keep firing on schedule while this
+# is active; only hypridle's own `systemctl suspend` at the sleep timeout is
+# what a --mode=block sleep inhibitor refuses.
+
+UNIT_NAME="archwork-inhibit"
+UNIT="$UNIT_NAME.service"
+
+usage() {
+	cat <<'USAGE'
+archwork-inhibit DURATION|--status|--cancel
+
+Suppress system sleep temporarily. Display dim and display-off timings are
+untouched (security-power.md); only --what=sleep is held.
+
+DURATION: 1h, 2h, 4h or indefinite (held until --cancel)
+
+Options:
+  --status    show whether sleep is currently inhibited by this control
+  --cancel    end inhibition now
+  -h, --help  this text
+USAGE
+}
+
+die() {
+	printf 'error: %s\n' "$1" >&2
+	exit 1
+}
+
+cancel() {
+	systemctl --user stop "$UNIT" 2>/dev/null || true
+}
+
+status() {
+	if systemctl --user is-active --quiet "$UNIT"; then
+		systemctl --user show "$UNIT" --property=Description --value
+	else
+		printf 'Sleep is not inhibited.\n'
+	fi
+}
+
+start() {
+	local duration="$1" seconds until_desc
+
+	case "$duration" in
+	1h) seconds=3600 ;;
+	2h) seconds=7200 ;;
+	4h) seconds=14400 ;;
+	indefinite) seconds=infinity ;;
+	*) die "unknown duration '$duration'. Use 1h, 2h, 4h or indefinite." ;;
+	esac
+
+	if [ "$seconds" = infinity ]; then
+		until_desc="manually re-enabled"
+	else
+		until_desc="$(date -d "+${seconds} seconds" '+%H:%M')"
+	fi
+
+	# A second start replaces the first rather than stacking two locks.
+	cancel
+
+	systemd-run --user --collect \
+		--unit="$UNIT_NAME" \
+		--description="Sleep inhibited until $until_desc" \
+		-- systemd-inhibit \
+		--what=sleep \
+		--who="$UNIT_NAME" \
+		--why="Manual sleep inhibit until $until_desc" \
+		--mode=block \
+		sleep "$seconds" >/dev/null
+
+	printf 'Sleep inhibited until %s.\n' "$until_desc"
+}
+
+main() {
+	case "${1:-}" in
+	-h | --help) usage ;;
+	--status) status ;;
+	--cancel)
+		cancel
+		printf 'Sleep inhibition cancelled.\n'
+		;;
+	'')
+		usage >&2
+		die "a duration or an option is required"
+		;;
+	*) start "$1" ;;
+	esac
+}
+
+# Sourcing with ARCHWORK_LIB_ONLY set gives the tests access to the functions
+# without running main. Nothing else should set it.
+if [ "${ARCHWORK_LIB_ONLY:-0}" != "1" ]; then
+	main "$@"
+fi

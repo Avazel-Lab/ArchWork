@@ -112,6 +112,12 @@ archwork_packages_session:
   # all, which a run found out.
   - pdfarranger
   - okular
+  # The idle daemon and the dim command it runs (M4, security-power.md,
+  # D-028). Neither is named by any decision document; hypridle is the
+  # Hyprland ecosystem's own companion for this, the same way waybar was the
+  # unnamed but obvious pick for M3's bar (D-020).
+  - hypridle
+  - brightnessctl
 
 # AUR packages, pinned by name like everything else (D-005). Empty until a
 # decision document names one that is needed: Quickshell and Satty arrive at

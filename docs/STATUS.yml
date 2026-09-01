@@ -3,7 +3,7 @@
 # Validated by scripts/check-plan-status.py.
 ---
 schema: 1
-updated: 2026-08-31
+updated: 2026-09-01
 
 phase: M4
 
@@ -29,7 +29,7 @@ milestones:
       commit: 0d20ddfa9b3592ef3740f6f25b402afdb9984537
       date: 2026-08-29
   M4:
-    status: not-started
+    status: in-progress
   M5:
     status: not-started
   M6:
@@ -76,6 +76,26 @@ last_rebuild:
 # open kernel module driving backend drm. That is Hyprland actually
 # rendering through the real GPU, not just a session that came up: this is
 # the desktop's first confirmed login on real hardware.
+#
+# M4 started on 2026-08-30 (D-028): hypridle and brightnessctl added to the
+# session package set, the dim/display-off/sleep listeners written to
+# dotfiles/hypr/hypridle.conf, and scripts/archwork-inhibit installed by a new
+# power role for the sleep inhibit control.
+#
+# Running the phase on 2026-09-01 found four bugs, three of them reachable
+# only by running it: a predicate nothing defined, a keystroke sendkey
+# refused, hyprctl dispatch broken by D-026's move to Lua so the display never
+# switched off, and a journal query reading systemd-logind for a message
+# systemd-suspend.service emits. That last one was failing in the safe
+# direction and passing in the dangerous one: its negation is what asserts the
+# machine did not sleep under a held inhibitor, so that criterion had never
+# been tested at all.
+#
+# The behaviour itself was observed on the run at f3c99b9's parent: display
+# off at 901s, no sleep under the inhibitor, the display still off, suspend at
+# 1805s measured from the QEMU monitor, locked on the way down, display back
+# on after wake. That is not an evidence line, because no run has yet
+# completed green end to end.
 
 # One record per machine, replaced rather than appended to. The checker
 # rejects an install claimed as passed without a commit SHA and a date, on
@@ -97,11 +117,20 @@ first_install:
     status: never-run
 
 next_actions:
-  - Start M4, the power and sleep timings, now that hmlxdesktop02 reaches a
-    working desktop
-  - Prove the timings on feat/m4-power-timings in a VM. The hypridle
-    listeners and the inhibit control are written, and nothing has yet
-    asserted them against M4's exit criteria, which need nested
-    virtualisation
+  - Run the M4 exit criteria against a clean VM rebuild and get a green run
+    end to end. The behaviour is observed and the four bugs are fixed; what
+    is missing is one run where every assertion passes. Record it with a
+    commit SHA
+  - Land the application manifests once a VM has installed them. They are on
+    feat/application-manifests with CI green and no machine has run them
+  - Point the VM harness at a work directory with room. TMPDIR defaults to
+    /tmp, which is a 16 GB tmpfs on this development machine, and two 10 GB
+    runs do not fit in it
 
-blockers: []
+blockers:
+  - M4 has no VM evidence yet. The configuration, the inhibit control and
+    now the automated check its last exit criterion asks for are all
+    written and unit-tested, and nobody has yet watched the three timings
+    fire or the inhibit lock hold on a real machine. The run is
+    make vm-power ISO=..., and it takes about 65 minutes because the
+    criteria are two idle windows of half an hour.

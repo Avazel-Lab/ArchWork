@@ -721,3 +721,32 @@ Consequences:
 - The change needs a reboot to take effect: `nouveau` already holds the card, and blacklisting it does nothing until the kernel starts fresh without loading it.
 - Not yet run on `hmlxdesktop02` as this is written. `docs/STATUS.yml` carries the blocker until someone reruns the playbook, reboots, and confirms Hyprland actually reaches a session, per the evidence rule in `CLAUDE.md`.
 - `desktop-laptop-differences.md` does not gain a GPU row for this. Its table tracks profile-level differences already expressed as group variables and package lists, which is what `archwork_nvidia_gpu` and the two packages above already are.
+
+## D-028 Two things M4 needs that no document names
+
+**Status:** accepted
+**Date:** 2026-08-30
+**Affects:** `security-power.md`, `desktop-shell.md`, M4, M6
+
+The same shape as D-020: `security-power.md` and `desktop-shell.md` between them fully specify what M4 has to do, dim at 5 minutes, display off at 15, sleep at 30, a sleep inhibit control offering 1h/2h/4h/indefinite that leaves dim and display-off alone, but neither document names the tool that watches for idle or the interface the inhibit control takes before Quickshell exists to hold it.
+
+**An idle daemon.** Hyprland does not watch for idle time itself.
+
+Recommendation: `hypridle`, the Hyprland ecosystem's own companion for this, the same way `waybar` was the unnamed but obvious pick for M3's bar. It still reads the hyprlang config format rather than Lua: it is a separate binary from Hyprland, and D-026 only migrated `hyprland.conf` itself, the same reasoning that already left `hyprlock.conf` alone. `brightnessctl` runs as its dim command; it finds no backlight device on the desktop's external monitors and no-ops there, which is fine, since `security-power.md` states the timings, not that dimming has a visible effect on every profile, and hypridle does not care whether the command an `on-timeout` runs succeeds.
+
+**What the sleep inhibit control is, before Quickshell owns it at M6.** `desktop-shell.md` gives the eventual UI to Quickshell and says nothing about M4's own version, the same gap M3 had for a launcher, which fuzzel filled without becoming the permanent answer.
+
+Recommendation: `scripts/archwork-inhibit`, a plain command, not a GUI: over-building an interim widget here is exactly the effort D-020 warned M6 would throw away. It holds the lock through a transient `systemd-run --user` unit rather than a PID file, because `systemctl` already knows how to start, stop and describe one. `systemd-inhibit --what=sleep --mode=block` is what actually holds the lock; hypridle's own `systemctl suspend` at the 1800-second listener is what a held lock refuses, which is the entire mechanism behind "sleep is inhibited, dim and display-off are not." Nothing about the inhibitor touches those two listeners, so there is no separate code path to keep in sync with `security-power.md` if the timings ever change.
+
+**Implemented directly, on the same basis as D-020's `waybar` and font recommendations.** Both are established, close to zero-controversy technical picks rather than genuine forks needing the owner's judgement, unlike D-027's driver choice, which depended on hardware knowledge only the owner had.
+
+Consequences:
+
+- `hypridle` and `brightnessctl` join `archwork_packages_session` in `group_vars/all.yml`, shared across both profiles per `security-power.md`.
+- `dotfiles/hypr/hypridle.conf` carries the three listeners. Each `timeout` is measured from the same last-activity clock independently: 300, 900 and 1800 seconds, not one chained on top of the last.
+- `hyprland.lua`'s `hyprland.start` handler execs `hypridle` alongside `waybar` and `mako`, the same fallback-set pattern D-020 already established.
+- A new `power` Ansible role installs `scripts/archwork-inhibit` to `/usr/local/bin`. It is the one piece of M4 that is genuinely new code rather than configuration, so it is the one covered by unit tests (`tests/unit/archwork-inhibit.bats`), with `systemctl` and `systemd-run` stubbed rather than exercised against a real logind session.
+- The automated check the last exit criterion asks for is `tests/vm/assert-m4.sh` and the `power` phase in `tests/vm/run-install.sh`, added on 2026-08-31. It measures rather than reads: each observation records the seconds since the keystroke that reset the idle clock, and the assertion is a window around the configured number, with the lower bound doing as much work as the upper. A listener that fires early is as wrong as one that never fires, and only the lower bound catches it.
+- The sleep timing is measured from outside the guest, by `tests/vm/suspend-watch.py` against the QEMU monitor. A machine cannot time its own suspend: the last thing it does before S3 is stop running.
+- One criterion a VM cannot settle. Dimming has no observable effect where there is no backlight device, which is every VM and the desktop's external monitors both. `assert-m4.sh` reports it as a skip, counted and printed apart from the passes, rather than quietly counting the listener's presence in the file as the timing being met. The laptop panel is the only thing that can prove that one.
+- Still not run. The check exists and its own helpers are covered by `tests/unit/m4-checks.bats` and `tests/unit/suspend-watch.bats`, which need no VM. The 65 minute run against a real machine has not happened, so nothing here is evidence that the timings hold. `docs/STATUS.yml` carries that as the blocker.
