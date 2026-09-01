@@ -52,10 +52,9 @@ hl.config({
     },
 
     misc = {
-        -- A plain background rather than the Hyprland logo. Hyprpaper is
-        -- installed and unconfigured on purpose: no wallpaper is chosen
-        -- anywhere, and this grey is a placeholder for whatever the theme
-        -- decision picks (D-020).
+        -- No Hyprland logo and no splash. What is behind the windows is
+        -- hyprpaper's, configured in hyprpaper.conf next to this file, and
+        -- the grey below is only what shows before it starts.
         disable_hyprland_logo    = true,
         disable_splash_rendering = true,
         background_color         = 0x1c1c1c,
@@ -101,6 +100,12 @@ hl.on("hyprland.start", function()
     -- The M4 dim/display-off/sleep timings (security-power.md, D-028).
     -- hypridle reads dotfiles/hypr/hypridle.conf, linked alongside this file.
     hl.exec_cmd("hypridle")
+
+    -- The wallpaper, which is the keybinding cheat sheet: a fresh ArchWork
+    -- desktop has no menus and nothing to discover by clicking, so the keys
+    -- are on the wall until they are in the hands. hyprpaper reads
+    -- dotfiles/hypr/hyprpaper.conf, linked alongside this file.
+    hl.exec_cmd("hyprpaper")
 end)
 
 local mod = "SUPER"
