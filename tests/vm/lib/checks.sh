@@ -471,15 +471,21 @@ config_is_repo_dotfile() {
 	[ "$(readlink -f "$path")" = "$HOME_ROOT/$user/src/ArchWork/dotfiles/hypr/$(basename "$path")" ]
 }
 
-# The wallpaper hyprpaper actually has loaded, not the one its file asks for.
+# The wallpaper hyprpaper is actually showing, not the one its file asks for.
 #
-# `hyprctl hyprpaper listloaded` answers with the paths in memory. A running
-# hyprpaper that failed to read its image is still a running hyprpaper, and the
-# whole point of this wallpaper is that somebody can read it, so asking the
-# process list would prove the wrong thing.
-hyprpaper_loaded() {
+# `listactive`, not `listloaded`, for two reasons. The hyprpaper in extra does
+# not know `listloaded` and answers "invalid hyprpaper request", so a check
+# built on it fails on every machine whatever the wallpaper is doing: the run
+# on 2026-09-02 reported the sheet missing on a machine that had hyprpaper up
+# and the right config in front of it. And active is the stronger question
+# anyway. Loaded means the image is in memory; active means it is on the
+# monitor, and the point of this wallpaper is that somebody can read it.
+#
+# A running hyprpaper that failed to read its image is still a running
+# hyprpaper, so asking the process list would prove the wrong thing.
+hyprpaper_active() {
 	local user="$1" name="$2"
-	as_user_in_session "$user" hyprctl hyprpaper listloaded 2>/dev/null |
+	as_user_in_session "$user" hyprctl hyprpaper listactive 2>/dev/null |
 		grep -q -- "$name"
 }
 
