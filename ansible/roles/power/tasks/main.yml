@@ -1,0 +1,20 @@
+---
+# M4: the power and sleep timings (security-power.md, D-028).
+#
+# The timings themselves live in dotfiles/hypr/hypridle.conf, which the
+# dotfiles role already links as part of the hypr directory. This role is
+# just the interim sleep inhibit control, which desktop-shell.md gives to
+# Quickshell from M6 onward.
+#
+# Nothing here asks which machine it is running on. Both profiles get the
+# same timings (security-power.md).
+
+- name: Install the sleep inhibit control
+  ansible.builtin.copy:
+    src: "{{ archwork_repo_dir }}/scripts/archwork-inhibit"
+    dest: /usr/local/bin/archwork-inhibit
+    remote_src: true
+    owner: root
+    group: root
+    mode: "0755"
+  become: true

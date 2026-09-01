@@ -97,6 +97,10 @@ hl.on("hyprland.start", function()
     -- the configuration it ships, per D-020.
     hl.exec_cmd("waybar")
     hl.exec_cmd("mako")
+
+    -- The M4 dim/display-off/sleep timings (security-power.md, D-028).
+    -- hypridle reads dotfiles/hypr/hypridle.conf, linked alongside this file.
+    hl.exec_cmd("hypridle")
 end)
 
 local mod = "SUPER"
