@@ -21,7 +21,7 @@ setup() {
 
 @test "the shipped config has the three timings M4 asks for" {
 	hypridle_listener_has "$CONF" 300 brightnessctl
-	hypridle_listener_has "$CONF" 900 "dpms off"
+	hypridle_listener_has "$CONF" 900 'action = "off"'
 	hypridle_listener_has "$CONF" 1800 "systemctl suspend"
 }
 
@@ -41,14 +41,14 @@ setup() {
 	cat >"$conf" <<'CONF'
 general {
     lock_cmd = hyprlock
-    after_sleep_cmd = hyprctl dispatch dpms on
+    after_sleep_cmd = hyprctl dispatch 'hl.dsp.dpms({ action = "on" })'
 }
 
 listener {
     timeout = 900
 }
 CONF
-	! hypridle_listener_has "$conf" 900 "dpms on"
+	! hypridle_listener_has "$conf" 900 'action = "on"'
 }
 
 @test "the timing window rejects early as firmly as late" {
@@ -154,4 +154,24 @@ CONF
 	done < <(sed -e :a -e '/\\$/N; s/\\\n//; ta' "$script" |
 		grep -oE 'check(_timing|_not)? "[^"]*"( [0-9]+)*[[:space:]]+[a-z_]+' |
 		sed -E 's/.*"([ 0-9]+)?[[:space:]]*//' | grep -vE '^(test|systemctl)$')
+}
+
+@test "no dotfile calls hyprctl dispatch with a bare dispatcher name" {
+	# The second bug a real run found in this phase, and the one that cost a
+	# whole 65 minute window. D-026 moved hyprctl's dispatch argument to Lua,
+	# so `hyprctl dispatch dpms off` is a syntax error rather than a
+	# dispatcher call. hypridle ignores the exit status of what it runs, so
+	# the display never switched off and nothing anywhere said why.
+	#
+	# The mechanical half is checkable without a compositor: the argument has
+	# to be quoted, because every Lua form needs parens the shell would
+	# otherwise eat. A bare word after `dispatch` is the old syntax.
+	local hit
+	hit="$(grep -rn "hyprctl dispatch [^'\"]" "$REPO_ROOT/dotfiles" |
+		grep -vE ':[0-9]+:[[:space:]]*#' || true)"
+	if [ -n "$hit" ]; then
+		echo "these pass an unquoted argument to hyprctl dispatch:"
+		echo "$hit"
+		return 1
+	fi
 }

@@ -80,7 +80,7 @@ assert_config() {
 	check "a listener dims at ${DIM_AT}s" \
 		hypridle_listener_has "$CONF" "$DIM_AT" brightnessctl
 	check "a listener switches the display off at ${DISPLAY_OFF_AT}s" \
-		hypridle_listener_has "$CONF" "$DISPLAY_OFF_AT" 'dpms off'
+		hypridle_listener_has "$CONF" "$DISPLAY_OFF_AT" 'action = "off"'
 	check "a listener sleeps at ${SLEEP_AT}s" \
 		hypridle_listener_has "$CONF" "$SLEEP_AT" 'systemctl suspend'
 	check "the inhibit control is installed" test -x /usr/local/bin/archwork-inhibit
