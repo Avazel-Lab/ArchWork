@@ -769,7 +769,15 @@ What the lists are, and why there is a new one:
 - `archwork_packages_aur`, 9 packages, shared. The `-bin` variants are deliberate where upstream ships a binary: building Chromium or VS Code from source in the D-005 chroot costs hours and produces the same program.
 - `archwork_packages_gaming` and `archwork_packages_ai` on the desktop, empty on the laptop, plus `archwork_packages_aur_profile`. These are the two application rows in `desktop-laptop-differences.md`. The laptop file sets them to `[]` rather than omitting them, so the difference is visible in the file rather than implied by an absent variable.
 
-**Multilib, which no document had to name until now.** Steam is a `multilib` package and the stock `pacman.conf` ships that repository commented out, so the gaming profile could not install the one application the differences table names for it. The packages role now uncomments the pair, gated on `archwork_multilib`, which is true on the desktop and false everywhere else. It runs before the database refresh, because a cache refreshed without multilib does not know about the packages the install then asks for. The laptop does not get a 32-bit repository it would never use.
+**Multilib, which no document had to name until now, and which took two goes.** Steam is a `multilib` package and the stock `pacman.conf` ships that repository commented out, so the gaming profile could not install the one application the differences table names for it. The packages role now uncomments the pair, gated on `archwork_multilib`, which is true on the desktop and false everywhere else. It runs before the database refresh, because a cache refreshed without multilib does not know about the packages the install then asks for. The laptop does not get a 32-bit repository it would never use.
+
+That was not sufficient, and a run on 2026-09-02 found out three minutes in:
+
+    error: 'steam': could not find or read package
+
+`ansible-playbook --check` changes nothing by definition, so the multilib task does not run during a dry run, so pacman still does not know about `steam`, so the check fails against a machine that is perfectly fine. M2 requires that check to pass, which makes this a real blocker rather than a cosmetic one.
+
+So the installer enables multilib too, on the desktop profile, right after `pacstrap`. Having both do it is deliberate rather than duplication: D-027 observed that files written only by the installer are a real gap in what reconciliation can reach afterwards, and a machine installed before this existed still needs to converge. The installer's `sed` is anchored on the commented pair the stock file ships, is idempotent, leaves `[multilib-testing]` alone, and fails loudly if the section is not the stock one, because the alternative is matching nothing and failing later at pacman with no clue why. `sed` rather than `perl`: this runs on the Arch ISO, which carries `sed` in base and does not promise `perl`.
 
 **Deliberately left out, which the M7 criterion asks for by name.**
 
