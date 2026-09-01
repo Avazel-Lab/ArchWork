@@ -817,3 +817,33 @@ Also unproven and worth saying plainly: the HP LaserJet Pro MFP M28w has its who
    Recommendation: add `epsonscan2` when the scanner is next to the machine and the workflow can actually be tried, rather than now. Adding it now puts a scanner driver on the laptop for hardware it may never meet, and would let a manifest entry stand in for a test that has not happened, which is the thing the evidence rule in `CLAUDE.md` exists to stop.
 
    **Answered on 2026-09-01: add it now, so the workflow can be picked up later.** `epsonscan2` is in `archwork_packages_aur`. The recommendation to wait was overruled on the grounds that having the driver there already is what makes the test easy to start. The caution it carried still stands and is worth repeating rather than dropping: the package being installed is not evidence that scanning works, and the FastFoto workflow, batch ADF, duplex, mixed sizes and automatic filenames, remains untested.
+
+## D-031 paru cannot install as root, and the AUR path had never run
+
+**Status:** open, and it blocks the application manifests
+**Date:** 2026-09-02
+**Affects:** D-005, D-018, D-029, M2, M5, M7
+
+The first reconcile ever to install AUR packages failed at the last task of the aur role:
+
+    error: can't install AUR package as root
+
+The role runs `paru --sync --chroot` with `become: true`, and paru refuses to run as root. It has always done that. The task never noticed because `archwork_packages_aur` was `[]` from M2 until D-029, and the task is guarded by `when: archwork_packages_aur | length > 0`, so the only part of the AUR path that had ever executed was the bootstrap that builds paru itself. That part works, because `makechrootpkg` wants to be root and `pacman -U` is root's job anyway.
+
+So the role has been green for four milestones while the half of it that matters had never been reached. Same shape as the M4 checks that passed while testing nothing, and the reason it survived this long is that an empty list makes a `when` guard indistinguishable from a working task.
+
+**The obvious fix is a trap, and it is worth writing down before someone tries it.** Running paru as `archwork_admin_user` works in the VM and fails on hardware. The installer writes `%wheel ALL=(ALL:ALL) ALL`, which prompts for a password, and only a *test* install also writes `99-archwork-test` with `NOPASSWD: ALL`. So paru as the admin user would pass every harness run and hang on the first real reconcile on `hmlxdesktop02`, waiting on a password prompt nobody is watching. This repository has enough of those already.
+
+Three real options.
+
+1. **A narrow sudoers rule for the build user**, letting it run `/usr/bin/pacman` without a password. This is what almost every Ansible AUR role does, and it directly reverses D-018's "it holds no privileges of its own: a locked password, no authorized keys, and nothing in sudoers". It should be reversed with eyes open rather than quietly: `pacman -U` on an arbitrary package file runs that package's install scripts as root, so this is a root-equivalent grant, not a narrow one. D-025 removed the `docker` group for exactly this reasoning.
+
+2. **Build with `makechrootpkg` and install with `pacman -U`, per package, from Ansible.** No privilege changes at all, and it is precisely what the paru bootstrap in this same role already does. The cost is that Ansible takes over dependency resolution between AUR packages, which is the job paru exists to do. Most of the current set is `-bin` packages with repository-only dependencies, so it may be less painful than it sounds, and it may also be quietly wrong the first time an AUR package depends on another one.
+
+3. **A local repository.** paru builds into a directory that is a pacman repository, and pacman installs from it as root the ordinary way. Root never builds, the build user never gains sudo, and dependency resolution stays with the tool that understands it. It is the most machinery of the three and the only one that leaves both halves of D-018 intact.
+
+Recommendation: option 3, and option 2 if that turns out to need more moving parts than it is worth. Not option 1, because a root-equivalent grant to an account created for unattended builds is exactly the thing D-018 and D-025 both decided against, and it would be reversing two accepted decisions to save an afternoon.
+
+This is the repository owner's call. Until it is made, `archwork_packages_aur` cannot be installed, which blocks the application manifests, which blocks M7's manifest criterion.
+
+**A second thing this run surfaced, smaller and not blocking.** paru asked which provider to use for `java-runtime-headless`, `cargo`, and for four of the AUR names themselves, where `fsearch`, `claude-code`, `epsonscan2`, `protonup-qt` and `opendeck` each have `-git` or `-bin` siblings. `--noconfirm` takes the default, which is the first listed, so an unattended run silently picks `jdk-openjdk` and `rust` and the non-suffixed AUR package. That happens to be what is wanted in every case here. It is still a dependency chosen by list order rather than by anyone, and whichever option above is taken should pin the providers explicitly.
