@@ -1,0 +1,61 @@
+---
+# Snapshots and retention (D-007). btrbk is installed by the packages role;
+# this places its configuration, the pacman hook that calls it, and the two
+# scripts that wrap it.
+#
+# Nothing here asks which machine it is on. Both profiles snapshot @ on the
+# same terms.
+
+- name: Install the snapshot and health scripts
+  # Alongside archwork-rollback and archwork-inhibit, which other roles place.
+  # All of them are self-contained by design (D-014): a machine that needs
+  # rolling back or checking may not have this repository on it.
+  ansible.builtin.copy:
+    src: "{{ archwork_repo_dir }}/scripts/{{ item }}"
+    dest: "/usr/local/bin/{{ item }}"
+    remote_src: true
+    owner: root
+    group: root
+    mode: "0755"
+  loop:
+    - archwork-snapshot
+    - archwork-health
+    - archwork-update
+  become: true
+
+- name: Create the btrbk configuration directory
+  ansible.builtin.file:
+    path: /etc/btrbk
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  become: true
+
+- name: Place the btrbk configuration
+  ansible.builtin.copy:
+    src: btrbk.conf
+    dest: /etc/btrbk/btrbk.conf
+    owner: root
+    group: root
+    mode: "0644"
+  become: true
+
+- name: Create the pacman hook directory
+  # pacman reads /etc/pacman.d/hooks, and a stock install does not create it.
+  ansible.builtin.file:
+    path: /etc/pacman.d/hooks
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  become: true
+
+- name: Place the pre-transaction snapshot hook
+  ansible.builtin.copy:
+    src: 50-archwork-pre-snapshot.hook
+    dest: /etc/pacman.d/hooks/50-archwork-pre-snapshot.hook
+    owner: root
+    group: root
+    mode: "0644"
+  become: true

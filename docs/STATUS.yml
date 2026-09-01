@@ -116,6 +116,16 @@ first_install:
   laptop:
     status: never-run
 
+# M5 started on 2026-09-01 (D-030), while the M4 evidence run was still going.
+# archwork-snapshot, archwork-health and archwork-update are written and unit
+# tested, with the btrbk configuration and the pacman pre-transaction hook
+# D-007 promised, placed by a new snapshots role. 26 unit tests, all stubs:
+# no btrbk has taken a snapshot, no hook has fired, and no rollback has run.
+#
+# Three of M5's six exit criteria are VM work not yet started: break a machine
+# and roll it back, check pacman -Qi agrees with the disk afterwards, and boot
+# the recovery UKI to run the rollback from it. make vm-health and
+# make vm-recovery are still the stubs that print what milestone delivers them.
 next_actions:
   - Run the M4 exit criteria against a clean VM rebuild and get a green run
     end to end. The behaviour is observed and the four bugs are fixed; what

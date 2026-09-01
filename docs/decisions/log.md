@@ -750,3 +750,37 @@ Consequences:
 - The sleep timing is measured from outside the guest, by `tests/vm/suspend-watch.py` against the QEMU monitor. A machine cannot time its own suspend: the last thing it does before S3 is stop running.
 - One criterion a VM cannot settle. Dimming has no observable effect where there is no backlight device, which is every VM and the desktop's external monitors both. `assert-m4.sh` reports it as a skip, counted and printed apart from the passes, rather than quietly counting the listener's presence in the file as the timing being met. The laptop panel is the only thing that can prove that one.
 - Still not run. The check exists and its own helpers are covered by `tests/unit/m4-checks.bats` and `tests/unit/suspend-watch.bats`, which need no VM. The 65 minute run against a real machine has not happened, so nothing here is evidence that the timings hold. `docs/STATUS.yml` carries that as the blocker.
+
+## D-030 What M5 builds, and the two places it had to choose
+
+**Status:** accepted
+**Date:** 2026-09-01
+**Affects:** `storage-boot.md`, D-007, D-014, M5
+
+M5's exit criteria name a workflow and a set of health checks without naming the shape of either. This records what was built and the choices that were not obvious.
+
+**Four scripts, three of them self-contained.** `archwork-rollback` already existed from M1. `archwork-snapshot` wraps btrbk for the pacman hook D-007 promised, `archwork-health` asserts that the machine still matches this repository, and `archwork-update` is the workflow. The first three depend on nothing but the machine, on D-014's reasoning: a machine that needs rolling back or checking may not have the repository on it. `archwork-update` is the exception and says so, because its reconcile step runs the playbook out of the clone.
+
+**The health check deliberately shares no code with the harness.** `tests/vm/lib/checks.sh` asserts most of the same facts, and it would have been easy to install it as a library. It is not, because the harness is the test and the health check is the thing being tested. A test that imports the implementation of what it checks proves less than one that does not, and this repository has spent enough time this month on checks that passed while testing nothing.
+
+**Where it had to choose, and the two are inconsistent on purpose.**
+
+A failed snapshot stops `archwork-update` and does not stop the pacman hook. The hook sets `AbortOnFail = false`: it fires on every transaction, including ones nobody thought of as an update, and a machine that cannot install a package because btrbk is broken is unmanageable. `archwork-update` is someone asking for the safe workflow by name, so the honest answer when the safety net is broken is to say so rather than quietly do the unsafe thing. `pacman -Syu` remains available to anyone who wants it, and `--no-snapshot` says it deliberately.
+
+That asymmetry was found by a unit test rather than reasoned out in advance. `set -e` had been stopping the update already, with no message and no flag, which looked identical to the considered behaviour and was not it.
+
+**What is not proven.** None of this has run on a machine. The scripts pass ShellCheck and 26 unit tests, and the units are stubs: no btrbk has taken a snapshot, no pacman hook has fired, and no rollback has been exercised. Three of M5's six exit criteria are VM work that has not been done, and the sixth is a fact about the NAS that nobody has checked.
+
+**Three questions for the repository owner.**
+
+1. **The retention numbers are invented.** `snapshot_preserve_min 2d`, then `14d 8w`. Nothing in any decision document says how long a snapshot should live, and the pacman hook means one per transaction, so a busy week is dozens of them sharing a filesystem with everything else.
+
+   Recommendation: keep them until a real machine has run for a month and the numbers can be argued from what `@snapshots` actually costs. Guessing again from a different armchair is not an improvement.
+
+2. **Nothing schedules `archwork-update`.** It is a command someone runs. A systemd timer would make updates happen without being remembered, and would also mean a machine that reboots into a broken kernel at 03:00 with nobody watching.
+
+   Recommendation: leave it manual. This is a workstation with a rollback path that needs a person to choose a snapshot, and unattended updates on a rolling distribution are how people find out their machine changed while they were asleep.
+
+3. **The btrbk configuration is untested and the format is unforgiving.** `volume /`, `snapshot_dir .snapshots`, `subvolume .` is the layout this repository's subvolumes imply, and it was written from the documentation rather than from a working machine.
+
+   Recommendation: treat the first VM run as the test of this file specifically, and expect to change it. It is the single piece of M5 most likely to be wrong.

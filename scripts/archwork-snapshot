@@ -1,0 +1,65 @@
+#!/usr/bin/env bash
+#
+# Take the pre-transaction snapshot that D-007 buys by not using snap-pac.
+#
+# Called by /etc/pacman.d/hooks before any package transaction, and by
+# archwork-update before it starts. Installed to /usr/local/bin, and
+# self-contained for the same reason archwork-rollback is: a machine that needs
+# a snapshot may not have the repository on it.
+#
+# It only ever adds. Retention is btrbk's job, driven by /etc/btrbk/btrbk.conf,
+# so nothing here decides what to delete.
+
+set -euo pipefail
+
+BTRBK="${BTRBK:-btrbk}"
+CONFIG="${ARCHWORK_BTRBK_CONFIG:-/etc/btrbk/btrbk.conf}"
+DRY_RUN=false
+
+usage() {
+	cat <<'USAGE'
+archwork-snapshot [--dry-run]
+
+Takes a Btrfs snapshot of @ through btrbk, the way a pacman transaction or
+archwork-update does. Retention is btrbk's, set in /etc/btrbk/btrbk.conf.
+
+  --dry-run   ask btrbk what it would do and change nothing
+USAGE
+}
+
+die() {
+	printf 'error: %s\n' "$1" >&2
+	exit 1
+}
+
+main() {
+	while [ $# -gt 0 ]; do
+		case "$1" in
+		--dry-run) DRY_RUN=true; shift ;;
+		-h | --help) usage; exit 0 ;;
+		*) die "unknown option '$1'. Run --help." ;;
+		esac
+	done
+
+	command -v "$BTRBK" >/dev/null 2>&1 || die "btrbk is not installed"
+	[ -r "$CONFIG" ] || die "no btrbk configuration at $CONFIG"
+
+	# A pacman hook that fails takes the transaction with it. A snapshot is a
+	# safety net rather than the point of the transaction, so a btrbk that
+	# cannot run says so loudly and lets the update proceed: refusing to
+	# update a machine because its safety net is broken leaves it unpatched,
+	# which is the worse of the two.
+	if [ "$DRY_RUN" = true ]; then
+		"$BTRBK" -c "$CONFIG" dryrun run || printf 'warning: btrbk dry run failed\n' >&2
+		return 0
+	fi
+
+	if ! "$BTRBK" -c "$CONFIG" run; then
+		printf 'warning: the pre-transaction snapshot failed. Continuing without one.\n' >&2
+		printf 'warning: run archwork-health afterwards, and fix btrbk before the next update.\n' >&2
+	fi
+}
+
+if [ "${BASH_SOURCE[0]}" = "$0" ]; then
+	main "$@"
+fi
