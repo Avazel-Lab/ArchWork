@@ -761,14 +761,22 @@ Also unproven and worth saying plainly: the HP LaserJet Pro MFP M28w has its who
 
    Recommendation: leave it out of the manifest and install Codex through npm in the user's own environment, the way its upstream documents. The reason is not the vote count, it is that `paru --chroot` on an auto-updated PKGBUILD makes an unattended rebuild depend on an unpinned third party, and D-005 routed AUR builds through a clean chroot precisely to bound what a package build can touch. If it should be in the manifest anyway, `openai-codex-bin` is the one.
 
+   **Still open on 2026-09-01.** The other three questions here are answered; this one was asked back rather than decided, so Codex is in no manifest and nothing installs it. Whichever way it goes, it changes one line.
+
 2. **Python 3.13, "managed explicitly rather than depending on Arch's rolling system Python staying at 3.13".** `applications.md` asks for this and names no mechanism. The system `python` package is whatever Arch has moved to, which is exactly what the line is written against. The options are an AUR `python313` alongside the system interpreter, or a version manager such as `uv`, `mise` or `pyenv` owning it in the user's home.
 
    Recommendation: `uv`, which is in `extra`. It pins and fetches interpreters per project rather than installing a second system-wide Python that pacman would then also want to upgrade, and it is the option that does not put two interpreters on `PATH` and hope the right one wins. This is a real choice about how the workstation does Python, though, not a package name, which is why it is here.
+
+   **Answered on 2026-09-01: `uv`.** It is in `archwork_packages_applications`. Nothing yet uses it to pin 3.13, so this decides the mechanism and not the pinning: the first project that needs the interpreter is what will show whether it holds.
 
 3. **libvirt needs two packages `applications.md` does not name.** `virt-manager` is listed and called out as useful for clean ArchWork rebuild VMs, and that is the use that breaks: libvirt's default NAT network needs `dnsmasq`, and booting a UEFI guest needs `edk2-ovmf`. Neither is a hard dependency, so the stack installs and then cannot do the thing it was installed for. `CLAUDE.md` bars adding a package no decision document lists, which is why they are not in the manifest.
 
    Recommendation: add both, and treat this as `applications.md` naming a capability rather than a package list. Every ArchWork test VM in this repository is a UEFI guest, so a virt-manager that cannot boot one is not the tool that was asked for.
 
+   **Answered on 2026-09-01: add both.** `dnsmasq` and `edk2-ovmf` are in `archwork_packages_applications`. `applications.md` is not amended for this: it names what the workstation is for, and the packages a listed capability needs are a manifest question.
+
 4. **The Epson FastFoto FF-680W driver.** `epsonscan2` is in the AUR (26 votes) and is the obvious candidate, but `applications.md` is explicit that driver-level support is not sufficient: the FastFoto-style workflow, batch ADF scanning, duplex, mixed photo sizes, automatic filenames, has to be tested before scanning counts as solved.
 
    Recommendation: add `epsonscan2` when the scanner is next to the machine and the workflow can actually be tried, rather than now. Adding it now puts a scanner driver on the laptop for hardware it may never meet, and would let a manifest entry stand in for a test that has not happened, which is the thing the evidence rule in `CLAUDE.md` exists to stop.
+
+   **Answered on 2026-09-01: add it now, so the workflow can be picked up later.** `epsonscan2` is in `archwork_packages_aur`. The recommendation to wait was overruled on the grounds that having the driver there already is what makes the test easy to start. The caution it carried still stands and is worth repeating rather than dropping: the package being installed is not evidence that scanning works, and the FastFoto workflow, batch ADF, duplex, mixed sizes and automatic filenames, remains untested.

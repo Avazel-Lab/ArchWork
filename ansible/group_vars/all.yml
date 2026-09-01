@@ -151,6 +151,12 @@ archwork_packages_aur:
   - bruno-bin
   # AI coding CLI. Codex is not here: see docs/decisions/log.md D-029.
   - claude-code
+  # The Epson FastFoto FF-680W's scanner driver. Installed so the workflow can
+  # be tried when the scanner is next to the machine; applications.md is
+  # explicit that the driver is not the criterion, a tested batch and ADF
+  # workflow is. Added on the repository owner's call, 2026-09-01 (D-029,
+  # question 4). Its presence here is not evidence that scanning works.
+  - epsonscan2
 
 # AUR packages for one profile only. Empty here, set in group_vars/desktop.yml.
 archwork_packages_aur_profile: []
@@ -260,6 +266,14 @@ archwork_packages_applications:
   - qemu-desktop
   - libvirt
   - virt-manager
+  # applications.md names virt-manager and not these two, and without them the
+  # stack installs and cannot do the thing it is listed for: libvirt's default
+  # NAT network needs dnsmasq, and a UEFI guest needs edk2-ovmf. Every ArchWork
+  # test VM is a UEFI guest. Answered by the repository owner on 2026-09-01
+  # (D-029, question 3): applications.md named a capability, not a package
+  # list.
+  - dnsmasq
+  - edk2-ovmf
   # Kubernetes. The kubectx package ships kubens too.
   - helm
   - k9s
@@ -279,6 +293,14 @@ archwork_packages_applications:
   - git-crypt
   - lazygit
   - meld
+  # How Python is pinned. applications.md asks for 3.13 "managed explicitly
+  # rather than depending on Arch's rolling system Python staying at 3.13" and
+  # names no mechanism. uv is the answer, chosen by the repository owner on
+  # 2026-09-01 (D-029, question 2): it fetches and pins an interpreter per
+  # project rather than installing a second system-wide Python that pacman
+  # would also want to upgrade, so nothing ends up with two interpreters on
+  # PATH hoping the right one wins.
+  - uv
   # General CLI and developer utilities
   - ripgrep
   - fd
