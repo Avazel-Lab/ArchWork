@@ -876,6 +876,18 @@ phase_power() {
 		--monitor "$WORK_DIR/monitor.sock" --wake ||
 		die "the machine did not come back from suspend"
 
+	# A key on a sleeping machine does two things: it wakes it, and it is
+	# input. system_wakeup on the monitor is only the first, and without the
+	# second the compositor's idle clock is still reading the 1805 seconds
+	# that put the machine to sleep in the first place. hypridle then fires
+	# the same listener again within seconds of the resume.
+	#
+	# That is what ended run 3 on 2026-09-01: every M4 criterion passed, in
+	# the window before the machine went straight back down, and the recovery
+	# phase after it timed out waiting for a reboot that a sleeping guest was
+	# never going to perform.
+	press --key shift || die "could not reset the idle clock after the wake"
+
 	# S3 takes the network with it, so the connection has to be remade rather
 	# than reused.
 	local attempt
@@ -1006,7 +1018,16 @@ phase_recovery() {
 	while kill -0 "$QEMU_PID" 2>/dev/null; do
 		sleep 2
 		waited=$((waited + 2))
-		[ "$waited" -ge 120 ] && die "the guest did not shut down for the recovery boot"
+		# Say what it was doing rather than only that it did not do it. A
+		# guest that went back to sleep and a guest that hung on shutdown
+		# look identical from out here, and the first cost a whole run
+		# before anything asked.
+		if [ "$waited" -ge 120 ]; then
+			local state
+			state="$(python3 "$SCRIPT_DIR/suspend-watch.py" \
+				--monitor "$WORK_DIR/monitor.sock" --status 2>/dev/null)"
+			die "the guest did not shut down for the recovery boot. QEMU reports its run state as '${state:-unreadable}'"
+		fi
 	done
 	QEMU_PID=""
 

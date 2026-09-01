@@ -73,15 +73,22 @@ def main() -> int:
         "seconds it took on stdout",
     )
     parser.add_argument("--wake", action="store_true", help="wake a suspended guest")
+    parser.add_argument("--status", action="store_true",
+                        help="print the guest's run state and exit. For saying what a "
+                             "guest was doing when something timed out waiting on it")
     parser.add_argument("--poll", type=float, default=5.0, help="seconds between checks")
     args = parser.parse_args()
 
+    if args.status:
+        with Monitor(args.monitor) as monitor:
+            print(run_state(monitor))
+        return 0
     if args.wake:
         return wake(args.monitor)
     if args.wait is not None:
         return wait_for_suspend(args.monitor, args.wait, args.poll)
 
-    parser.error("one of --wait or --wake is required")
+    parser.error("one of --wait, --wake or --status is required")
     return 2
 
 
