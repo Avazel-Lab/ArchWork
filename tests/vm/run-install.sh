@@ -876,6 +876,18 @@ phase_power() {
 		--monitor "$WORK_DIR/monitor.sock" --wake ||
 		die "the machine did not come back from suspend"
 
+	# A key on a sleeping machine does two things: it wakes it, and it is
+	# input. system_wakeup on the monitor is only the first, and without the
+	# second the compositor's idle clock is still reading the 1805 seconds
+	# that put the machine to sleep in the first place. hypridle then fires
+	# the same listener again within seconds of the resume.
+	#
+	# That is what ended run 3 on 2026-09-01: every M4 criterion passed, in
+	# the window before the machine went straight back down, and the recovery
+	# phase after it timed out waiting for a reboot that a sleeping guest was
+	# never going to perform.
+	press --key shift || die "could not reset the idle clock after the wake"
+
 	# S3 takes the network with it, so the connection has to be remade rather
 	# than reused.
 	local attempt
@@ -999,15 +1011,40 @@ phase_recovery() {
 		'sudo bootctl set-oneshot archwork-recovery.efi' ||
 		die "could not select the recovery entry, see bootctl list on the guest"
 
+	# Read the console across the shutdown. Without this the transcript stops
+	# at the login prompt, and a hang is indistinguishable from slowness: this
+	# phase has now timed out twice with nothing to look at afterwards.
+	local shutdown_log="$WORK_DIR/shutdown-console.log"
+	python3 "$SCRIPT_DIR/serial-log.py" \
+		--socket "$WORK_DIR/serial.sock" --out "$shutdown_log" &
+	local serial_logger=$!
+
 	# -no-reboot means the guest reboot stops QEMU rather than looping.
 	ssh "${SSH_OPTS[@]}" gary@127.0.0.1 'sudo systemctl reboot' || true
 
-	local waited=0
+	# systemd gives a unit 90 seconds to stop by default and a graphical
+	# session has several of them, so 120 was a race this lost rather than a
+	# limit that meant anything.
+	local waited=0 deadline=420
 	while kill -0 "$QEMU_PID" 2>/dev/null; do
 		sleep 2
 		waited=$((waited + 2))
-		[ "$waited" -ge 120 ] && die "the guest did not shut down for the recovery boot"
+		# Say what it was doing rather than only that it did not do it. A
+		# guest that went back to sleep and a guest that hung on shutdown
+		# look identical from out here, and the first cost a whole run
+		# before anything asked.
+		if [ "$waited" -ge "$deadline" ]; then
+			local state
+			state="$(python3 "$SCRIPT_DIR/suspend-watch.py" \
+				--monitor "$WORK_DIR/monitor.sock" --status 2>/dev/null)"
+			kill "$serial_logger" 2>/dev/null || true
+			printf '\nthe last thing the console said:\n' >&2
+			tr -d '\033' <"$shutdown_log" 2>/dev/null | tail -n 25 >&2 || true
+			die "the guest did not shut down for the recovery boot after ${deadline}s. QEMU reports its run state as '${state:-unreadable}', and the console is in $shutdown_log"
+		fi
 	done
+	kill "$serial_logger" 2>/dev/null || true
+	wait "$serial_logger" 2>/dev/null || true
 	QEMU_PID=""
 
 	start_installed_vm

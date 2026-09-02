@@ -91,11 +91,24 @@ last_rebuild:
 # machine did not sleep under a held inhibitor, so that criterion had never
 # been tested at all.
 #
-# The behaviour itself was observed on the run at f3c99b9's parent: display
-# off at 901s, no sleep under the inhibitor, the display still off, suspend at
-# 1805s measured from the QEMU monitor, locked on the way down, display back
-# on after wake. That is not an evidence line, because no run has yet
-# completed green end to end.
+# Every M4 exit criterion passed on 2026-09-01 at commit 8558d4e, on the
+# desktop profile: the display off at 904s against a 900 to 960 window, the
+# machine still awake at the end of a 30 minute idle window with the inhibitor
+# held, the display still off through it so the lock touched only sleep,
+# suspend at 1805s measured from the QEMU monitor because a machine cannot
+# time its own, logind and systemd-suspend both recording the sleep, hyprlock
+# up before it went down, and the display back on after the wake.
+#
+# One criterion is a skip rather than a pass, on every run and by design: the
+# display dims at 300s cannot be observed where there is no backlight device,
+# which is every VM. The laptop panel is the only thing that can settle it.
+#
+# The run did not complete. The recovery phase after M4 timed out waiting for
+# a reboot, because the harness woke the guest with system_wakeup, which is
+# not input, so the compositor's idle clock still read 1805s and hypridle put
+# the machine straight back to sleep. Fixed on fix/wake-resets-the-idle-clock
+# by sending the keystroke the wake had always claimed to be. M4 is therefore
+# proven and the run that proves it end to end has not been done.
 
 # One record per machine, replaced rather than appended to. The checker
 # rejects an install claimed as passed without a commit SHA and a date, on
@@ -117,10 +130,9 @@ first_install:
     status: never-run
 
 next_actions:
-  - Run the M4 exit criteria against a clean VM rebuild and get a green run
-    end to end. The behaviour is observed and the four bugs are fixed; what
-    is missing is one run where every assertion passes. Record it with a
-    commit SHA
+  - Land fix/wake-resets-the-idle-clock and run vm-power once more, for a
+    green run end to end rather than one that passes M4 and dies in the
+    phase after it. Then M4 is the repository owner's to call
   - Land the application manifests once a VM has installed them. They are on
     feat/application-manifests with CI green and no machine has run them
   - Point the VM harness at a work directory with room. TMPDIR defaults to
@@ -128,9 +140,12 @@ next_actions:
     runs do not fit in it
 
 blockers:
-  - M4 has no VM evidence yet. The configuration, the inhibit control and
-    now the automated check its last exit criterion asks for are all
-    written and unit-tested, and nobody has yet watched the three timings
-    fire or the inhibit lock hold on a real machine. The run is
-    make vm-power ISO=..., and it takes about 65 minutes because the
-    criteria are two idle windows of half an hour.
+  - No vm-power run has yet completed end to end. Every M4 criterion passed on
+    2026-09-01 at 8558d4e, and that run then died in the recovery phase for a
+    reason now fixed on fix/wake-resets-the-idle-clock and not yet shown to be
+    fixed. Nothing here is M4 failing; it is M4 proven by a run that did not
+    finish.
+  - The application manifests are unproven. D-029 puts 93 packages across two
+    profiles into the lists on the strength of the package APIs confirming the
+    names exist, which is not the same as a machine installing them, and the
+    AUR half builds in a chroot that has never built anything.
