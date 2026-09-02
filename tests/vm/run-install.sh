@@ -256,7 +256,7 @@ validate_phases() {
 	local phase
 	for phase in ${PHASES//,/ }; do
 		case "$phase" in
-		assert | greeter | session | desktop | portals | power | recovery) ;;
+		assert | greeter | session | desktop | portals | power | rollback | recovery) ;;
 		*) die "'$phase' is not a phase that can be resumed. Try assert, greeter, session, desktop, portals, power, rollback or recovery." ;;
 		esac
 
@@ -1120,8 +1120,16 @@ reboot_guest() {
 		--passphrase-file "$WORK_DIR/passphrase" \
 		--log "$WORK_DIR/boot-console.log" || return 1
 
+	# 150 attempts rather than 60. The machine this waits for has just been
+	# through a full M4 run, a suspend, a wake and a rollback, and its first
+	# boot on a fresh @ is not the quick one. Run 11 on 2026-09-02 reached a
+	# login prompt on the serial console and then ran out of SSH attempts
+	# while it was still starting services, so the phase reported a rollback
+	# failure against a machine that was fine: booting the same disk by hand
+	# afterwards answered SSH immediately, and re-running the phase alone
+	# passed every check.
 	local attempt
-	for attempt in $(seq 1 60); do
+	for attempt in $(seq 1 150); do
 		ssh "${SSH_OPTS[@]}" gary@127.0.0.1 true 2>/dev/null && return 0
 		sleep 2
 	done

@@ -3,7 +3,7 @@
 # Validated by scripts/check-plan-status.py.
 ---
 schema: 1
-updated: 2026-09-01
+updated: 2026-09-02
 
 phase: M4
 
@@ -126,6 +126,24 @@ first_install:
 # and roll it back, check pacman -Qi agrees with the disk afterwards, and boot
 # the recovery UKI to run the rollback from it. make vm-health and
 # make vm-recovery are still the stubs that print what milestone delivers them.
+# M5's rollback criteria passed on 2026-09-02 on the desktop profile. The
+# phase proved the machine healthy, snapshotted it through btrbk, removed
+# tailscale and stopped the service, watched the health check notice, rolled
+# back with archwork-rollback, rebooted, and found the machine itself again:
+# 19 health checks passed with nothing failed, pacman -Qk agreed with the
+# disk, and the removed package was back. That is three of M5's six exit
+# criteria, and the fourth, the recovery UKI, is a separate phase that has
+# not been run since M1.
+#
+# Not an evidence line yet. The run that carried it, run 11, failed on its
+# own reboot wait rather than on anything it was testing: 120 seconds of SSH
+# attempts ran out while the machine was still starting services after a
+# rollback that had worked. Booting the same disk by hand answered SSH at
+# once, and re-running the phase alone passed everything. The window is now
+# 300 seconds. A clean run end to end is what would make this evidence.
+#
+# The btrbk configuration D-030 flagged as the piece most likely to be wrong
+# turned out to be right: it took the snapshot archwork-rollback then used.
 next_actions:
   - Run the M4 exit criteria against a clean VM rebuild and get a green run
     end to end. The behaviour is observed and the four bugs are fixed; what
