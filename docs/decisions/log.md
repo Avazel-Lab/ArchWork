@@ -884,3 +884,34 @@ Consequences:
 
 - `applications-tooling.md` and D-018's wording both need correcting to say the build account has this grant. Until they are, D-018 contradicts the code, which `CLAUDE.md` says is worse than no document.
 - The AUR path still has never completed. This unblocks it; it does not prove it. The run that does is the evidence.
+
+## D-034 Two applications want different Chromiums
+
+**Status:** open, and it blocks the AUR set
+**Date:** 2026-09-02
+**Affects:** `applications.md`, D-029, M7
+
+The first reconcile to reach the AUR install with a working paru stopped here:
+
+    :: Conflicts found:
+        ungoogled-chromium-bin: chromium
+    :: Conflicting packages will have to be confirmed manually
+    error: can not install conflicting packages with --noconfirm
+
+`mermaid-cli` depends on `nodejs` and `chromium`, and has done since M2. It is in `archwork_packages_shared` because `applications.md` asks for Mermaid, diagrams as code, and the CLI renders them through a headless browser. So every ArchWork machine has already installed Google's Chromium, 417 MiB of it, as a dependency nobody looked at.
+
+`ungoogled-chromium-bin` declares `conflicts=chromium` and `provides=chromium=151.0.7922.173`. The repository's `chromium` is at 152.0.7977.75.
+
+So two entries in `applications.md` want incompatible things, and the collision was invisible until something tried to install both. It is not a packaging accident that can be worked around: whichever browser wins, `mermaid-cli` will use it, because it needs a chromium and does not care which.
+
+The real question is therefore not "how do we install both" but **which Chromium this workstation runs**, since there can only be one and the diagram tool gets the same one as the browser.
+
+1. **Repository `chromium`.** Google's build, current, and security updates arrive through the ordinary `pacman -Syu`. `applications.md` chose Ungoogled specifically for "Chromium/Blink compatibility without Google's browser services", so this drops the reason it was listed.
+2. **`ungoogled-chromium-bin`.** What the document asked for. It satisfies `mermaid-cli` through `provides`, so nothing else breaks. The cost is that a browser is the most exposed program on a workstation, and this one is a binary repackaged by an AUR maintainer, currently a major version behind the repository, updated when that maintainer gets to it. The install also has to be allowed to replace `chromium`, which `paru --noconfirm` refuses to do on its own.
+3. **Neither, and drop `mermaid-cli`.** Not really available: Mermaid is the documented diagram tool, and the CLI needs a browser engine. It only moves the question.
+
+Recommendation: option 1, the repository package, and amend `applications.md` rather than leave it saying something the machine does not do. The reasoning is that the "ungoogled" benefit is about telemetry and Google service integration, while the cost is slower security updates on the single most attack-exposed application on the machine, and this workstation already runs Zen as its primary browser. Chromium here is the compatibility fallback and the thing that renders diagrams, which is a much weaker case for accepting a lagging build.
+
+If the ungoogled build matters more than the update lag, option 2 is legitimate and the manifest change is one line, plus whatever makes the replacement non-interactive.
+
+Either way `applications.md` needs editing, because right now it lists two applications that cannot both be installed and does not say so.
