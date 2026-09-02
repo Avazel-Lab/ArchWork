@@ -777,10 +777,16 @@ That asymmetry was found by a unit test rather than reasoned out in advance. `se
 
    Recommendation: keep them until a real machine has run for a month and the numbers can be argued from what `@snapshots` actually costs. Guessing again from a different armchair is not an improvement.
 
+   **Answered on 2026-09-02: leave them.** Revisit once a machine has run for a month, when the cost of `@snapshots` is a measurement rather than an estimate.
+
 2. **Nothing schedules `archwork-update`.** It is a command someone runs. A systemd timer would make updates happen without being remembered, and would also mean a machine that reboots into a broken kernel at 03:00 with nobody watching.
 
    Recommendation: leave it manual. This is a workstation with a rollback path that needs a person to choose a snapshot, and unattended updates on a rolling distribution are how people find out their machine changed while they were asleep.
 
+   **Answered on 2026-09-02: manual.** Nothing schedules `archwork-update`, and nothing should without reopening this.
+
 3. **The btrbk configuration is untested and the format is unforgiving.** `volume /`, `snapshot_dir .snapshots`, `subvolume .` is the layout this repository's subvolumes imply, and it was written from the documentation rather than from a working machine.
 
    Recommendation: treat the first VM run as the test of this file specifically, and expect to change it. It is the single piece of M5 most likely to be wrong.
+
+   **Answered by the run on 2026-09-02: it was right.** btrbk took the snapshot, `archwork-rollback list` found it, and the rollback used it. The piece called most likely to be wrong was the one that worked first time, which is worth remembering next time a prediction like that feels solid.
