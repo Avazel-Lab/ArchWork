@@ -750,3 +750,34 @@ Consequences:
 - The sleep timing is measured from outside the guest, by `tests/vm/suspend-watch.py` against the QEMU monitor. A machine cannot time its own suspend: the last thing it does before S3 is stop running.
 - One criterion a VM cannot settle. Dimming has no observable effect where there is no backlight device, which is every VM and the desktop's external monitors both. `assert-m4.sh` reports it as a skip, counted and printed apart from the passes, rather than quietly counting the listener's presence in the file as the timing being met. The laptop panel is the only thing that can prove that one.
 - Still not run. The check exists and its own helpers are covered by `tests/unit/m4-checks.bats` and `tests/unit/suspend-watch.bats`, which need no VM. The 65 minute run against a real machine has not happened, so nothing here is evidence that the timings hold. `docs/STATUS.yml` carries that as the blocker.
+
+## D-032 hyprpaper 0.8 does not apply the wallpaper this configuration asks for
+
+**Status:** open, and it blocks the keybinding wallpaper
+**Date:** 2026-09-02
+**Affects:** `desktop-shell.md`, D-026, M3
+
+The keybinding wallpaper is configured, installed and never displayed. `hyprpaper` runs, reads the configuration from the repository clone, finds the monitor, and then says:
+
+    DEBUG: Found 1 output(s)
+    DEBUG: Monitor Virtual-1 has no target: no wp will be created
+
+`hyprctl hyprpaper listactive` returns nothing at all, which is the honest answer: no wallpaper was ever created.
+
+What was ruled out, on a live session on the guest, with `hyprpaper 0.8.4-6`:
+
+- **The path.** Tilde and fully expanded absolute forms behave identically. The file is there, owned by the user, and `file` reports a valid 2560x1440 PNG.
+- **The monitor field.** `,PATH`, `, PATH`, `*,PATH` and `Virtual-1,PATH` all produce the same "has no target".
+- **The environment.** Setting `XDG_CURRENT_DESKTOP` changes nothing.
+- **The launch method.** Started by hand, and started through the `hyprpaper.service` the package ships, both behave the same.
+- **The image.** Not reached, since nothing is ever preloaded.
+
+Most telling: with `--verbose`, hyprpaper logs nothing whatsoever about parsing `preload` or `wallpaper`. It does not complain about the file, the syntax or a missing key. It reads the configuration and produces zero targets in silence.
+
+That is the shape of a configuration format that has moved. D-026 records Hyprland replacing hyprlang with Lua and deleting its own example from upstream, and D-028 assumed hypridle and hyprlock were unaffected because they are separate binaries. hyprpaper 0.8 is built on `hyprtoolkit`, which the log shows looking for its own `hyprtoolkit.conf`, so this is the same migration arriving at the next tool along. The package ships no example configuration and `--help` documents only `--config`, `--verbose`, `--version` and `--help`, so the current contract cannot be established from the machine.
+
+There is a second, weaker possibility that the run cannot separate: EGL fails on the guest's virtual GPU and hyprtoolkit falls back to `kms_swrast`. "No target" is logged before any rendering is attempted, so this is unlikely to be the cause, but a machine with a real GPU would settle it.
+
+Recommendation: establish what hyprpaper 0.8 actually reads before shipping this, from upstream rather than by trying syntaxes, and expect the answer to be a new format. Do not merge the wallpaper until a machine has displayed it. The assertion that caught this stays as it is: it failed on a machine where hyprpaper was running with the right configuration in front of it, which is exactly what it was written to do.
+
+The wider point is worth more than the wallpaper. If hyprpaper has moved, `hypridle.conf` and `hyprlock.conf` are on the same path, and both are load-bearing: hypridle carries every M4 timing and hyprlock is what locks the screen. D-026 called the Hyprland format change "larger than it sounds" and it is still arriving.
