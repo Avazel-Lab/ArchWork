@@ -874,6 +874,12 @@ D-025 removed the `docker` group on adjacent reasoning, and the difference is wo
 
 Rejected alongside: option 2, Ansible driving `makechrootpkg` per package, which moves AUR dependency resolution into a playbook and reimplements paru badly; and option 3, a local repository, which does not solve the problem on its own and adds machinery on top of whichever option does.
 
+**How the user is switched, which took two goes.** The first attempt used Ansible's `become_user`, and the run died before paru was reached:
+
+    chmod: invalid mode: 'A+user:archwork-build:rx:allow'
+
+`become_user` to an unprivileged account makes Ansible hand its temporary files over with `setfacl`, which needs the `acl` package the machine does not have. Installing it would be a package no decision document lists, added to solve a problem this role had already solved twice: it uses `runuser -u` for `makepkg --packagelist` and says why in a comment right there. So the paru call uses `runuser` too, with `HOME` set explicitly, since `runuser` without `-l` keeps root's.
+
 Consequences:
 
 - `applications-tooling.md` and D-018's wording both need correcting to say the build account has this grant. Until they are, D-018 contradicts the code, which `CLAUDE.md` says is worse than no document.

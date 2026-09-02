@@ -158,17 +158,23 @@
   # on the workstation (D-005). The shared list and the profile list are
   # concatenated here rather than in a profile file, so that neither this task
   # nor any group_vars file has to know what the other profile installs.
+  # runuser, not become_user, for the reason this role already gives above:
+  # root becomes another user without needing a rule. become_user to an
+  # unprivileged account makes Ansible hand its temporary files over with
+  # setfacl, which needs the acl package, and without it the run dies on
+  # "chmod: invalid mode: A+user:archwork-build:rx:allow" before paru is
+  # reached at all. Installing acl to work around that would be a package no
+  # decision document lists, to solve a problem this role had already solved.
+  #
+  # HOME is set explicitly because runuser without -l keeps root's, and paru
+  # keeps its clone cache under it.
   ansible.builtin.command:
     cmd: >-
+      runuser -u {{ archwork_build_user }} --
+      env HOME={{ archwork_build_home }}
       paru --sync --noconfirm --chroot --needed
       {{ (archwork_packages_aur + archwork_packages_aur_profile) | join(' ') }}
   register: aur_paru_sync
   when: (archwork_packages_aur + archwork_packages_aur_profile) | length > 0
   changed_when: "'there is nothing to do' not in aur_paru_sync.stdout | lower"
-  # As the build user, not root: paru refuses to run as root and says so rather
-  # than doing anything (D-033). HOME is set explicitly because become does not
-  # give a login shell, and paru keeps its clone cache under it.
   become: true
-  become_user: "{{ archwork_build_user }}"
-  environment:
-    HOME: "{{ archwork_build_home }}"
