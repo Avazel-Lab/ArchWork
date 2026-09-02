@@ -753,9 +753,9 @@ Consequences:
 
 ## D-032 hyprpaper 0.8 does not apply the wallpaper this configuration asks for
 
-**Status:** open, and it blocks the keybinding wallpaper
+**Status:** accepted
 **Date:** 2026-09-02
-**Affects:** `desktop-shell.md`, D-026, M3
+**Affects:** `desktop-shell.md`, D-026, D-028, M3
 
 The keybinding wallpaper is configured, installed and never displayed. `hyprpaper` runs, reads the configuration from the repository clone, finds the monitor, and then says:
 
@@ -781,3 +781,19 @@ There is a second, weaker possibility that the run cannot separate: EGL fails on
 Recommendation: establish what hyprpaper 0.8 actually reads before shipping this, from upstream rather than by trying syntaxes, and expect the answer to be a new format. Do not merge the wallpaper until a machine has displayed it. The assertion that caught this stays as it is: it failed on a machine where hyprpaper was running with the right configuration in front of it, which is exactly what it was written to do.
 
 The wider point is worth more than the wallpaper. If hyprpaper has moved, `hypridle.conf` and `hyprlock.conf` are on the same path, and both are load-bearing: hypridle carries every M4 timing and hyprlock is what locks the screen. D-026 called the Hyprland format change "larger than it sounds" and it is still arriving.
+
+**Answered on 2026-09-02, from upstream rather than by trying more syntaxes.** The format did move, in 0.8.0, alongside the switch to the hyprtoolkit and hyprwire backends. `preload` and `wallpaper = monitor,path` are replaced by a block:
+
+    wallpaper {
+        monitor =
+        path = ~/.config/hypr/wallpaper-keybindings.png
+        fit_mode = contain
+    }
+
+An empty `monitor` is the fallback, applying to every display without an entry of its own, which is what both profiles want. `fit_mode` is optional and defaults to `cover`; this uses `contain`, because `cover` crops to fill the screen and what it crops off a 2560x1440 sheet on a differently shaped display is the bindings down the edges.
+
+The repository owner's condition was that the fix be no more involved than an ordinary wallpaper change. It is: one configuration file, in the format the current version documents.
+
+**What made this expensive is worth recording.** The old keys are not rejected. hyprpaper reads them, produces no wallpaper, and says so only as `Monitor Virtual-1 has no target: no wp will be created` in a log nobody was reading. Four syntax variants, both path forms, two launch methods and an environment variable were ruled out one at a time against a program that was never going to accept any of them. The wiki page for the tool does not carry the configuration section, and the package ships no example, so the answer came from an upstream issue thread.
+
+**The watch item stands and is now sharper.** Two of the three Hyprland ecosystem tools this repository configures have changed format inside six weeks. `hypridle.conf` carries every M4 timing and `hyprlock.conf` is the lock screen, and both would fail the same way: read, ignored, silent. The M4 assertions measure effects rather than reading the file, so a hypridle migration would surface as timings that stop firing rather than as nothing at all, which is the one piece of luck in this.
