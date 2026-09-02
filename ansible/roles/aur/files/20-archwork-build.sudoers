@@ -1,17 +1,22 @@
-# The build account may run the package tools without a password (D-033).
+# The build account may run commands as root without a password (D-033).
 #
 # Managed by ArchWork. paru refuses to run as root, so the AUR set is installed
-# as archwork-build, and that account needs to reach pacman and the devtools
-# chroot helpers to do it. Without this the reconcile stops dead at the first
-# AUR package, which is where it stopped on 2026-09-02.
+# as archwork-build, and paru then reaches for root itself through sudo.
 #
-# This reverses D-018's "nothing in sudoers" deliberately, and D-033 records
-# why. The short version: pacman installing a package runs that package's own
-# scripts as root whoever invoked it, so this is a root-equivalent grant and
-# should be read as one. It is acceptable here because the account is locked,
-# has no password and no authorized keys, exists only for this role, and the
-# reconcile that drives it is already running as root.
+# This started as a list of four binaries, on the reasoning that a scoped grant
+# is more legible than a blanket one. Two runs took that list apart: paru wants
+# pacman, then makechrootpkg, then `install -dm755 /var/lib/aurbuild/x86_64`,
+# and there is no reason to think that is the end of it. The list was not a
+# boundary, it was a guess about paru's internals that failed twice.
 #
-# Scoped to the binaries the chroot build path uses rather than to ALL, so that
-# the grant is at least legible. Do not widen it without amending D-033.
-archwork-build ALL=(root) NOPASSWD: /usr/bin/pacman, /usr/bin/makechrootpkg, /usr/bin/mkarchroot, /usr/bin/arch-nspawn
+# It was never a security boundary either, which is the part that matters.
+# `pacman -U` runs the installed package's own scripts as root, so the first
+# entry on that list already granted everything the rest of it withheld. A
+# narrow-looking rule that grants root anyway is worse than a wide one: it
+# invites a reader to believe in a limit that is not there.
+#
+# So this is what it always was. Read it as: the build account is root, without
+# a password, whenever something invokes it. D-033 records why that is
+# acceptable here, and D-018 is amended to say it is no longer true that this
+# account holds no privileges.
+archwork-build ALL=(root) NOPASSWD: ALL

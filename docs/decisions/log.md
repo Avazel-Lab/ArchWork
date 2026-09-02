@@ -860,7 +860,11 @@ This is the repository owner's call. Until it is made, `archwork_packages_aur` c
 
 D-031 found that `paru` refuses to run as root, so the task that installs the AUR set had never worked. The repository owner chose the narrow sudoers rule on 2026-09-02, from the four options D-031 lists.
 
-`/etc/sudoers.d/20-archwork-build` lets `archwork-build` run `pacman`, `makechrootpkg`, `mkarchroot` and `arch-nspawn` as root without a password, and the install task runs as that user instead of as root. Scoped to those four rather than to `ALL`, so the grant is at least legible, and written with `validate: visudo -cf %s`, because a malformed sudoers file locks everyone out of sudo on a machine whose recovery story assumes you can get back in.
+`/etc/sudoers.d/20-archwork-build` lets `archwork-build` run `pacman`, `makechrootpkg`, `mkarchroot` and `arch-nspawn` as root without a password, and the install task runs as that user instead of as root. It was written scoped to those four rather than to `ALL`, and that did not survive contact. Two runs took the list apart: paru wants `pacman`, then `makechrootpkg`, then `install -dm755 /var/lib/aurbuild/x86_64`, and nothing suggests that is the end of it. The list was not a boundary, it was a guess about paru's internals, and it failed twice.
+
+It was not a security boundary either, which matters more. `pacman -U` runs the installed package's own scripts as root, so the first entry already granted everything the other three withheld. A narrow-looking rule that grants root anyway is worse than a blanket one, because it invites the next reader to believe in a limit that is not there. The rule is now `ALL`, and reads as what it always was.
+
+Written with `validate: visudo -cf %s` either way, because a malformed sudoers file locks everyone out of sudo on a machine whose recovery story assumes you can get back in.
 
 **This reverses half of D-018, and it should be read as reversed rather than as narrowed.** `pacman -U` runs the installed package's own scripts as root whoever invoked it, so the grant is root-equivalent no matter how short the list of binaries is. D-018 said the build account "holds no privileges of its own"; that is now untrue and this entry is where a future reader should find out.
 
@@ -879,6 +883,10 @@ Rejected alongside: option 2, Ansible driving `makechrootpkg` per package, which
     chmod: invalid mode: 'A+user:archwork-build:rx:allow'
 
 `become_user` to an unprivileged account makes Ansible hand its temporary files over with `setfacl`, which needs the `acl` package the machine does not have. Installing it would be a package no decision document lists, added to solve a problem this role had already solved twice: it uses `runuser -u` for `makepkg --packagelist` and says why in a comment right there. So the paru call uses `runuser` too, with `HOME` set explicitly, since `runuser` without `-l` keeps root's.
+
+**A second thing this found, which is not about privileges.** `paru --chroot` builds in `/var/lib/aurbuild`, and `paru --help` offers no option to point it elsewhere. D-018 put the ArchWork chroot at `/var/cache/archwork/chroot` deliberately, under `@var_cache`, so that a large build cache sits outside the rollback boundary. That reasoning is defeated: the chroot this role creates is used only to build paru itself, and every AUR package after that builds in `/var/lib/aurbuild`, which is inside `@` and rolls back with it.
+
+Nothing has been changed about that yet. It is a real gap between what D-018 says the machine does and what it does, and it needs its own decision: either stop using `paru --chroot` and drive `makechrootpkg` against the ArchWork chroot directly, or accept that AUR builds happen inside the rollback boundary and amend D-018 to say so. Whether `paru.conf` can redirect it was not established; the command line cannot.
 
 Consequences:
 
