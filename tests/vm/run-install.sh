@@ -32,6 +32,7 @@ REPEAT=1
 KEEP=false
 RECONCILE=false
 POWER=false
+ROLLBACK=false
 WORK_DIR=""
 # A kept work directory to boot again instead of installing into a new one.
 # Set by --resume, and never a source of evidence: see run_phases.
@@ -180,6 +181,10 @@ parse_args() {
 			POWER=true
 			shift
 			;;
+		--rollback)
+			ROLLBACK=true
+			shift
+			;;
 		-h | --help)
 			usage
 			exit 0
@@ -251,8 +256,8 @@ validate_phases() {
 	local phase
 	for phase in ${PHASES//,/ }; do
 		case "$phase" in
-		assert | greeter | session | desktop | portals | power | recovery) ;;
-		*) die "'$phase' is not a phase that can be resumed. Try assert, greeter, session, desktop, portals, power or recovery." ;;
+		assert | greeter | session | desktop | portals | power | rollback | recovery) ;;
+		*) die "'$phase' is not a phase that can be resumed. Try assert, greeter, session, desktop, portals, power, rollback or recovery." ;;
 		esac
 
 		case "$phase" in
@@ -276,6 +281,7 @@ run_phases() {
 		desktop) phase_desktop ;;
 		portals) phase_portals ;;
 		power) phase_power ;;
+		rollback) phase_rollback ;;
 		recovery) phase_recovery ;;
 		esac
 	done
@@ -1014,6 +1020,134 @@ phase_reconcile() {
 		'chmod +x /tmp/checks/assert-m2.sh && sudo /tmp/checks/assert-m2.sh gary'
 }
 
+# M5: break the machine on purpose, roll it back, and check it came back.
+#
+# Everything broken here is inside @, which is the only thing archwork-rollback
+# touches. That is not incidental to the test, it is the test: a break on the
+# ESP or in /home would survive the rollback by design, and choosing one of
+# those would prove the rollback had failed when it had done exactly what
+# storage-boot.md says.
+#
+# The package removal is the point of the last criterion. /usr and
+# /var/lib/pacman both live in @ and roll back together, so pacman's idea of
+# what is installed and what is actually on disk stay in step. If @var_lib were
+# ever carved out, they would not, and this is the check that would notice.
+phase_rollback() {
+	log "Phase 11: break the machine, roll it back, check it came back"
+
+	ssh "${SSH_OPTS[@]}" gary@127.0.0.1 'mkdir -p /tmp/checks'
+
+	printf '\nBefore anything is broken\n'
+	ssh "${SSH_OPTS[@]}" gary@127.0.0.1 'sudo /usr/local/bin/archwork-health' ||
+		die "the machine was not healthy before the rollback test, so nothing after this would mean anything"
+
+	log "Taking the snapshot to roll back to"
+	ssh "${SSH_OPTS[@]}" gary@127.0.0.1 'sudo /usr/local/bin/archwork-snapshot' ||
+		die "could not take a snapshot to roll back to"
+
+	# The name goes into a file on the guest and expands there, the way
+	# phase_power hands over T0. A snapshot name pasted into a remote command
+	# is a remote command the local shell has already had an opinion about.
+	ssh "${SSH_OPTS[@]}" gary@127.0.0.1 \
+		'sudo /usr/local/bin/archwork-rollback list | tail -1 > /tmp/checks/snapshot'
+	local snapshot
+	snapshot="$(ssh "${SSH_OPTS[@]}" gary@127.0.0.1 'cat /tmp/checks/snapshot')"
+	[ -n "$snapshot" ] || die "archwork-rollback lists no snapshots, so btrbk did not make one"
+	log "Rolling back to $snapshot later"
+
+	# Break it. tailscale is a package the health check asks about by name, it
+	# is not needed to reach the machine over SSH, and removing it changes both
+	# /usr and /var/lib/pacman, which is the pair the last criterion is about.
+	log "Breaking the machine on purpose"
+	ssh "${SSH_OPTS[@]}" gary@127.0.0.1 \
+		'sudo systemctl stop tailscaled.service && sudo pacman -Rdd --noconfirm tailscale' ||
+		die "could not break the machine, so the rollback would prove nothing"
+
+	printf '\nWith the machine deliberately broken\n'
+	if ssh "${SSH_OPTS[@]}" gary@127.0.0.1 'sudo /usr/local/bin/archwork-health'; then
+		die "the health check passed on a machine with tailscale removed, so it is not checking what it claims"
+	fi
+	printf '  ok    the health check noticed\n'
+
+	log "Rolling back"
+	# The script asks for a typed confirmation, which is right at a keyboard
+	# and wrong here, so the answer goes in on stdin.
+	ssh "${SSH_OPTS[@]}" gary@127.0.0.1 \
+		'printf "rollback\n" | sudo /usr/local/bin/archwork-rollback to "$(cat /tmp/checks/snapshot)"' ||
+		die "archwork-rollback failed"
+
+	log "Rebooting onto the rolled-back root"
+	reboot_guest 420 || die "the guest did not come back after the rollback"
+
+	printf '\nAfter the rollback\n'
+	ssh "${SSH_OPTS[@]}" gary@127.0.0.1 'sudo /usr/local/bin/archwork-health' ||
+		die "the health check still fails after the rollback"
+	printf '  ok    the health check passes again\n'
+
+	# The criterion in plan.md, and the reason /var/lib may never be carved
+	# out of @. -Qk asks pacman whether the files it believes it installed are
+	# on the disk; a database that rolled back separately from the files it
+	# describes answers no.
+	ssh "${SSH_OPTS[@]}" gary@127.0.0.1 'sudo pacman -Qk >/dev/null 2>&1' ||
+		die "pacman -Qk disagrees with the disk after the rollback, which is a broken subvolume boundary"
+	printf '  ok    pacman agrees with what is on disk\n'
+
+	ssh "${SSH_OPTS[@]}" gary@127.0.0.1 'pacman -Q tailscale >/dev/null 2>&1' ||
+		die "tailscale did not come back, so the rollback did not restore @"
+	printf '  ok    the package that was removed is back\n'
+}
+
+# Reboot the guest and wait for it to answer again. Shared by the rollback
+# phase and anything else that needs the machine to come back rather than to
+# stop, unlike phase_recovery, which wants QEMU to exit.
+reboot_guest() {
+	local deadline="${1:-420}"
+
+	local shutdown_log="$WORK_DIR/reboot-console.log"
+	python3 "$SCRIPT_DIR/serial-log.py" \
+		--socket "$WORK_DIR/serial.sock" --out "$shutdown_log" &
+	local serial_logger=$!
+
+	ssh "${SSH_OPTS[@]}" gary@127.0.0.1 'sudo systemctl reboot' || true
+
+	local waited=0
+	while kill -0 "$QEMU_PID" 2>/dev/null; do
+		sleep 2
+		waited=$((waited + 2))
+		if [ "$waited" -ge "$deadline" ]; then
+			kill "$serial_logger" 2>/dev/null || true
+			printf '\nthe last thing the console said:\n' >&2
+			tr -d '\033' <"$shutdown_log" 2>/dev/null | tail -n 25 >&2 || true
+			return 1
+		fi
+	done
+	kill "$serial_logger" 2>/dev/null || true
+	wait "$serial_logger" 2>/dev/null || true
+	QEMU_PID=""
+
+	start_installed_vm
+
+	python3 "$SCRIPT_DIR/serial-unlock.py" \
+		--socket "$WORK_DIR/serial.sock" \
+		--passphrase-file "$WORK_DIR/passphrase" \
+		--log "$WORK_DIR/boot-console.log" || return 1
+
+	# 150 attempts rather than 60. The machine this waits for has just been
+	# through a full M4 run, a suspend, a wake and a rollback, and its first
+	# boot on a fresh @ is not the quick one. Run 11 on 2026-09-02 reached a
+	# login prompt on the serial console and then ran out of SSH attempts
+	# while it was still starting services, so the phase reported a rollback
+	# failure against a machine that was fine: booting the same disk by hand
+	# afterwards answered SSH immediately, and re-running the phase alone
+	# passed every check.
+	local attempt
+	for attempt in $(seq 1 150); do
+		ssh "${SSH_OPTS[@]}" gary@127.0.0.1 true 2>/dev/null && return 0
+		sleep 2
+	done
+	return 1
+}
+
 # plan.md M1 requires the recovery UKI to boot, not merely to exist. Assert it
 # by booting it: anything less proves the file is present and nothing else.
 phase_recovery() {
@@ -1119,6 +1253,9 @@ main() {
 			phase_portals
 			if [ "$POWER" = true ]; then
 				phase_power
+			fi
+			if [ "$ROLLBACK" = true ]; then
+				phase_rollback
 			fi
 		fi
 		phase_recovery

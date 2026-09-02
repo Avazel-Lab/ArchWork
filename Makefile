@@ -12,7 +12,7 @@ SHELL := /usr/bin/env bash
 SHELL_SCRIPTS := $(shell find . -name '*.sh' -not -path './.git/*' 2>/dev/null) \
                  $(shell grep -rl '^#!/usr/bin/env bash' scripts tests 2>/dev/null | grep -v '\.sh$$')
 
-.PHONY: check lint tracking shellcheck yamllint ansible-lint unit vm-idempotence vm-rebuild vm-power vm-health vm-recovery help
+.PHONY: check lint tracking shellcheck yamllint ansible-lint unit vm-idempotence vm-rebuild vm-power vm-rollback vm-recovery help
 
 ## check: L0 lint plus the plan/status cross-check
 check: tracking lint unit
@@ -72,8 +72,17 @@ vm-power:
 	@mkdir -p "$(VM_TMPDIR)"
 	TMPDIR="$(VM_TMPDIR)" tests/vm/run-install.sh --iso "$(ISO)" --reconcile --power $(VM_ARGS)
 
-# L4 and L5 arrive with M5. CI cannot run these, and no CI job should pretend to.
-vm-health vm-recovery:
+## vm-rollback: L4, break a machine on purpose and roll it back. Pass ISO=/path/to.iso
+vm-rollback:
+	@test -n "$(ISO)" || { echo "vm-rollback needs ISO=/path/to/archlinux.iso"; exit 1; }
+	@mkdir -p "$(VM_TMPDIR)"
+	TMPDIR="$(VM_TMPDIR)" tests/vm/run-install.sh --iso "$(ISO)" --reconcile --rollback $(VM_ARGS)
+
+# vm-health is not a target. archwork-health runs on the machine, and the
+# rollback phase runs it three times: before the break, after it, and after the
+# rollback. A separate target that only ran it once on a healthy machine would
+# be a check that has never been shown to fail.
+vm-recovery:
 	@echo "$@ is not implemented yet. See docs/plan.md for which milestone delivers it."
 	@exit 1
 

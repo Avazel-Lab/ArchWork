@@ -1,0 +1,23 @@
+# Snapshot @ before any package transaction (D-007).
+#
+# Managed by ArchWork. This is what snap-pac would have given free, and D-007
+# chose to write it rather than add a second snapshot tool alongside btrbk.
+#
+# Operation Remove is here as well as Install and Upgrade: a removal is exactly
+# as capable of leaving a machine that will not boot.
+[Trigger]
+Operation = Install
+Operation = Upgrade
+Operation = Remove
+Type = Package
+Target = *
+
+[Action]
+Description = Taking a pre-transaction Btrfs snapshot...
+When = PreTransaction
+Exec = /usr/local/bin/archwork-snapshot
+# The snapshot is a safety net, not the point of the transaction. A machine
+# left unpatched because its safety net broke is worse off than one updated
+# without a snapshot, so this never aborts the transaction. archwork-snapshot
+# prints loudly when it fails.
+AbortOnFail = false

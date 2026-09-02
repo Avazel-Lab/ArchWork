@@ -14,3 +14,7 @@
     - services
     - session
     - power
+    # Snapshots, the update path and the health checks (M5, D-007). Last,
+    # because the pacman hook it places calls a script the earlier roles have
+    # to have installed first.
+    - snapshots

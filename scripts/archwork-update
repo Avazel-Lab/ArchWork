@@ -1,0 +1,205 @@
+#!/usr/bin/env bash
+#
+# The safe update workflow (M5).
+#
+# Snapshot, then Arch packages, then AUR packages, then reconcile configuration,
+# then check the machine is still itself. In that order, and stopping where it
+# matters.
+#
+# Installed to /usr/local/bin/archwork-update. Unlike archwork-rollback,
+# archwork-health and archwork-snapshot, this one does need the repository: the
+# reconcile step runs the playbook out of the clone. It says so rather than
+# failing obscurely when the clone is missing.
+
+set -euo pipefail
+
+REPO_DIR="${ARCHWORK_REPO_DIR:-}"
+DRY_RUN=false
+SKIP_AUR=false
+SKIP_RECONCILE=false
+SKIP_SNAPSHOT=false
+
+ID="${ID:-id}"
+PACMAN="${PACMAN:-pacman}"
+PARU="${PARU:-paru}"
+SNAPSHOT="${ARCHWORK_SNAPSHOT:-/usr/local/bin/archwork-snapshot}"
+HEALTH="${ARCHWORK_HEALTH:-/usr/local/bin/archwork-health}"
+
+usage() {
+	cat <<'USAGE'
+archwork-update [--dry-run] [--skip-aur] [--skip-reconcile] [--no-snapshot]
+                [--repo PATH]
+
+Updates this machine the safe way:
+
+  1. a pre-update Btrfs snapshot, through btrbk
+  2. Arch packages, pacman -Syu
+  3. AUR packages, paru, built in the clean chroot
+  4. configuration, by running the playbook against this machine
+  5. health checks
+
+Stops at the first failure in steps 1 to 4. Step 5 always runs, because a
+machine that failed halfway through is exactly the one worth checking.
+
+  --dry-run          say what each step would do, change nothing
+  --skip-aur         Arch packages only
+  --skip-reconcile   do not run the playbook
+  --no-snapshot      update without a snapshot behind it, on purpose. Without
+                     this, a snapshot that cannot be taken stops the update
+  --repo PATH        the ArchWork clone, default: found under /home
+USAGE
+}
+
+die() {
+	printf 'error: %s\n' "$1" >&2
+	exit 1
+}
+
+step() {
+	printf '\n==> %s\n' "$1"
+}
+
+# The clone the reconcile step needs. Looked for rather than assumed, because
+# the administrator account's name is a group variable and this script has no
+# way to read one.
+#
+# An explicit --repo is checked as hard as a discovered one. Taking it on trust
+# means the update snapshots, updates every package, and only then discovers
+# there is no playbook to run, which is the worst place to find out.
+repo_is_usable() {
+	[ -f "$1/ansible/site.yml" ]
+}
+
+find_repo() {
+	if [ -n "$REPO_DIR" ]; then
+		repo_is_usable "$REPO_DIR" || return 1
+		printf '%s' "$REPO_DIR"
+		return 0
+	fi
+	local home
+	for home in /home/*; do
+		repo_is_usable "$home/src/ArchWork" || continue
+		printf '%s' "$home/src/ArchWork"
+		return 0
+	done
+	return 1
+}
+
+run_cmd() {
+	if [ "$DRY_RUN" = true ]; then
+		printf '  would run:'
+		printf ' %q' "$@"
+		printf '\n'
+		return 0
+	fi
+	"$@"
+}
+
+# paru refuses to run as root and builds as the invoking user, so the AUR step
+# has to drop to the account that owns the clone rather than staying root.
+repo_owner() {
+	stat -c '%U' "$1"
+}
+
+main() {
+	while [ $# -gt 0 ]; do
+		case "$1" in
+		--dry-run) DRY_RUN=true; shift ;;
+		--skip-aur) SKIP_AUR=true; shift ;;
+		--skip-reconcile) SKIP_RECONCILE=true; shift ;;
+		--no-snapshot) SKIP_SNAPSHOT=true; shift ;;
+		--repo) REPO_DIR="${2:-}"; shift 2 ;;
+		-h | --help) usage; exit 0 ;;
+		*) die "unknown option '$1'. Run --help." ;;
+		esac
+	done
+
+	if [ "$DRY_RUN" != true ] && [ "$("$ID" -u)" -ne 0 ]; then
+		die "this needs root for pacman and the playbook. Run it with sudo."
+	fi
+
+	local repo=""
+	if [ "$SKIP_RECONCILE" != true ]; then
+		repo="$(find_repo)" || {
+			if [ -n "$REPO_DIR" ]; then
+				die "'$REPO_DIR' has no ansible/site.yml in it, so it is not an ArchWork clone"
+			fi
+			die "no ArchWork clone found under /home. Pass --repo, or --skip-reconcile to update packages only."
+		}
+	fi
+
+	# A failed snapshot stops this, and deliberately does not stop the pacman
+	# hook, which sets AbortOnFail = false. The two are different situations.
+	# The hook fires on every transaction, including ones nobody thought of as
+	# an update, and aborting those would make the machine unmanageable. This
+	# command is someone asking for the safe workflow by name, so the honest
+	# answer when the safety net is broken is to say so rather than to quietly
+	# do the unsafe thing. pacman -Syu is still right there for anyone who
+	# wants it, and --no-snapshot says it on purpose.
+	step "Pre-update snapshot"
+	if [ "$SKIP_SNAPSHOT" = true ]; then
+		printf 'skipped, so there is no way back from this update but a reinstall\n'
+	elif [ ! -x "$SNAPSHOT" ]; then
+		die "$SNAPSHOT is not installed, so this update would have no way back. Install it, or pass --no-snapshot to update anyway."
+	elif [ "$DRY_RUN" = true ]; then
+		run_cmd "$SNAPSHOT" --dry-run
+	elif ! "$SNAPSHOT"; then
+		die "the pre-update snapshot failed, so nothing has been updated. Fix btrbk, or pass --no-snapshot to update without one."
+	fi
+
+	step "Arch packages"
+	run_cmd "$PACMAN" -Syu --noconfirm ||
+		die "pacman failed. Nothing after this has run; the snapshot above is the way back."
+
+	if [ "$SKIP_AUR" = true ]; then
+		step "AUR packages, skipped"
+	else
+		step "AUR packages"
+		if command -v "$PARU" >/dev/null 2>&1; then
+			local owner="root"
+			[ -n "$repo" ] && owner="$(repo_owner "$repo")"
+			# --chroot keeps the build off the workstation (D-005). runuser
+			# rather than sudo: root becomes another user without needing a
+			# rule, and paru refuses to run as root.
+			run_cmd runuser -u "$owner" -- \
+				"$PARU" --sync --sysupgrade --aur --noconfirm --chroot ||
+				die "paru failed. Arch packages are updated and the AUR set is not."
+		else
+			printf 'paru is not installed, so there is no AUR set to update\n'
+		fi
+	fi
+
+	if [ "$SKIP_RECONCILE" = true ]; then
+		step "Configuration, skipped"
+	else
+		step "Configuration"
+		# The same command M2 uses, against the committed inventory, with the
+		# machine limiting itself to its own host. uname -n rather than
+		# hostname: a base Arch install has no hostname binary, and an empty
+		# -l pattern means every host rather than none.
+		local host
+		host="$(uname -n)"
+		[ -n "$host" ] || die "this machine does not know its own name, so -l would match everything"
+		run_cmd env -C "$repo/ansible" ansible-playbook -l "$host" site.yml ||
+			die "reconciliation failed. Packages are updated and configuration is not."
+	fi
+
+	step "Health checks"
+	if [ ! -x "$HEALTH" ]; then
+		printf 'warning: %s is not installed, so nothing checked this machine\n' "$HEALTH" >&2
+		return 0
+	fi
+	if [ "$DRY_RUN" = true ]; then
+		run_cmd "$HEALTH"
+		return 0
+	fi
+	if ! "$HEALTH"; then
+		printf '\nThe update finished and the health checks did not pass.\n' >&2
+		printf 'Roll back with: archwork-rollback list, then archwork-rollback to SNAPSHOT\n' >&2
+		return 1
+	fi
+}
+
+if [ "${BASH_SOURCE[0]}" = "$0" ]; then
+	main "$@"
+fi
