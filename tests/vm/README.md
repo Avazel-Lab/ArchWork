@@ -9,14 +9,35 @@ job that skips itself and reports green is worse than no job. See
 
 ## Work directory and memory
 
-The harness writes the disk image into `${TMPDIR:-/tmp}`. With the M2 package
-set that image reaches roughly 4.4G. Where `/tmp` is a tmpfs, as it is on
-Ubuntu, that sits in RAM alongside the guest's own memory. Set `TMPDIR` to
-somewhere disk-backed on a machine with less RAM to spare:
+The harness writes the disk image into `${TMPDIR:-/tmp}`, and that image
+reached 9.8G on the M4 runs. Where `/tmp` is a tmpfs, as it is on Ubuntu, the
+image sits in RAM alongside the guest's own memory, and the filesystem is far
+smaller than a disk.
+
+Two things now stop that happening, because for a while only a comment did.
+The `make vm-*` targets point `TMPDIR` at `~/.cache/archwork/vm-tmp`, and
+`run-install.sh` refuses to start in a tmpfs or in under 24 GiB whatever
+`TMPDIR` says. Running the script directly, with a `TMPDIR` of your own, gets
+the refusal rather than the failure:
+
+```
+error: /tmp is tmpfs, which is RAM. The guest disk grows past 9 GiB, so a run
+there competes with the machine for memory and stops the moment the filesystem
+fills. Set TMPDIR to somewhere with room: TMPDIR=~/.cache/archwork/vm-tmp make ...
+```
+
+Point the targets somewhere else with `VM_TMPDIR`:
 
 ```bash
-TMPDIR=~/.cache/archwork make vm-idempotence ISO=/path/to/archlinux.iso
+VM_TMPDIR=/mnt/scratch make vm-idempotence ISO=/path/to/archlinux.iso
 ```
+
+What it looks like when nothing checks: on 2026-09-01 a `vm-power` run went
+into a 16 GiB tmpfs that already held a kept run, filled it, and QEMU paused
+the guest on ENOSPC. A paused guest and a slow one look identical from the
+outside, so it sat there for nine and a half hours before anyone asked QEMU
+what its run state was. The recovery-boot timeout now asks that question and
+prints the answer.
 
 ## What you need
 
