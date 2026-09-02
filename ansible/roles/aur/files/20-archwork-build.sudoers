@@ -1,0 +1,17 @@
+# The build account may run the package tools without a password (D-033).
+#
+# Managed by ArchWork. paru refuses to run as root, so the AUR set is installed
+# as archwork-build, and that account needs to reach pacman and the devtools
+# chroot helpers to do it. Without this the reconcile stops dead at the first
+# AUR package, which is where it stopped on 2026-09-02.
+#
+# This reverses D-018's "nothing in sudoers" deliberately, and D-033 records
+# why. The short version: pacman installing a package runs that package's own
+# scripts as root whoever invoked it, so this is a root-equivalent grant and
+# should be read as one. It is acceptable here because the account is locked,
+# has no password and no authorized keys, exists only for this role, and the
+# reconcile that drives it is already running as root.
+#
+# Scoped to the binaries the chroot build path uses rather than to ALL, so that
+# the grant is at least legible. Do not widen it without amending D-033.
+archwork-build ALL=(root) NOPASSWD: /usr/bin/pacman, /usr/bin/makechrootpkg, /usr/bin/mkarchroot, /usr/bin/arch-nspawn

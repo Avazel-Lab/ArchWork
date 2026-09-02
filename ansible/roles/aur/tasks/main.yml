@@ -17,8 +17,9 @@
 
 - name: Create the build user
   # makepkg refuses to run as root, so the build needs an unprivileged account
-  # to drop into. It holds no privileges of its own: a locked password, no
-  # authorized keys, and nothing in sudoers (D-018).
+  # to drop into. A locked password, no authorized keys and no login route
+  # (D-018). It is no longer true that it appears in no sudoers file: D-033
+  # gives it the package tools, because paru refuses to run as root.
   ansible.builtin.user:
     name: "{{ archwork_build_user }}"
     system: true
@@ -135,6 +136,23 @@
         cmd: pacman -U --noconfirm {{ aur_paru_package.stdout_lines | first }}
       changed_when: true
 
+- name: Let the build account reach the package tools
+  # paru refuses to run as root, so the install below runs as the build user,
+  # and that user needs pacman and the devtools chroot helpers (D-033). This
+  # reverses the "nothing in sudoers" half of D-018 on purpose.
+  #
+  # validate is not optional here. A malformed sudoers file locks everyone out
+  # of sudo on a machine whose whole recovery story assumes you can get back
+  # in, and visudo -cf is what stops this role ever shipping one.
+  ansible.builtin.copy:
+    src: 20-archwork-build.sudoers
+    dest: /etc/sudoers.d/20-archwork-build
+    owner: root
+    group: root
+    mode: "0440"
+    validate: visudo -cf %s
+  become: true
+
 - name: Install the AUR package set
   # paru builds through the same chroot, so this never leaves make dependencies
   # on the workstation (D-005). The shared list and the profile list are
@@ -147,4 +165,10 @@
   register: aur_paru_sync
   when: (archwork_packages_aur + archwork_packages_aur_profile) | length > 0
   changed_when: "'there is nothing to do' not in aur_paru_sync.stdout | lower"
+  # As the build user, not root: paru refuses to run as root and says so rather
+  # than doing anything (D-033). HOME is set explicitly because become does not
+  # give a login shell, and paru keeps its clone cache under it.
   become: true
+  become_user: "{{ archwork_build_user }}"
+  environment:
+    HOME: "{{ archwork_build_home }}"

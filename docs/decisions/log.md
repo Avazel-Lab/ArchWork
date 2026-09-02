@@ -425,6 +425,8 @@ D-005 settled that AUR packages build in a clean chroot rather than on the works
 
 So the build gets its own system account, with a locked password, no authorized keys and no login route. It holds no privileges of its own and appears in no sudoers file. Ansible already runs the reconciliation as root, and root becomes another user without needing a rule.
 
+**Amended on 2026-09-02 by D-033.** The last two sentences are no longer true and are left standing so that the change is visible rather than tidied away. The account now has `/etc/sudoers.d/20-archwork-build`, letting it run `pacman`, `makechrootpkg`, `mkarchroot` and `arch-nspawn` as root without a password, because `paru` refuses to run as root and the AUR set cannot be installed otherwise. Read that grant as root-equivalent, not narrow: D-033 explains why it is acceptable here and why D-025's removal of the `docker` group is not the same situation.
+
 `makechrootpkg` fits this exactly, once read rather than assumed. Its `check_root` returns immediately when `EUID` is 0, so the tool expects to be root and re-execs itself under sudo when it is not, and `-U` names the unprivileged account it drops to for the makepkg step.
 
 Rejected alternatives:
@@ -798,7 +800,7 @@ Also unproven and worth saying plainly: the HP LaserJet Pro MFP M28w has its who
 
    Recommendation: leave it out of the manifest and install Codex through npm in the user's own environment, the way its upstream documents. The reason is not the vote count, it is that `paru --chroot` on an auto-updated PKGBUILD makes an unattended rebuild depend on an unpinned third party, and D-005 routed AUR builds through a clean chroot precisely to bound what a package build can touch. If it should be in the manifest anyway, `openai-codex-bin` is the one.
 
-   **Still open on 2026-09-01.** The other three questions here are answered; this one was asked back rather than decided, so Codex is in no manifest and nothing installs it. Whichever way it goes, it changes one line.
+   **Answered on 2026-09-02: npm, by hand.** The unofficial AUR package is not trusted enough to sit in the rebuild path. Codex stays out of every manifest and `applications.md` gains no package name for it: installing it is `npm install -g @openai/codex` in the owner's own account, repeated after a rebuild like anything else outside the reproducible path. That is a deliberate hole in reproducibility, accepted because Codex is a tool the owner uses rather than something the platform depends on.
 
 2. **Python 3.13, "managed explicitly rather than depending on Arch's rolling system Python staying at 3.13".** `applications.md` asks for this and names no mechanism. The system `python` package is whatever Arch has moved to, which is exactly what the line is written against. The options are an AUR `python313` alongside the system interpreter, or a version manager such as `uv`, `mise` or `pyenv` owning it in the user's home.
 
@@ -820,7 +822,7 @@ Also unproven and worth saying plainly: the HP LaserJet Pro MFP M28w has its who
 
 ## D-031 paru cannot install as root, and the AUR path had never run
 
-**Status:** open, and it blocks the application manifests
+**Status:** answered, see D-033
 **Date:** 2026-09-02
 **Affects:** D-005, D-018, D-029, M2, M5, M7
 
@@ -842,8 +844,37 @@ Three real options.
 
 3. **A local repository.** paru builds into a directory that is a pacman repository, and pacman installs from it as root the ordinary way. Root never builds, the build user never gains sudo, and dependency resolution stays with the tool that understands it. It is the most machinery of the three and the only one that leaves both halves of D-018 intact.
 
-Recommendation: option 3, and option 2 if that turns out to need more moving parts than it is worth. Not option 1, because a root-equivalent grant to an account created for unattended builds is exactly the thing D-018 and D-025 both decided against, and it would be reversing two accepted decisions to save an afternoon.
+Recommendation was option 3, and it was wrong in a way worth leaving visible. A local repository does not remove the need to run paru as a non-root user; it only changes what happens after the build. It is option 1 or option 2 with a repository on top, not an alternative to either.
+
+**Answered on 2026-09-02: option 1, the narrow sudoers rule.** D-033 records it and amends D-018.
 
 This is the repository owner's call. Until it is made, `archwork_packages_aur` cannot be installed, which blocks the application manifests, which blocks M7's manifest criterion.
 
 **A second thing this run surfaced, smaller and not blocking.** paru asked which provider to use for `java-runtime-headless`, `cargo`, and for four of the AUR names themselves, where `fsearch`, `claude-code`, `epsonscan2`, `protonup-qt` and `opendeck` each have `-git` or `-bin` siblings. `--noconfirm` takes the default, which is the first listed, so an unattended run silently picks `jdk-openjdk` and `rust` and the non-suffixed AUR package. That happens to be what is wanted in every case here. It is still a dependency chosen by list order rather than by anyone, and whichever option above is taken should pin the providers explicitly.
+
+## D-033 The build account may run the package tools, and D-018 is amended
+
+**Status:** accepted
+**Date:** 2026-09-02
+**Affects:** D-005, D-018, D-025, D-031, M2, M7
+
+D-031 found that `paru` refuses to run as root, so the task that installs the AUR set had never worked. The repository owner chose the narrow sudoers rule on 2026-09-02, from the four options D-031 lists.
+
+`/etc/sudoers.d/20-archwork-build` lets `archwork-build` run `pacman`, `makechrootpkg`, `mkarchroot` and `arch-nspawn` as root without a password, and the install task runs as that user instead of as root. Scoped to those four rather than to `ALL`, so the grant is at least legible, and written with `validate: visudo -cf %s`, because a malformed sudoers file locks everyone out of sudo on a machine whose recovery story assumes you can get back in.
+
+**This reverses half of D-018, and it should be read as reversed rather than as narrowed.** `pacman -U` runs the installed package's own scripts as root whoever invoked it, so the grant is root-equivalent no matter how short the list of binaries is. D-018 said the build account "holds no privileges of its own"; that is now untrue and this entry is where a future reader should find out.
+
+What makes it acceptable, in the order the argument actually runs:
+
+- The reconcile driving it is already root. This does not widen what an ArchWork update can do; it widens what the build account can do, which is a much smaller set.
+- The account is locked, has no password, no authorized keys and no login shell anyone uses. Nothing reaches it except this role.
+- Installing an AUR package means trusting it as root regardless. The alternative is not a safer install, it is not installing AUR packages.
+
+D-025 removed the `docker` group on adjacent reasoning, and the difference is worth stating so the two do not read as inconsistent. That group was a standing grant to a *human* account for a daemon nothing on the machine was meant to use. This is a grant to a service account for the one thing it exists to do.
+
+Rejected alongside: option 2, Ansible driving `makechrootpkg` per package, which moves AUR dependency resolution into a playbook and reimplements paru badly; and option 3, a local repository, which does not solve the problem on its own and adds machinery on top of whichever option does.
+
+Consequences:
+
+- `applications-tooling.md` and D-018's wording both need correcting to say the build account has this grant. Until they are, D-018 contradicts the code, which `CLAUDE.md` says is worse than no document.
+- The AUR path still has never completed. This unblocks it; it does not prove it. The run that does is the evidence.
