@@ -887,7 +887,7 @@ Consequences:
 
 ## D-034 Two applications want different Chromiums
 
-**Status:** open, and it blocks the AUR set
+**Status:** accepted
 **Date:** 2026-09-02
 **Affects:** `applications.md`, D-029, M7
 
@@ -914,4 +914,10 @@ Recommendation: option 1, the repository package, and amend `applications.md` ra
 
 If the ungoogled build matters more than the update lag, option 2 is legitimate and the manifest change is one line, plus whatever makes the replacement non-interactive.
 
-Either way `applications.md` needs editing, because right now it lists two applications that cannot both be installed and does not say so.
+**Answered on 2026-09-02: option 2, `ungoogled-chromium-bin`.** The recommendation was overruled, and the reasoning it rested on is worth keeping visible rather than deleting: this does mean the browser engine on the machine, used both for browsing and for rendering diagrams, updates when an AUR maintainer rebuilds rather than when Arch ships a fix. That is the cost being accepted, deliberately, for a build without Google's services in it.
+
+What makes it work: `mermaid-cli` needs *a* chromium and `ungoogled-chromium-bin` provides one, so nothing is left unsatisfied. The two were only ever going to be the same program.
+
+How it is installed, since paru will not do it alone. `archwork_packages_aur_replaces` names the repository packages an AUR package replaces, and the aur role removes any that are installed with `pacman -Rdd` immediately before the AUR set goes in. `-Rdd` because the point is that something does still depend on the name: between those two tasks `mermaid-cli` has an unsatisfied dependency, and the window closes inside the same reconcile. The list is a variable rather than a hardcoded package name, because this role has no business knowing about Chromium and the next replacement should be one line in `group_vars`.
+
+`applications.md` still needs a sentence saying the two entries are the same program, so that the next reader does not rediscover this the way this run did.

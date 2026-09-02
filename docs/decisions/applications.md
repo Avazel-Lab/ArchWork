@@ -15,7 +15,7 @@ Package manifests grow milestone by milestone, so most of what is here is not in
 ## Browsers
 
 - **Zen Browser**, primary. Firefox/Gecko based.
-- **Ungoogled Chromium**, secondary. Chromium/Blink compatibility without Google's browser services.
+- **Ungoogled Chromium**, secondary. Chromium/Blink compatibility without Google's browser services. It is also the browser engine Mermaid renders diagrams through: `mermaid-cli` depends on a chromium, and this one provides it, so the two entries are one program (D-034). The cost of that choice is that browser updates arrive when the AUR maintainer rebuilds rather than when Arch ships them.
 
 ## Editors
 
@@ -208,7 +208,7 @@ SOPS was considered and is out of scope (D-024).
 
 ## Diagrams and documentation
 
-- **Mermaid** and the Mermaid CLI, diagrams as code for repositories and documentation.
+- **Mermaid** and the Mermaid CLI, diagrams as code for repositories and documentation. The CLI renders through a headless browser and pulls a chromium in as a dependency, which is Ungoogled Chromium above rather than a second copy (D-034).
 
 ## Phone integration
 

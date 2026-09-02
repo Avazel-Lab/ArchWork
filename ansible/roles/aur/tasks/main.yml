@@ -153,6 +153,43 @@
     validate: visudo -cf %s
   become: true
 
+- name: Find repository packages an AUR package is replacing
+  # D-034. An AUR package that declares conflicts= and provides= for a
+  # repository package is a drop-in replacement, and pacman would swap them
+  # given a confirmation. paru refuses before pacman ever sees it, saying it
+  # "can not install conflicting packages with --noconfirm", so there is no
+  # flag to answer and the repository package has to be gone first.
+  #
+  # Named in a variable rather than hardcoded here: this role has no business
+  # knowing about Chromium, and the next replacement should be one line in
+  # group_vars rather than an edit to a task.
+  ansible.builtin.command:
+    cmd: pacman -Q {{ item }}
+  register: aur_replaced_installed
+  loop: "{{ archwork_packages_aur_replaces }}"
+  changed_when: false
+  failed_when: false
+  check_mode: false
+  become: true
+
+- name: Remove them, so the AUR package can take their place
+  # -Rdd, because the whole point is that something still depends on the name
+  # being removed: mermaid-cli needs a chromium, and the AUR package provides
+  # one the moment it lands. Between this task and the next the dependency is
+  # unsatisfied, which is a real window and the reason this is here rather
+  # than in the packages role: it closes within the same reconcile.
+  ansible.builtin.command:
+    cmd: pacman -Rdd --noconfirm {{ item.item }}
+  loop: "{{ aur_replaced_installed.results | default([]) }}"
+  loop_control:
+    label: "{{ item.item }}"
+  when:
+    - not ansible_check_mode
+    - item.rc is defined
+    - item.rc == 0
+  changed_when: true
+  become: true
+
 - name: Install the AUR package set
   # paru builds through the same chroot, so this never leaves make dependencies
   # on the workstation (D-005). The shared list and the profile list are

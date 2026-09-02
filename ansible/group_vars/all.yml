@@ -167,6 +167,21 @@ archwork_packages_aur:
 # AUR packages for one profile only. Empty here, set in group_vars/desktop.yml.
 archwork_packages_aur_profile: []
 
+# Repository packages an AUR package above replaces (D-034).
+#
+# ungoogled-chromium-bin declares conflicts=chromium and provides=chromium, so
+# it is a drop-in replacement, and pacman would swap the two given a
+# confirmation. paru refuses before pacman sees it, so the repository package
+# has to be removed first and the aur role does that.
+#
+# chromium is here because mermaid-cli depends on it, which is how 417 MiB of
+# Google's Chromium arrived on every ArchWork machine as a dependency nobody
+# had looked at. The repository owner chose the ungoogled build on 2026-09-02:
+# mermaid-cli is satisfied by what it provides, so the diagram tool and the
+# secondary browser are now the same program, which they always were.
+archwork_packages_aur_replaces:
+  - chromium
+
 # Packages required on both profiles.
 #
 # Every entry traces to docs/decisions/applications-tooling.md or to a decision
