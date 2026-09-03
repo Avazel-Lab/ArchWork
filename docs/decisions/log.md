@@ -1097,3 +1097,70 @@ Claude Code has to be able to commit and push from `hmlxdesktop02`. `CLAUDE.md` 
 ### Fractional milestone numbers
 
 `M7.5` is the first. Milestone IDs are referenced from `docs/STATUS.yml`, the decision log and commit messages, so inserting a milestone renumbers nothing. `scripts/check-plan-status.py` accepted `M\d+` only and now accepts a fractional part.
+
+## D-037 virtio-gpu does not survive a suspend, and it takes the reboot with it
+
+**Status:** accepted for the harness, and it closes the run 21 blocker
+**Date:** 2026-09-03
+**Affects:** M4, M5, M7, `tests/vm/run-install.sh`, D-021
+
+Run 21 failed rebooting onto the rolled-back root, and every earlier explanation of it was wrong. It was not a slow boot, the SSH window was not too short, and the rollback had not broken the machine. The disk was kept, so what follows is the guest's own journal rather than an inference from outside. `@var_log` sits outside the rollback boundary, which is the only reason the evidence survived the rollback that preceded it.
+
+**The guest never rebooted, and it was never merely slow.** `journalctl --list-boots` shows one boot running from 02:30:32 to 04:15:42 while the harness waited and gave up at 04:16:13.
+
+Where the time went:
+
+    04:09:41  reboot requested from client PID 260211 ('systemctl')
+    04:09:42  Network Manager stopped, and most of the shutdown with it
+    04:11:12  systemd-logind.service: State 'stop-sigterm' timed out. Killing.
+    04:12:42  systemd-logind.service: Processes still around after SIGKILL. Ignoring.
+    04:13:00  kernel: INFO: task systemd-logind:598 blocked for more than 122 seconds
+    04:14:12  systemd-logind.service: State 'final-sigterm' timed out. Killing.
+    04:15:42  the rest of the shutdown ran, and journald flushed
+
+SIGKILL achieved nothing because the task was in uninterruptible sleep, in the DRM modeset lock:
+
+    task:systemd-logind  state:D
+     drm_modeset_lock ... drm_fb_helper_set_par ... fbcon_blank
+     do_unblank_screen ... vt_ioctl
+
+**What actually holds that lock.** A kernel worker, blocked in the same shutdown:
+
+    task:kworker/u16:9  state:D   Workqueue: events_unbound commit_work
+     virtio_gpu_queue_fenced_ctrl_buffer [virtio_gpu]
+     virtio_gpu_primary_plane_update [virtio_gpu]
+     drm_atomic_helper_commit_planes ... commit_tail
+
+That worker is waiting for the virtio-gpu device to complete a fenced command on its control queue, after the guest has resumed from S3. It never does. The worker holds the DRM modeset lock across the atomic commit, so logind's console unblank blocks behind it, `(sd-close)` blocks behind it, and the shutdown cannot finish. This is an emulated device that does not resume, not a fault in anything this repository installs.
+
+It explains the one difference nobody could account for: the rollback phase passes when resumed on its own and fails inside a full run. Only a full run suspends, because only a full run has the power phase in it.
+
+### A wrong answer, tested and discarded
+
+The first diagnosis was that `nvidia-utils` ships `10-nvidia-no-freeze-session.conf` into all four sleep units, setting `SYSTEMD_SLEEP_FREEZE_USER_SESSIONS=false`, so the compositor keeps running across a sleep and is still holding DRM when the reboot comes. systemd logs its own warning about that setting in the same journal, and `nvidia-utils` is desktop-profile only, which fitted the evidence.
+
+It is wrong. Putting session freezing back, confirmed in effect by the warning disappearing from the journal, changed nothing: the same logind, the same kworker, the same `virtio_gpu` stack, and no reboot within 700 seconds. Recorded here because it is a plausible enough story to be tried again by somebody reading only the first stack trace.
+
+### The measurements
+
+Same disk, same guest, same suspend, same wake, timed from the reboot request to QEMU exiting:
+
+| Display device | Sleep config | Reboot completed in |
+|---|---|---|
+| virtio-vga | as shipped | not within 700s |
+| virtio-vga | session freezing restored | not within 700s |
+| std VGA | as shipped | 4s |
+
+### What changes
+
+The harness boots the installed system on `-vga std` rather than virtio-vga. Nothing else moves. The guest keeps its serial console, its monitor socket, its 1280x800 framebuffer and its screen captures, so D-021 is unaffected: Hyprland starts on it, the greeter and the session both drew and both captured, and the desktop is the same desktop.
+
+Nothing real is lost by dropping virtio-gpu. No ArchWork machine has one. `hmlxdesktop02` has an RTX 3060 (D-027) and the laptop has Intel graphics, so virtio-gpu was only ever an artefact of the harness, and the only thing it was proving was itself.
+
+**No claim is made here about hardware.** This evidence is about an emulated device. Whether a real machine that has slept reboots promptly is a question for `hmlxdesktop02`, and M7.5 is the first thing that will put a person in front of one often enough to notice.
+
+### The deadlines were also wrong, separately
+
+`reboot_guest` allowed 420 seconds for QEMU to exit and `phase_recovery` allowed the same. systemd can legitimately spend 360 seconds on one unit that will not stop, before the rest of the shutdown starts. Both are now 600, both report QEMU's run state on timeout so that a sleeping guest and a stuck shutdown stop looking identical from outside, and `reboot_guest` prints how long the shutdown took and names this entry when it is slow.
+
+That hardening would not have saved run 21. Neither leg above finished at all, so no deadline was ever going to be long enough. It is worth having anyway: the next stuck shutdown should say what it was doing rather than leave someone to boot the disk afterwards and find out.
