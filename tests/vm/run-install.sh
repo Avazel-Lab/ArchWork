@@ -25,7 +25,21 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
 ISO=""
 PROFILE="desktop"
-DISK_SIZE="24G"
+# 64G, not the 24G that carried every run up to M4.
+#
+# The application manifests changed what a finished machine weighs. A run on
+# 2026-09-02 built the whole AUR set over 22 minutes and then could not commit
+# the transaction:
+#
+#   error: Partition / too full: 1049308 blocks needed, 1019783 blocks free
+#
+# The set is large on its own, LibreOffice and qemu-desktop and a Chromium and
+# an Electron editor, and paru keeps every package it builds under the build
+# cache as well, so the peak is roughly the installed size plus a copy.
+#
+# qcow2 is sparse, so this costs what the guest actually writes rather than
+# 64G of host disk per run.
+DISK_SIZE="64G"
 MEMORY="4096"
 CPUS="4"
 REPEAT=1
@@ -77,7 +91,7 @@ Required:
 Options:
   --profile NAME        desktop or laptop, default desktop
   --repeat N            consecutive runs, default 1. M1 needs 2.
-  --disk-size SIZE      default 24G
+  --disk-size SIZE      default 64G
   --memory MB           default 4096
   --cpus N              default 4
   --keep                keep the work directory, disk image included, so that
