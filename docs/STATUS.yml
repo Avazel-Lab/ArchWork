@@ -178,6 +178,24 @@ first_install:
 # D-029 also raises four questions the repository owner has to answer:
 # Codex CLI, how Python 3.13 is pinned, libvirt's two unnamed dependencies,
 # and the Epson scanner driver.
+# Run 21 on 2026-09-03 is the furthest any run has reached. In one pass it
+# installed 93 repository packages and 12 AUR packages, passed the dry run,
+# reconciled twice with the second reporting changed=0, reached a session,
+# skipped the wallpaper honestly because the guest has no GPU to draw it,
+# passed every M4 timing including the suspend at 1805s, ran archwork-update
+# through to its health checks for the first time, and broke itself on
+# purpose and watched the health check notice.
+#
+# It then failed rebooting onto the rolled-back root. That one step is all
+# that stands between this and a green run.
+#
+# What is known about it, rather than guessed: the same phase passes on its
+# own when resumed with --phases rollback, booting the same disk by hand
+# answers SSH immediately, the SSH window is 300 seconds where 120 also
+# failed, and start_installed_vm does remove the stale sockets. The one
+# difference between the passing case and the failing one is that the failing
+# one has been through M4's suspend and wake first.
+
 next_actions:
   - Find why the post-rollback reboot does not bring SSH back in a full run.
     The rollback phase passes on its own when resumed, and fails at the same
