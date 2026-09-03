@@ -12,7 +12,7 @@ SHELL := /usr/bin/env bash
 SHELL_SCRIPTS := $(shell find . -name '*.sh' -not -path './.git/*' 2>/dev/null) \
                  $(shell grep -rl '^#!/usr/bin/env bash' scripts tests 2>/dev/null | grep -v '\.sh$$')
 
-.PHONY: check lint tracking shellcheck yamllint ansible-lint unit vm-idempotence vm-rebuild vm-power vm-rollback vm-recovery help
+.PHONY: check lint tracking shellcheck yamllint ansible-lint unit vm-idempotence vm-rebuild vm-power vm-update vm-rollback vm-recovery help
 
 ## check: L0 lint plus the plan/status cross-check
 check: tracking lint unit
@@ -71,6 +71,12 @@ vm-power:
 	@test -n "$(ISO)" || { echo "vm-power needs ISO=/path/to/archlinux.iso"; exit 1; }
 	@mkdir -p "$(VM_TMPDIR)"
 	TMPDIR="$(VM_TMPDIR)" tests/vm/run-install.sh --iso "$(ISO)" --reconcile --power $(VM_ARGS)
+
+## vm-update: L4, run the update workflow on a built machine. Pass ISO=/path/to.iso
+vm-update:
+	@test -n "$(ISO)" || { echo "vm-update needs ISO=/path/to/archlinux.iso"; exit 1; }
+	@mkdir -p "$(VM_TMPDIR)"
+	TMPDIR="$(VM_TMPDIR)" tests/vm/run-install.sh --iso "$(ISO)" --reconcile --update $(VM_ARGS)
 
 ## vm-rollback: L4, break a machine on purpose and roll it back. Pass ISO=/path/to.iso
 vm-rollback:

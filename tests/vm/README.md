@@ -79,6 +79,38 @@ tests/vm/run-install.sh --resume ~/.cache/archwork/archwork-vm.XXXXXX \
 
 That took 38 seconds, against the 40 minutes a full run costs.
 
+## The update and rollback phases
+
+M5 describes two things that had never run outside a unit test.
+
+`--update` runs `archwork-update` on the built machine: the dry run first,
+because it is cheap and fails before anything is upgraded, then the real one.
+It asserts the machine is still healthy afterwards, which is a different
+question from whether the script exited zero, and that a snapshot was left
+behind, because a safety net that was never deployed is the failure an exit
+status hides.
+
+`--rollback` breaks the machine on purpose and puts it back. It proves the
+machine healthy, snapshots it, removes a package the health check asks about,
+asserts the check *notices*, rolls back, reboots and checks the machine is
+itself again. That fourth step is what keeps the rest honest: a break the
+checker cannot see would let the phase pass while proving nothing.
+
+What is broken is inside `@` deliberately. A break on the ESP or in `/home`
+would survive the rollback by design, so choosing one would report a failure
+when the rollback had done exactly what `storage-boot.md` says.
+
+```bash
+make vm-update ISO=/path/to/archlinux.iso
+make vm-rollback ISO=/path/to/archlinux.iso
+```
+
+The recovery phase then runs `archwork-rollback` from the rescue shell itself.
+There is no SSH there, no network and no sshd, so `serial-run.py` types on the
+console and reads the exit status back. D-014 put the script on the root
+filesystem rather than in the recovery initramfs, and this is the check that
+asks whether that decision holds.
+
 ## The power phase
 
 M4's criteria are wall clock timings, so measuring them costs wall clock time.

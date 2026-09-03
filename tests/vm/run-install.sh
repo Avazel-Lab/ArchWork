@@ -47,6 +47,7 @@ KEEP=false
 RECONCILE=false
 POWER=false
 ROLLBACK=false
+UPDATE=false
 WORK_DIR=""
 # A kept work directory to boot again instead of installing into a new one.
 # Set by --resume, and never a source of evidence: see run_phases.
@@ -199,6 +200,10 @@ parse_args() {
 			ROLLBACK=true
 			shift
 			;;
+		--update)
+			UPDATE=true
+			shift
+			;;
 		-h | --help)
 			usage
 			exit 0
@@ -270,8 +275,8 @@ validate_phases() {
 	local phase
 	for phase in ${PHASES//,/ }; do
 		case "$phase" in
-		assert | greeter | session | desktop | portals | power | rollback | recovery) ;;
-		*) die "'$phase' is not a phase that can be resumed. Try assert, greeter, session, desktop, portals, power, rollback or recovery." ;;
+		assert | greeter | session | desktop | portals | power | update | rollback | recovery) ;;
+		*) die "'$phase' is not a phase that can be resumed. Try assert, greeter, session, desktop, portals, power, update, rollback or recovery." ;;
 		esac
 
 		case "$phase" in
@@ -295,6 +300,7 @@ run_phases() {
 		desktop) phase_desktop ;;
 		portals) phase_portals ;;
 		power) phase_power ;;
+		update) phase_update ;;
 		rollback) phase_rollback ;;
 		recovery) phase_recovery ;;
 		esac
@@ -1034,6 +1040,54 @@ phase_reconcile() {
 		'chmod +x /tmp/checks/assert-m2.sh && sudo /tmp/checks/assert-m2.sh gary'
 }
 
+# M5's first exit criterion, which describes a workflow and had never been run.
+#
+# archwork-update is the one script in this repository that nothing exercised.
+# The rollback phase runs archwork-snapshot, archwork-health and
+# archwork-rollback between them, and the criterion that names the update
+# workflow, snapshot then Arch then AUR then reconcile then health, was
+# satisfied by unit tests with every step stubbed.
+#
+# On a machine built minutes earlier there is usually little to upgrade, and
+# that is fine: what is under test is the workflow reaching the end in the
+# right order on a real machine, not that Arch published something today.
+phase_update() {
+	log "Phase 12: the update workflow"
+
+	# The dry run first. It is cheap, it proves the script finds the clone and
+	# the order it would work in, and a failure here says so before anything
+	# has been upgraded.
+	ssh "${SSH_OPTS[@]}" gary@127.0.0.1 \
+		'sudo /usr/local/bin/archwork-update --dry-run' ||
+		die "archwork-update --dry-run failed, so the real one was not attempted"
+	printf '  ok    the dry run names every step and changes nothing\n'
+
+	# Then for real. --skip-aur, because paru upgrading the AUR set here would
+	# rebuild whatever moved since the reconcile twenty minutes ago, which is
+	# a test of the AUR mirrors rather than of this workflow, and the AUR path
+	# already has a phase of its own.
+	log "Running the update for real"
+	ssh "${SSH_OPTS[@]}" gary@127.0.0.1 \
+		'sudo /usr/local/bin/archwork-update --skip-aur' ||
+		die "archwork-update failed on a machine that was healthy before it ran"
+	printf '  ok    the update ran through to its health checks\n'
+
+	# The workflow ends in health checks and reports their result, so a pass
+	# above already means they passed. This asserts the machine is still
+	# itself afterwards, which is a different question from whether the script
+	# exited zero.
+	ssh "${SSH_OPTS[@]}" gary@127.0.0.1 'sudo /usr/local/bin/archwork-health' ||
+		die "the machine is not healthy after archwork-update"
+	printf '  ok    the machine is still itself afterwards\n'
+
+	# The snapshot the update took has to be there, or the safety net the
+	# whole workflow is built around was not deployed.
+	ssh "${SSH_OPTS[@]}" gary@127.0.0.1 \
+		'sudo /usr/local/bin/archwork-rollback list | grep -q .' ||
+		die "the update left no snapshot behind, so there is no way back from it"
+	printf '  ok    it left a snapshot to roll back to\n'
+}
+
 # M5: break the machine on purpose, roll it back, and check it came back.
 #
 # Everything broken here is inside @, which is the only thing archwork-rollback
@@ -1229,6 +1283,35 @@ phase_recovery() {
 		--fail-on "(account is locked|Cannot open access to console)" \
 		--log "$WORK_DIR/recovery-console.log" ||
 		die "the recovery UKI did not reach a rescue shell, see $WORK_DIR/recovery-console.log"
+
+	# M5 asks that the recovery UKI boots *and that the rollback script on it
+	# works*. Reaching a shell is the first half. D-014 put the script on the
+	# root filesystem rather than in the recovery initramfs, so whether it is
+	# reachable from here is a real question about that decision rather than a
+	# formality, and until now nothing asked it.
+	#
+	# There is no SSH in rescue mode: no network, no sshd. The only way in is
+	# to type on the console.
+	log "Running the rollback script from the rescue shell"
+
+	python3 "$SCRIPT_DIR/serial-run.py" \
+		--socket "$WORK_DIR/serial.sock" \
+		--command "test -x /usr/local/bin/archwork-rollback" \
+		--log "$WORK_DIR/recovery-console.log" ||
+		die "archwork-rollback is not on the recovery system, so D-014's delivery does not hold"
+	printf '  ok    the rollback script is present on the recovery system\n'
+
+	# list, not `to`. Listing has to unlock nothing and destroy nothing, and it
+	# still exercises the part that could fail here: mounting the Btrfs top
+	# level from a rescue environment and reading @snapshots. A rollback the
+	# operator could not list is a rollback they cannot choose.
+	python3 "$SCRIPT_DIR/serial-run.py" \
+		--socket "$WORK_DIR/serial.sock" \
+		--command "/usr/local/bin/archwork-rollback list" \
+		--timeout 180 \
+		--log "$WORK_DIR/recovery-console.log" ||
+		die "archwork-rollback could not list snapshots from the rescue shell, see $WORK_DIR/recovery-console.log"
+	printf '  ok    it lists snapshots from the rescue shell\n'
 }
 
 main() {
@@ -1267,6 +1350,9 @@ main() {
 			phase_portals
 			if [ "$POWER" = true ]; then
 				phase_power
+			fi
+			if [ "$UPDATE" = true ]; then
+				phase_update
 			fi
 			if [ "$ROLLBACK" = true ]; then
 				phase_rollback
