@@ -1215,6 +1215,35 @@ phase_recovery() {
 		--fail-on "(account is locked|Cannot open access to console)" \
 		--log "$WORK_DIR/recovery-console.log" ||
 		die "the recovery UKI did not reach a rescue shell, see $WORK_DIR/recovery-console.log"
+
+	# M5 asks that the recovery UKI boots *and that the rollback script on it
+	# works*. Reaching a shell is the first half. D-014 put the script on the
+	# root filesystem rather than in the recovery initramfs, so whether it is
+	# reachable from here is a real question about that decision rather than a
+	# formality, and until now nothing asked it.
+	#
+	# There is no SSH in rescue mode: no network, no sshd. The only way in is
+	# to type on the console.
+	log "Running the rollback script from the rescue shell"
+
+	python3 "$SCRIPT_DIR/serial-run.py" \
+		--socket "$WORK_DIR/serial.sock" \
+		--command "test -x /usr/local/bin/archwork-rollback" \
+		--log "$WORK_DIR/recovery-console.log" ||
+		die "archwork-rollback is not on the recovery system, so D-014's delivery does not hold"
+	printf '  ok    the rollback script is present on the recovery system\n'
+
+	# list, not `to`. Listing has to unlock nothing and destroy nothing, and it
+	# still exercises the part that could fail here: mounting the Btrfs top
+	# level from a rescue environment and reading @snapshots. A rollback the
+	# operator could not list is a rollback they cannot choose.
+	python3 "$SCRIPT_DIR/serial-run.py" \
+		--socket "$WORK_DIR/serial.sock" \
+		--command "/usr/local/bin/archwork-rollback list" \
+		--timeout 180 \
+		--log "$WORK_DIR/recovery-console.log" ||
+		die "archwork-rollback could not list snapshots from the rescue shell, see $WORK_DIR/recovery-console.log"
+	printf '  ok    it lists snapshots from the rescue shell\n'
 }
 
 main() {
