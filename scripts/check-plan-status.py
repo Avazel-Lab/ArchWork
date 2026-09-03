@@ -32,7 +32,9 @@ VALID_REBUILD = {"never-run", "passed", "failed", "superseded"}
 VALID_INSTALL = {"never-run", "passed", "failed"}
 PROFILES = {"desktop", "laptop"}
 
-MILESTONE_HEADING = re.compile(r"^### (M\d+) ", re.MULTILINE)
+# A milestone inserted between two numbered ones takes a fractional ID rather
+# than renumbering everything after it. M7.5 is the first (D-036).
+MILESTONE_HEADING = re.compile(r"^### (M\d+(?:\.\d+)?) ", re.MULTILINE)
 DECISION_HEADING = re.compile(r"^## (D-\d+) ", re.MULTILINE)
 
 errors: list[str] = []

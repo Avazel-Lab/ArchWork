@@ -1058,3 +1058,42 @@ Recommendation: switch both to `-bin`. It follows a decision already taken rathe
 Not decided here, because it changes which package the machine installs and that is `applications.md`'s business.
 
 **Deferred meanwhile.** Both are commented out of the manifests rather than deleted, with a pointer to this entry. M7's criterion allows an entry to be deliberately left out as long as the reason is written down, and this is that. The cost of leaving them in was the whole run, and everything else waiting behind them, M4's timings, M5's rollback and the wallpaper, has never been proven in a single pass.
+
+## D-036 The platform gets used before it is finished
+
+**Status:** accepted
+**Date:** 2026-09-03
+**Affects:** `docs/plan.md`, M7, M8, M7.5
+
+The repository owner asked for a minimum viable product: a machine with Zen Browser, Visual Studio Code and the Claude Code CLI on it, plus the tooling to develop this repository, usable for real work while the platform is still being built.
+
+Nothing in the manifests needs to change to get there. `zen-browser-bin`, `visual-studio-code-bin` and `claude-code` have been in `archwork_packages_aur` since D-029 on 2026-09-01, alongside `ansible`, `git`, `python`, `nodejs`, `github-cli` and `shellcheck` in the shared repository set. `hmlxdesktop02` was installed on 2026-08-30 at `f87cc05`, two days before that. The machine is not short of a decision. It is short of a deployment.
+
+**The plan gated this behind M7, and that gate is now wrong.** M7 wants three consecutive zero-touch rebuilds. No `vm-power` run has yet completed end to end. Holding the physical machine unusable until it does keeps every hour of development inside a VM harness that takes an hour a run, when the machine that would make development faster is already installed and already boots.
+
+So M7.5 is added between M7 and M8, and it does not wait for M7. M8 still does, and everything M8 asks for beyond a usable machine stays there.
+
+### What the milestone is not
+
+Four gaps were raised against this before it was accepted. The owner closed all four, and the closures are what make it small:
+
+- **Configuration drift.** Not a risk here, because nothing is configured by hand. Changes reach the machine through Ansible exactly as they reach a VM, and the machine gets redeployed from time to time. The drift detection this entry originally proposed is not needed and is out of scope.
+- **Getting back to Kubuntu.** Not a gap. Kubuntu remains the default boot entry and Arch is selected deliberately from the firmware boot menu. Nothing in this milestone touches the boot order.
+- **`/home` is unprotected.** Accepted knowingly. The whole Arch installation is disposable and losing it costs nothing. No backup, no `@home` snapshot, no NAS.
+- **End-to-end testing.** Stays in Kubuntu, and rebooting between the two is not a cost worth designing around.
+
+### Install fresh rather than reconcile
+
+Asked which was better for development, the owner left it to this entry. Install fresh.
+
+Reconciling the existing installation is faster by an hour or so and exercises the update path. It also leaves the machine's state as `f87cc05` plus an unrecorded number of reconciles, which is not a thing anyone can reproduce or point a commit SHA at. A fresh install from one commit on `main` gives the milestone an evidence line that means something, and it runs the installer and the AUR path on real hardware, which is the first exit criterion of M8 and has never been done with the applications present. The cost is an hour on a machine nobody is relying on yet.
+
+That choice is cheap to reverse. If the install proves awkward on the day, reconciling the existing machine reaches the same desktop and only the evidence is weaker.
+
+### Repository access from the machine
+
+Claude Code has to be able to commit and push from `hmlxdesktop02`. `CLAUDE.md` keeps SSH private keys out of the `age` set deliberately, so the key is generated on the machine and added to the GitHub account as a second key, with `gh auth login` alongside it for the API. Nothing is copied from `hmlxdesktop01` and nothing enters this repository.
+
+### Fractional milestone numbers
+
+`M7.5` is the first. Milestone IDs are referenced from `docs/STATUS.yml`, the decision log and commit messages, so inserting a milestone renumbers nothing. `scripts/check-plan-status.py` accepted `M\d+` only and now accepts a fractional part.
