@@ -930,6 +930,14 @@ How it is installed, since paru will not do it alone. `archwork_packages_aur_rep
 
 `applications.md` still needs a sentence saying the two entries are the same program, so that the next reader does not rediscover this the way this run did.
 
+**The first implementation of this was not idempotent, and the reason is the same shape as the bug it was fixing.** It asked `pacman -Q chromium`, which answers yes when something merely *provides* chromium. Once `ungoogled-chromium-bin` was installed, the second reconcile was told chromium was still there and then failed removing a package that no longer existed:
+
+    pacman -Rdd --noconfirm chromium -> non-zero
+
+The question meant was "is a package called chromium installed", and the question asked was "is the name chromium satisfied". A provider answers the second and not the first. It now reads `pacman -Qq`, which lists installed package names and resolves nothing, and tests exact membership.
+
+That is the third time in this work a check has been answered by something other than the thing it was about, after `hyprctl hyprpaper listloaded` and `no_suspend_logged_since`. M2's second-run-changes-nothing rule is what caught it, which is the rule doing exactly what it was written for.
+
 ## D-035 Two AUR packages will not build, and both are source builds
 
 **Status:** open, and it defers two applications
