@@ -2,7 +2,9 @@
 
 A step by step guide for the first install on real hardware. Follow it in order.
 
-Expect about an hour, most of it waiting for packages. Expect to do it more than once: this is the first time any of it runs outside a virtual machine, and the point of the exercise is to find what a VM could not show.
+Expect a couple of hours, most of it waiting for packages.
+
+That estimate was an hour before the application manifests landed, and it is worth saying where the new one comes from rather than rounding up a guess. In a VM on the development machine, on 2026-09-03, the installer took under two minutes and the first reconcile took 33, of which most was building the AUR set. Real hardware has a faster disk and more cores and a worse excuse for being slow, but it is building the same packages, and `ungoogled-chromium-bin` and the rest are large downloads wherever they land. Budget two hours and be pleasantly surprised. Expect to do it more than once: this is the first time any of it runs outside a virtual machine, and the point of the exercise is to find what a VM could not show.
 
 ---
 
