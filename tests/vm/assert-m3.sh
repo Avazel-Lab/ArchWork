@@ -37,7 +37,19 @@ printf '\nThe wallpaper, which is the keybinding cheat sheet\n'
 check "hyprpaper.conf is the one in the repository clone" \
 	config_is_repo_dotfile "/home/$USER_NAME/.config/hypr/hyprpaper.conf" "$USER_NAME"
 
-if hyprpaper_can_render "$USER_NAME"; then
+#
+# Ask the running hyprpaper before probing, and not for tidiness. The probe
+# starts a second hyprpaper, and on a machine that can render, that second
+# instance takes the IPC socket and is then killed by its own timeout, leaving
+# hyprctl talking to something dead. Proven on run 22's disk: hyprpaper_active
+# passed, the probe ran, and the identical call then failed with the cheat
+# sheet still plainly on the screen in the capture.
+#
+# It was invisible while every VM had no GPU. The probe died allocating a
+# buffer before it could take anything over, so a destructive check looked
+# harmless right up until the guest could draw (D-032, D-037).
+if hyprpaper_active "$USER_NAME" wallpaper-keybindings.png ||
+	hyprpaper_can_render "$USER_NAME"; then
 	check "hyprpaper is running as the user" user_process_running "$USER_NAME" hyprpaper
 	# On the monitor, not merely configured. A hyprpaper that could not read
 	# its image is still a running hyprpaper, and an unreadable cheat sheet
