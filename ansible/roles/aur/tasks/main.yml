@@ -214,4 +214,44 @@
   register: aur_paru_sync
   when: (archwork_packages_aur + archwork_packages_aur_profile) | length > 0
   changed_when: "'there is nothing to do' not in aur_paru_sync.stdout | lower"
+  failed_when: false
   become: true
+
+# What paru reports when a build fails is that a build failed. It does not pass
+# the compiler's own output through, and makepkg's log lives inside the chroot
+# copy, so a failure on 2026-09-03 produced two package names and no reason
+# (D-035). The chroot is still there after the run, and nobody was going to
+# look inside it by hand on a machine the harness tears down.
+- name: Find the build logs of anything that failed
+  ansible.builtin.find:
+    paths: "/var/lib/aurbuild/x86_64/{{ archwork_build_user }}/build"
+    patterns: "*.log"
+    recurse: true
+    file_type: file
+  register: aur_build_logs
+  when:
+    - aur_paru_sync is defined
+    - aur_paru_sync.rc is defined
+    - aur_paru_sync.rc != 0
+  failed_when: false
+  become: true
+
+- name: Say what the build actually said, then fail
+  # The point of this task is the message. Ansible would otherwise report a
+  # non-zero return code and the package names, which is what sent a person
+  # into a chroot that had already been deleted.
+  ansible.builtin.fail:
+    msg: |-
+      The AUR build failed.
+
+      paru said:
+      {{ aur_paru_sync.stderr | default('') | regex_search('error: packages failed to build.*') | default('nothing useful', true) }}
+
+      Build logs left in the chroot, which is kept:
+      {{ (aur_build_logs.files | default([]) | map(attribute='path') | list) | join('\n      ') | default('none found', true) }}
+
+      Read them with: sudo cat <path>
+  when:
+    - aur_paru_sync is defined
+    - aur_paru_sync.rc is defined
+    - aur_paru_sync.rc != 0
