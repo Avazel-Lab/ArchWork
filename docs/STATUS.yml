@@ -5,7 +5,7 @@
 schema: 1
 updated: 2026-09-03
 
-phase: M4
+phase: M5
 
 milestones:
   M0:
@@ -31,7 +31,7 @@ milestones:
   M4:
     status: in-progress
   M5:
-    status: not-started
+    status: in-progress
   M6:
     status: not-started
   M7:
@@ -48,9 +48,9 @@ milestones:
 # A rebuild claim without a commit SHA is rejected by the checker.
 # Clean install from the ISO, M1 assertions, the D-016 reconciliation twice
 # with the second run reporting zero changed tasks, and the recovery UKI.
-# Both profiles on this commit, run separately: the desktop, then the laptop
-# with its @swap subvolume and swapfile that the desktop does not have. M3 had
-# only ever been shown on the desktop profile before this.
+# The desktop profile on this commit. The laptop profile, with its @swap
+# subvolume and swapfile the desktop does not have, was last shown at
+# 0d20ddf on 2026-08-29 and has not been through a vm-power run.
 #
 # Everything M3 asks of a machine, on a session greetd starts through
 # start-hyprland with its configuration in Lua (D-026): login at the real
@@ -69,8 +69,8 @@ milestones:
 # against a real tailnet waits on the D-006 auth key.
 last_rebuild:
   status: passed
-  commit: 0d20ddfa9b3592ef3740f6f25b402afdb9984537
-  date: 2026-08-29
+  commit: e970eecd6266072fd607b1476b2e8af3b668af63
+  date: 2026-09-03
 
 # D-027 confirmed on hmlxdesktop02 at commit 85f8972, 2026-08-30. nvidia_drm,
 # nvidia_modeset, nvidia_uvm and nvidia are the modules loaded, no nouveau,
@@ -150,82 +150,52 @@ first_install:
 # criteria, and the fourth, the recovery UKI, is a separate phase that has
 # not been run since M1.
 #
-# Not an evidence line yet. The run that carried it, run 11, failed on its
-# own reboot wait rather than on anything it was testing: 120 seconds of SSH
-# attempts ran out while the machine was still starting services after a
-# rollback that had worked. Booting the same disk by hand answered SSH at
-# once, and re-running the phase alone passed everything. The window is now
-# 300 seconds. A clean run end to end is what would make this evidence.
+# Run 23 on 2026-09-03 at commit e970eec is the first vm-power run to pass
+# end to end, on the desktop profile. In one unattended pass: installed from
+# the ISO, asserted the M1 criteria, reconciled twice with the second run
+# reporting changed=0, reached the greeter and logged in, passed every M3
+# session criterion, opened the portal file picker from GTK and from Qt,
+# passed the M4 timings including the suspend at 1805s, ran archwork-update
+# through to its health checks, broke itself on purpose and watched the
+# health check notice, rolled back and rebooted onto the rolled-back root,
+# and booted the recovery UKI to a rescue shell where archwork-rollback
+# listed snapshots.
 #
-# The btrbk configuration D-030 flagged as the piece most likely to be wrong
-# turned out to be right: it took the snapshot archwork-rollback then used.
-# The application baseline reached the manifests on 2026-09-01 (D-029),
-# ahead of M7 rather than during it. 84 packages from the official
-# repositories in archwork_packages_applications, 9 shared AUR packages, and
-# gaming, local AI and OpenDeck on the desktop profile only. Every name was
-# checked against the Arch package API and the AUR RPC rather than recalled.
-# multilib is enabled on the desktop, because Steam cannot install without
-# it.
+# The only two FAILs in its transcript are the deliberate break, and the line
+# after them is the health check noticing it.
 #
-# The reason for doing it early is that the first login on hmlxdesktop02
-# reached a desktop with nothing on it to work with, and M7 proves three
-# rebuilds land the same machine: until the applications are in the
-# manifests, that would prove repeatability of something short of the
-# workstation.
+# It is also the first run to assert the keybinding wallpaper rather than
+# skip it. That answers D-032: a VM can draw it, so the criterion no longer
+# waits on hardware. What hmlxdesktop02 still settles is whether it looks
+# right on a real panel, which is a person looking (D-021).
 #
-# Not run. make check passes and both profiles resolve their lists with no
-# duplicates, and no VM has installed any of it. The M2 idempotence test is
-# what catches the likeliest failure, which is one of these packages writing
-# its own configuration on first run and never reporting changed=0 again.
-# D-029 also raises four questions the repository owner has to answer:
-# Codex CLI, how Python 3.13 is pinned, libvirt's two unnamed dependencies,
-# and the Epson scanner driver.
-# Run 21 on 2026-09-03 is the furthest any run has reached. In one pass it
-# installed 93 repository packages and 12 AUR packages, passed the dry run,
-# reconciled twice with the second reporting changed=0, reached a session,
-# skipped the wallpaper because the guest could not then draw it,
-# passed every M4 timing including the suspend at 1805s, ran archwork-update
-# through to its health checks for the first time, and broke itself on
-# purpose and watched the health check notice.
+# Two harness defects were fixed to get here, both found by booting the disk
+# of the run that had failed rather than by reasoning from outside it.
+# D-037: virtio-gpu does not survive S3, so the guest runs on std VGA now.
+# D-039: the wallpaper check started a second hyprpaper and broke the
+# wallpaper it was about to assert. D-038 is why those disks were still there
+# to be asked.
 #
-# It then failed rebooting onto the rolled-back root, and that is now
-# diagnosed and fixed (D-037). The disk was kept and booted, and the guest's
-# own journal says the machine never rebooted at all: a kernel worker was
-# stuck inside virtio_gpu after the resume from S3, holding the DRM modeset
-# lock, and systemd-logind blocked behind it in uninterruptible sleep. That
-# is an emulated device that does not survive a suspend, not a fault in
-# anything this repository installs, and it is why the rollback phase passes
-# when resumed on its own: only a full run suspends.
+# The application baseline reached the manifests on 2026-09-01 (D-029): 84
+# packages from the official repositories, 9 shared AUR packages, and gaming,
+# local AI and OpenDeck on the desktop profile only, with multilib enabled
+# there because Steam cannot install without it. Run 23 installed them and
+# still reported changed=0 on the second reconcile, which is what would have
+# caught one of them writing its own configuration on first run.
 #
-# The harness now boots the installed system on std VGA. Measured on the same
-# disk, timed from the reboot request to QEMU exiting: virtio-vga did not
-# finish within 700 seconds, and std VGA finished in 4. Hyprland starts on it
-# and both the greeter and the session captured, so D-021 is unaffected.
-#
-# No claim is made about hardware. hmlxdesktop02 has an RTX 3060 and no
-# virtio-gpu, so nothing here says whether a real machine that has slept
-# reboots promptly.
-#
-# Run 22 on 2026-09-03 is the first on std VGA. It installed, reconciled
-# twice with the second reporting changed=0, reached a session, and drew the
-# keybinding wallpaper, which no VM had managed before. It then failed on the
-# check for that wallpaper, with the sheet plainly on the screen in its own
-# capture: the predicate that decides whether to assert or skip starts a
-# second hyprpaper, which takes the IPC socket and dies, so the check that
-# follows it asks a corpse. Fixed by asking the running hyprpaper first
-# (D-039), and the fixed assertion passes on run 22's own disk.
-#
-# Run 22 kept that disk without being asked, which is D-038 doing its job on
-# the first failure after it landed.
+# Not proven by this run: the laptop profile, which has never been through
+# vm-power, and M7's three consecutive rebuilds. D-029 also leaves three
+# questions for the repository owner: Codex CLI, how Python 3.13 is pinned,
+# and libvirt's two unnamed dependencies.
 
 next_actions:
   - Start M7.5 (D-036). Install hmlxdesktop02 from the ISO at one commit on
     main and bring it up with bootstrap.sh alone, so the machine can be used
     for work and for developing this repository. Nothing needs writing
     first, because the applications have been in the manifests since D-029
-  - Run make vm-power end to end on the std VGA harness. D-037 removed the
-    reason run 21 died and nothing else is known to be in the way, so the
-    next run is the one that either goes green or finds the next thing
+  - Run vm-power on the laptop profile. Run 23 proved the desktop profile
+    end to end and the laptop has never been through one, so every M4 and M5
+    claim on this repository rests on one profile
   - Two decisions wait on the repository owner. Where AUR packages build now
     that paru --chroot defeats the placement D-018 chose (D-033), and whether
     joplin-desktop and opendeck become their -bin variants (D-035)
@@ -240,8 +210,4 @@ next_actions:
 # testing stays in Kubuntu. The Arch installation is disposable and that is
 # what makes the milestone small.
 
-blockers:
-  - No vm-power run has completed end to end. Run 21 on 2026-09-03 got the
-    furthest and died on the reboot after the rollback. The cause is found
-    and fixed (D-037), and the fix has been shown to work on its own; no
-    full run has been done on it yet.
+blockers: []
