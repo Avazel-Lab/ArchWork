@@ -1180,3 +1180,31 @@ The reason is D-037. Run 21's disk survived only because that run happened to be
 A run that passed has nothing left to tell anyone, and its disk is 28 GB.
 
 The decision belongs to the repository owner, who set it on 2026-09-03. The logic sits in `tests/vm/lib/workdir.sh` rather than inline in the `EXIT` trap so that it is unit tested: it is three lines guarding an `rm -rf` of a 28 GB directory, and the expensive way to learn it is wrong is to lose the disk of the run that failed.
+
+## D-039 The wallpaper check was breaking the wallpaper, and D-032 is answered
+
+**Status:** accepted, and it closes D-032's blocker
+**Date:** 2026-09-03
+**Affects:** M3, M7, D-032, `tests/vm/assert-m3.sh`
+
+D-032 recorded that the keybinding wallpaper could not be proven in a VM: hyprpaper 0.8 renders through hyprtoolkit and aquamarine, that path could not allocate a buffer without a GPU, and `hmlxdesktop02` was said to be the only thing that could settle it. `docs/STATUS.yml` has carried it as a blocker since.
+
+Both halves of that turned out to be wrong, and D-037 is what exposed them.
+
+**A VM can draw it.** The display device moved from virtio-vga to std VGA (D-037), and bochs allows the dumb buffer that virtio-gpu refused. hyprpaper allocates, renders, and puts the cheat sheet on the monitor. The capture from run 22 shows it in full: the heading, all four sections of bindings, the idle timings, and the generator line naming `scripts/make-keybinding-wallpaper.py`.
+
+**And the check was breaking it.** Run 22 failed that criterion anyway, with the wallpaper plainly on the screen in its own capture. `hyprpaper_can_render` decides whether to assert or skip by starting a second hyprpaper under `timeout 8`. On a machine that can render, that second instance takes hyprpaper's IPC socket and is then killed by the timeout, so `hyprctl hyprpaper listactive` afterwards is talking to something dead. The predicate destroyed the subject of the check that followed it.
+
+Proven on run 22's kept disk rather than argued, running the real predicates in order on a live session:
+
+    BEFORE: pass
+    probe says: can render
+    AFTER: fail
+
+It was harmless for as long as no VM had a GPU. The probe died allocating a buffer before it could take anything over, so a destructive check looked like a safe one right up until the guest could draw. That is the third time in this project a check has been answered by something other than the thing it was about, after `hyprctl hyprpaper listloaded` and `no_suspend_logged_since`.
+
+**The fix is ordering.** Ask the running hyprpaper first, and only run the probe when the answer is no, to decide between failing and skipping. The probe stays, because a machine that genuinely cannot render still needs the skip, and it is now only reached in the case where there is nothing left to break.
+
+Verified on the same disk from a clean session: `ok the sheet is on the monitor and not just named in the config`.
+
+**Consequence for D-032.** It is answered, and not by the machine it named. The wallpaper is proven on a VM, which means M3's wallpaper criterion no longer waits on hardware. What `hmlxdesktop02` still settles is whether it looks right on a real panel at a real resolution, which is a D-021 judgement made by a person looking, not an assertion.

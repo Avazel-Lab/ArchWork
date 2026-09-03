@@ -183,7 +183,7 @@ first_install:
 # Run 21 on 2026-09-03 is the furthest any run has reached. In one pass it
 # installed 93 repository packages and 12 AUR packages, passed the dry run,
 # reconciled twice with the second reporting changed=0, reached a session,
-# skipped the wallpaper honestly because the guest has no GPU to draw it,
+# skipped the wallpaper because the guest could not then draw it,
 # passed every M4 timing including the suspend at 1805s, ran archwork-update
 # through to its health checks for the first time, and broke itself on
 # purpose and watched the health check notice.
@@ -205,6 +205,18 @@ first_install:
 # No claim is made about hardware. hmlxdesktop02 has an RTX 3060 and no
 # virtio-gpu, so nothing here says whether a real machine that has slept
 # reboots promptly.
+#
+# Run 22 on 2026-09-03 is the first on std VGA. It installed, reconciled
+# twice with the second reporting changed=0, reached a session, and drew the
+# keybinding wallpaper, which no VM had managed before. It then failed on the
+# check for that wallpaper, with the sheet plainly on the screen in its own
+# capture: the predicate that decides whether to assert or skip starts a
+# second hyprpaper, which takes the IPC socket and dies, so the check that
+# follows it asks a corpse. Fixed by asking the running hyprpaper first
+# (D-039), and the fixed assertion passes on run 22's own disk.
+#
+# Run 22 kept that disk without being asked, which is D-038 doing its job on
+# the first failure after it landed.
 
 next_actions:
   - Start M7.5 (D-036). Install hmlxdesktop02 from the ISO at one commit on
@@ -233,6 +245,3 @@ blockers:
     furthest and died on the reboot after the rollback. The cause is found
     and fixed (D-037), and the fix has been shown to work on its own; no
     full run has been done on it yet.
-  - The keybinding wallpaper cannot be proven in a VM. hyprpaper 0.8 renders
-    through hyprtoolkit and cannot allocate a buffer without a GPU, so its
-    checks are skipped there and hmlxdesktop02 is what settles it (D-032).
