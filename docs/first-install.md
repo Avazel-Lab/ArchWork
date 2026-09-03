@@ -198,11 +198,13 @@ A dark desktop with a bar across the top.
 | `Super` + `L` | lock the screen |
 | `Print` | screenshot into `~/Pictures/screenshots` |
 
+The same table is on the wallpaper, generated from the configuration that binds the keys, so it cannot drift from them.
+
 Worth checking, because no virtual machine could show any of it:
 
 - **Both monitors**, at their real resolutions and refresh rates. Nothing in the configuration names a monitor layout yet, so this is the likeliest thing to need fixing.
 - **Sound**, actually out of the speakers.
-- **The graphics card**, and whether the desktop feels smooth.
+- **The graphics card.** It is an NVIDIA RTX 3060 running the open kernel modules, not the AMD part the CPU might lead you to expect (D-027). `hyprctl systeminfo` should name it, and `lsmod` should show `nvidia_drm` and no `nouveau`.
 - **Suspend and resume.**
 - Open a file from PDF Arranger and from Okular. Both pickers should be dark and match the desktop.
 - `tailscale status` should answer. It will say logged out, which is right for now.
@@ -211,11 +213,31 @@ Worth checking, because no virtual machine could show any of it:
 
 ---
 
-## Getting back to Kubuntu or Windows
+## Put Kubuntu back as the default
 
-The install makes Arch the first boot entry. It does not touch the other two bootloaders, which sit on their own disks.
+`bootctl install` makes Arch the first boot entry, and nothing in the installer puts that back. Leave it that way while you are getting the machine working, because every reboot in the steps above wants to land in Arch.
 
-Press **F8** at the ASUS logo and pick the one you want. To make one of them the default again, reorder the entries with `efibootmgr` from any of the three systems.
+Once the desktop is up and you are happy with it, put Kubuntu back in front. M7.5 asks for exactly this: Kubuntu stays the default and Arch is chosen deliberately, so that a broken Arch never costs you the machine you work on.
+
+From any of the three systems:
+
+```bash
+efibootmgr
+```
+
+That lists the entries with four digit numbers and shows the current `BootOrder`. Then set the order you want, Kubuntu first:
+
+```bash
+sudo efibootmgr -o 000A,000B,000C
+```
+
+Substitute the real numbers from your own listing. Nothing is destroyed by getting the order wrong; the firmware boot menu still reaches everything.
+
+## Getting back to Kubuntu or Windows in a hurry
+
+The install does not touch the other two bootloaders, which sit on their own disks. systemd-boot only scans its own EFI partition, so the Arch boot menu will never offer them however the order is set.
+
+Press **F8** at the ASUS logo and pick the one you want.
 
 ---
 
@@ -232,6 +254,8 @@ Nothing after step 6 is dangerous, and the wiped disk has nothing left to lose, 
 
 ## What this is and is not
 
-This is exploration, not milestone M8. M8 wants thirty days of daily use with health checks green.
+This is milestone M7.5, the machine becoming usable, not M8. M8 wants Steam, controllers, local AI models on `@ai_models`, a restore from the NAS, and thirty days of daily use with health checks green.
 
-Everything here is proven in a virtual machine and none of it has met real firmware, two monitors, an AMD graphics card or a speaker. The only step that costs anything is the first wipe, and that data is confirmed expendable (D-017). Everything after it is repeatable.
+M7.5 asks for something smaller: a machine you can work on, and one this repository can be developed on. Everything reaches it through Ansible, exactly as it reaches a VM, so nothing is configured by hand and nothing needs capturing afterwards (D-036).
+
+Most of this is proven in a virtual machine. Some of it has now met real firmware: the desktop was installed this way on 2026-08-30 and reached a Hyprland session on its own GPU (D-027). What a VM still cannot show is two monitors at their real resolutions, sound out of the speakers, and how the machine behaves over days rather than minutes. The only step that costs anything is the first wipe, and that data is confirmed expendable (D-017). Everything after it is repeatable.
