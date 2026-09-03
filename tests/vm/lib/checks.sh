@@ -471,6 +471,44 @@ config_is_repo_dotfile() {
 	[ "$(readlink -f "$path")" = "$HOME_ROOT/$user/src/ArchWork/dotfiles/hypr/$(basename "$path")" ]
 }
 
+# The wallpaper hyprpaper is actually showing, not the one its file asks for.
+#
+# `listactive`, not `listloaded`, for two reasons. The hyprpaper in extra does
+# not know `listloaded` and answers "invalid hyprpaper request", so a check
+# built on it fails on every machine whatever the wallpaper is doing: the run
+# on 2026-09-02 reported the sheet missing on a machine that had hyprpaper up
+# and the right config in front of it. And active is the stronger question
+# anyway. Loaded means the image is in memory; active means it is on the
+# monitor, and the point of this wallpaper is that somebody can read it.
+#
+# A running hyprpaper that failed to read its image is still a running
+# hyprpaper, so asking the process list would prove the wrong thing.
+# Whether hyprpaper can draw anything on this machine at all.
+#
+# 0.8 renders through hyprtoolkit and aquamarine, and in a VM with no real GPU
+# that path fails before it reaches the wallpaper: EGL cannot initialise, the
+# fallback asks KMS for a dumb buffer, the ioctl is refused, and the process
+# dies acquiring a swapchain buffer. The configuration is read correctly and
+# the monitor is found first, so this is not a configuration fault and saying
+# the wallpaper is missing would be reporting the wrong thing.
+#
+# Same shape as backlight_present and the M4 dim criterion: a VM cannot settle
+# it, so the criterion is skipped and counted apart from the passes rather than
+# quietly failing on every run. The laptop panel proves the one and a machine
+# with a GPU proves this.
+hyprpaper_can_render() {
+	local user="$1" output
+	output="$(as_user_in_session "$user" timeout 8 hyprpaper 2>&1)"
+	! printf '%s' "$output" |
+		grep -qE "Failed to allocate a GBM buffer|Failed acquiring a buffer|DRM_IOCTL_MODE_CREATE_DUMB failed"
+}
+
+hyprpaper_active() {
+	local user="$1" name="$2"
+	as_user_in_session "$user" hyprctl hyprpaper listactive 2>/dev/null |
+		grep -q -- "$name"
+}
+
 # The lock the M4 criterion names, read the way the criterion states it.
 sleep_inhibitor_held() {
 	systemd-inhibit --list 2>/dev/null |

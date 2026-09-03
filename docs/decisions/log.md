@@ -891,6 +891,64 @@ This is the repository owner's call. Until it is made, `archwork_packages_aur` c
 
 **A second thing this run surfaced, smaller and not blocking.** paru asked which provider to use for `java-runtime-headless`, `cargo`, and for four of the AUR names themselves, where `fsearch`, `claude-code`, `epsonscan2`, `protonup-qt` and `opendeck` each have `-git` or `-bin` siblings. `--noconfirm` takes the default, which is the first listed, so an unattended run silently picks `jdk-openjdk` and `rust` and the non-suffixed AUR package. That happens to be what is wanted in every case here. It is still a dependency chosen by list order rather than by anyone, and whichever option above is taken should pin the providers explicitly.
 
+## D-032 hyprpaper 0.8 does not apply the wallpaper this configuration asks for
+
+**Status:** accepted
+**Date:** 2026-09-02
+**Affects:** `desktop-shell.md`, D-026, D-028, M3
+
+The keybinding wallpaper is configured, installed and never displayed. `hyprpaper` runs, reads the configuration from the repository clone, finds the monitor, and then says:
+
+    DEBUG: Found 1 output(s)
+    DEBUG: Monitor Virtual-1 has no target: no wp will be created
+
+`hyprctl hyprpaper listactive` returns nothing at all, which is the honest answer: no wallpaper was ever created.
+
+What was ruled out, on a live session on the guest, with `hyprpaper 0.8.4-6`:
+
+- **The path.** Tilde and fully expanded absolute forms behave identically. The file is there, owned by the user, and `file` reports a valid 2560x1440 PNG.
+- **The monitor field.** `,PATH`, `, PATH`, `*,PATH` and `Virtual-1,PATH` all produce the same "has no target".
+- **The environment.** Setting `XDG_CURRENT_DESKTOP` changes nothing.
+- **The launch method.** Started by hand, and started through the `hyprpaper.service` the package ships, both behave the same.
+- **The image.** Not reached, since nothing is ever preloaded.
+
+Most telling: with `--verbose`, hyprpaper logs nothing whatsoever about parsing `preload` or `wallpaper`. It does not complain about the file, the syntax or a missing key. It reads the configuration and produces zero targets in silence.
+
+That is the shape of a configuration format that has moved. D-026 records Hyprland replacing hyprlang with Lua and deleting its own example from upstream, and D-028 assumed hypridle and hyprlock were unaffected because they are separate binaries. hyprpaper 0.8 is built on `hyprtoolkit`, which the log shows looking for its own `hyprtoolkit.conf`, so this is the same migration arriving at the next tool along. The package ships no example configuration and `--help` documents only `--config`, `--verbose`, `--version` and `--help`, so the current contract cannot be established from the machine.
+
+There is a second, weaker possibility that the run cannot separate: EGL fails on the guest's virtual GPU and hyprtoolkit falls back to `kms_swrast`. "No target" is logged before any rendering is attempted, so this is unlikely to be the cause, but a machine with a real GPU would settle it.
+
+Recommendation: establish what hyprpaper 0.8 actually reads before shipping this, from upstream rather than by trying syntaxes, and expect the answer to be a new format. Do not merge the wallpaper until a machine has displayed it. The assertion that caught this stays as it is: it failed on a machine where hyprpaper was running with the right configuration in front of it, which is exactly what it was written to do.
+
+The wider point is worth more than the wallpaper. If hyprpaper has moved, `hypridle.conf` and `hyprlock.conf` are on the same path, and both are load-bearing: hypridle carries every M4 timing and hyprlock is what locks the screen. D-026 called the Hyprland format change "larger than it sounds" and it is still arriving.
+
+**Answered on 2026-09-02, from upstream rather than by trying more syntaxes.** The format did move, in 0.8.0, alongside the switch to the hyprtoolkit and hyprwire backends. `preload` and `wallpaper = monitor,path` are replaced by a block:
+
+    wallpaper {
+        monitor =
+        path = ~/.config/hypr/wallpaper-keybindings.png
+        fit_mode = contain
+    }
+
+An empty `monitor` is the fallback, applying to every display without an entry of its own, which is what both profiles want. `fit_mode` is optional and defaults to `cover`; this uses `contain`, because `cover` crops to fill the screen and what it crops off a 2560x1440 sheet on a differently shaped display is the bindings down the edges.
+
+The repository owner's condition was that the fix be no more involved than an ordinary wallpaper change. It is: one configuration file, in the format the current version documents.
+
+**What made this expensive is worth recording.** The old keys are not rejected. hyprpaper reads them, produces no wallpaper, and says so only as `Monitor Virtual-1 has no target: no wp will be created` in a log nobody was reading. Four syntax variants, both path forms, two launch methods and an environment variable were ruled out one at a time against a program that was never going to accept any of them. The wiki page for the tool does not carry the configuration section, and the package ships no example, so the answer came from an upstream issue thread.
+
+**The format fix was right, and the wallpaper still cannot be proven here.** With the block configuration in place, hyprpaper reads it, finds the monitor, and gets as far as allocating a buffer before dying:
+
+    KMS: DRM_IOCTL_MODE_CREATE_DUMB failed: Permission denied
+    GBM: Failed to allocate a GBM buffer: bo null
+    Swapchain: Failed acquiring a buffer
+
+0.8 renders through hyprtoolkit and aquamarine. In a guest with no real GPU that path fails before it reaches the image: EGL will not initialise, the fallback asks KMS for a dumb buffer, the ioctl is refused, and the process dies. Reaching buffer allocation at all is the evidence that the configuration is now correct, because the old format never got past "no target".
+
+So this joins the M4 dim criterion as something a VM cannot settle. `assert-m3.sh` asks `hyprpaper_can_render` first and skips the wallpaper checks where the answer is no, counted apart from the passes rather than failing on every run. The configuration check still runs everywhere, because that part is about the file and not the hardware.
+
+Only a machine with a GPU proves it, which means `hmlxdesktop02` and its RTX 3060. Until then the wallpaper is written, generated, configured in the right format, and unproven.
+
+**The watch item stands and is now sharper.** Two of the three Hyprland ecosystem tools this repository configures have changed format inside six weeks. `hypridle.conf` carries every M4 timing and `hyprlock.conf` is the lock screen, and both would fail the same way: read, ignored, silent. The M4 assertions measure effects rather than reading the file, so a hypridle migration would surface as timings that stop firing rather than as nothing at all, which is the one piece of luck in this.
 ## D-033 The build account may run the package tools, and D-018 is amended
 
 **Status:** accepted
