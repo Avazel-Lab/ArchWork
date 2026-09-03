@@ -145,8 +145,9 @@ archwork_packages_aur:
   # what the baseline names; the `code` package in extra is the OSS build
   # without the Marketplace, so it is a different program.
   - visual-studio-code-bin
-  # Notes
-  - joplin-desktop
+  # Notes. joplin-desktop is deferred, not dropped: see D-035. It is one of
+  # only two source builds in this list and one of only two that failed.
+  # - joplin-desktop
   # Password managers. NordPass is primary, Bitwarden is in extra below.
   - nordpass-bin
   # Media library management

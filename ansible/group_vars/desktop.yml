@@ -43,5 +43,7 @@ archwork_packages_aur_profile:
   # Local AI model management and UI.
   - lmstudio-bin
   # Stream Deck management, desktop-specific rather than on every machine
-  # (applications.md, desktop-laptop-differences.md).
-  - opendeck
+  # (applications.md, desktop-laptop-differences.md). Deferred, not dropped:
+  # see D-035. It is one of only two source builds in the AUR set and one of
+  # only two that failed.
+  # - opendeck

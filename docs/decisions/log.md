@@ -929,3 +929,27 @@ What makes it work: `mermaid-cli` needs *a* chromium and `ungoogled-chromium-bin
 How it is installed, since paru will not do it alone. `archwork_packages_aur_replaces` names the repository packages an AUR package replaces, and the aur role removes any that are installed with `pacman -Rdd` immediately before the AUR set goes in. `-Rdd` because the point is that something does still depend on the name: between those two tasks `mermaid-cli` has an unsatisfied dependency, and the window closes inside the same reconcile. The list is a variable rather than a hardcoded package name, because this role has no business knowing about Chromium and the next replacement should be one line in `group_vars`.
 
 `applications.md` still needs a sentence saying the two entries are the same program, so that the next reader does not rediscover this the way this run did.
+
+## D-035 Two AUR packages will not build, and both are source builds
+
+**Status:** open, and it defers two applications
+**Date:** 2026-09-03
+**Affects:** `applications.md`, D-029, M7
+
+The run that finally had room to finish built twelve of the fourteen AUR packages over 52 minutes and then stopped:
+
+    error: packages failed to build: joplin-3.6.16-1 (joplin-desktop)  opendeck-2.14.0-1
+
+Those two are the only entries in the set that build from source. Every other one is a `-bin` package that unpacks a binary upstream already published, which is why the other twelve took 52 minutes between them and these two took the run down.
+
+What the logs actually say, which is less than it should be. `opendeck` fails inside `rustc` with `failed to build app`, and paru does not pass the compiler's own diagnostic through, so the reason is not in the transcript. `joplin-desktop` fails with `Build failed, check /var/lib/aurbuild/x86_64/archwork-build/build`, a path inside a chroot the run then tore down. Neither failure names a cause, and no evidence of an out-of-memory kill appears in either, though the guest has 4 GB and both are large JavaScript and Rust builds.
+
+So the honest position is that two source builds failed for reasons this run did not capture.
+
+**Both have `-bin` variants.** `opendeck-bin` and `joplin-bin` exist, and `joplin-appimage` besides. D-029 already states the principle: the `-bin` variants are deliberate where upstream ships a binary, because building the same program from source in the chroot costs hours and produces the same program. These two were listed without that rule being applied to them.
+
+Recommendation: switch both to `-bin`. It follows a decision already taken rather than making a new one, it removes the two longest builds from every rebuild, and it sidesteps a class of failure that has now cost a run. If the source builds matter for a reason this entry does not know about, the alternative is to find out why they fail, which needs the chroot kept after a failure and the compiler output captured, neither of which the harness does today.
+
+Not decided here, because it changes which package the machine installs and that is `applications.md`'s business.
+
+**Deferred meanwhile.** Both are commented out of the manifests rather than deleted, with a pointer to this entry. M7's criterion allows an entry to be deliberately left out as long as the reason is written down, and this is that. The cost of leaving them in was the whole run, and everything else waiting behind them, M4's timings, M5's rollback and the wallpaper, has never been proven in a single pass.
