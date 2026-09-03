@@ -95,3 +95,37 @@ fake_df() {
 	[ "$status" -ne 0 ]
 	[[ "$output" == *"cannot read"* ]]
 }
+
+# What happens to the work directory when a run ends.
+#
+# The rule is that a run which failed keeps its disk and a run which passed
+# throws it away, because the disk of a failed run is the only thing that can
+# be asked what went wrong. Run 21 left one behind, and booting it and reading
+# the guest's journal is what found D-037 after three guesses made from
+# outside had all been wrong.
+
+@test "a run that failed keeps its work directory, even without --keep" {
+	run work_dir_disposition 1 false
+	[ "$status" -eq 0 ]
+	[ "$output" = "keep-failed" ]
+}
+
+@test "a run that failed keeps it whatever --keep says" {
+	run work_dir_disposition 1 true
+	[ "$output" = "keep-failed" ]
+}
+
+@test "any non-zero status counts as failed, not just 1" {
+	run work_dir_disposition 137 false
+	[ "$output" = "keep-failed" ]
+}
+
+@test "a run that passed throws its 28 GB disk away" {
+	run work_dir_disposition 0 false
+	[ "$output" = "discard" ]
+}
+
+@test "a run that passed keeps it when --keep asked, which is what --resume needs" {
+	run work_dir_disposition 0 true
+	[ "$output" = "keep-asked" ]
+}
