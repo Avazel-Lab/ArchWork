@@ -60,3 +60,23 @@ work_dir_refusal() {
 
 	return 0
 }
+
+# What to do with a work directory once a run is over.
+#
+# Three lines of logic guarding an rm -rf of a 28 GB directory, which is why
+# they are here rather than inline in a trap: the expensive way to find out
+# this is wrong is to lose the disk of the run that failed. D-037 was only
+# findable because run 21 had left its disk behind.
+#
+# Prints exactly one of keep-failed, keep-asked or discard.
+work_dir_disposition() {
+	local status="$1" keep="$2"
+
+	if [ "$status" -ne 0 ]; then
+		printf 'keep-failed\n'
+	elif [ "$keep" = true ]; then
+		printf 'keep-asked\n'
+	else
+		printf 'discard\n'
+	fi
+}

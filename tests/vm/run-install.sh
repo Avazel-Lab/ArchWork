@@ -95,8 +95,10 @@ Options:
   --disk-size SIZE      default 64G
   --memory MB           default 4096
   --cpus N              default 4
-  --keep                keep the work directory, disk image included, so that
-                        --resume has something to boot
+  --keep                keep the work directory of a run that passed, disk
+                        image included, so that --resume has something to
+                        boot. A run that fails keeps its work directory
+                        without being asked
   --resume DIR          boot the disk in a kept work directory and run the
                         phases again, instead of installing from scratch.
                         Implies --keep and needs no --iso
@@ -133,15 +135,40 @@ kill_if_running() {
 	fi
 }
 
+# A failed run keeps its work directory whatever the flags say, and a run that
+# passed throws it away unless --keep asks otherwise.
+#
+# The disk of a run that failed is the only thing that can be asked what
+# happened, and it answers: D-037 came out of booting the disk run 21 left
+# behind and reading the guest's own journal, which said the machine had never
+# rebooted at all. Three earlier explanations of that failure were guesses made
+# from outside, and all three were wrong. A run that passed has nothing left to
+# tell anyone and its disk is 28 GB.
+#
+# Take the exit status first. Everything below it changes $?.
 cleanup() {
+	local status=$?
+
 	kill_if_running "$QEMU_PID"
 	kill_if_running "$HTTP_PID"
 	save_captures
-	if [ "$KEEP" = false ] && [ -n "$WORK_DIR" ] && [ -d "$WORK_DIR" ]; then
-		rm -rf "$WORK_DIR"
-	elif [ -n "$WORK_DIR" ]; then
-		printf '\nwork directory kept at %s\n' "$WORK_DIR"
+
+	if [ -z "$WORK_DIR" ] || [ ! -d "$WORK_DIR" ]; then
+		return
 	fi
+
+	case "$(work_dir_disposition "$status" "$KEEP")" in
+	keep-failed)
+		printf '\nthe run failed, so its work directory is kept at %s\n' "$WORK_DIR"
+		printf 'boot that disk and read journalctl -b -1 before theorising about why.\n'
+		;;
+	keep-asked)
+		printf '\nwork directory kept at %s\n' "$WORK_DIR"
+		;;
+	discard)
+		rm -rf "$WORK_DIR"
+		;;
+	esac
 }
 
 parse_args() {

@@ -1165,6 +1165,22 @@ Nothing real is lost by dropping virtio-gpu. No ArchWork machine has one. `hmlxd
 
 That hardening would not have saved run 21. Neither leg above finished at all, so no deadline was ever going to be long enough. It is worth having anyway: the next stuck shutdown should say what it was doing rather than leave someone to boot the disk afterwards and find out.
 
+## D-038 A run that failed keeps its disk, a run that passed does not
+
+**Status:** accepted
+**Date:** 2026-09-03
+**Affects:** `tests/vm/run-install.sh`, D-037
+
+Until now `--keep` decided this and nothing else did, so the work directory of a run was kept because someone remembered to ask, and thrown away otherwise. That is backwards. It also filled 240 GB with the disks of runs nobody was going to look at again.
+
+The rule now: a run that exits non-zero keeps its work directory whatever the flags say, and a run that passed deletes it unless `--keep` asks. `--keep` still means what `--resume` needs it to mean.
+
+The reason is D-037. Run 21's disk survived only because that run happened to be started with `--keep`, and booting it and reading the guest's own journal is what found the cause. Three earlier explanations of the same failure had been made by reasoning from outside the guest, and all three were wrong: a slow boot, an SSH window that was too short, and a compositor left running by the `nvidia-utils` sleep drop-in. The machine knew, and the only reason it could still be asked was luck.
+
+A run that passed has nothing left to tell anyone, and its disk is 28 GB.
+
+The decision belongs to the repository owner, who set it on 2026-09-03. The logic sits in `tests/vm/lib/workdir.sh` rather than inline in the `EXIT` trap so that it is unit tested: it is three lines guarding an `rm -rf` of a 28 GB directory, and the expensive way to learn it is wrong is to lose the disk of the run that failed.
+
 ## D-039 The wallpaper check was breaking the wallpaper, and D-032 is answered
 
 **Status:** accepted, and it closes D-032's blocker
