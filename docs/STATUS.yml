@@ -157,23 +157,44 @@ first_install:
 #
 # The btrbk configuration D-030 flagged as the piece most likely to be wrong
 # turned out to be right: it took the snapshot archwork-rollback then used.
+# The application baseline reached the manifests on 2026-09-01 (D-029),
+# ahead of M7 rather than during it. 84 packages from the official
+# repositories in archwork_packages_applications, 9 shared AUR packages, and
+# gaming, local AI and OpenDeck on the desktop profile only. Every name was
+# checked against the Arch package API and the AUR RPC rather than recalled.
+# multilib is enabled on the desktop, because Steam cannot install without
+# it.
+#
+# The reason for doing it early is that the first login on hmlxdesktop02
+# reached a desktop with nothing on it to work with, and M7 proves three
+# rebuilds land the same machine: until the applications are in the
+# manifests, that would prove repeatability of something short of the
+# workstation.
+#
+# Not run. make check passes and both profiles resolve their lists with no
+# duplicates, and no VM has installed any of it. The M2 idempotence test is
+# what catches the likeliest failure, which is one of these packages writing
+# its own configuration on first run and never reporting changed=0 again.
+# D-029 also raises four questions the repository owner has to answer:
+# Codex CLI, how Python 3.13 is pinned, libvirt's two unnamed dependencies,
+# and the Epson scanner driver.
 next_actions:
-  - Land fix/wake-resets-the-idle-clock and run vm-power once more, for a
-    green run end to end rather than one that passes M4 and dies in the
-    phase after it. Then M4 is the repository owner's to call
-  - Land the application manifests once a VM has installed them. They are on
-    feat/application-manifests with CI green and no machine has run them
-  - Point the VM harness at a work directory with room. TMPDIR defaults to
-    /tmp, which is a 16 GB tmpfs on this development machine, and two 10 GB
-    runs do not fit in it
+  - Find why the post-rollback reboot does not bring SSH back in a full run.
+    The rollback phase passes on its own when resumed, and fails at the same
+    point inside a full vm-power run, after M4 has suspended and woken the
+    machine. That difference is the lead. Booting the same disk by hand
+    answers SSH at once, so the machine is fine and the harness path is not
+  - Decide where AUR packages build. paru --chroot uses /var/lib/aurbuild and
+    cannot be redirected, so the placement D-018 chose to keep a large build
+    cache outside the rollback boundary is defeated (D-033)
+  - Decide whether joplin-desktop and opendeck become their -bin variants.
+    Both are source builds, both failed, and both are deferred with the
+    reason written down (D-035)
 
 blockers:
-  - No vm-power run has yet completed end to end. Every M4 criterion passed on
-    2026-09-01 at 8558d4e, and that run then died in the recovery phase for a
-    reason now fixed on fix/wake-resets-the-idle-clock and not yet shown to be
-    fixed. Nothing here is M4 failing; it is M4 proven by a run that did not
-    finish.
-  - The application manifests are unproven. D-029 puts 93 packages across two
-    profiles into the lists on the strength of the package APIs confirming the
-    names exist, which is not the same as a machine installing them, and the
-    AUR half builds in a chroot that has never built anything.
+  - No vm-power run has completed end to end. Run 21 on 2026-09-03 got the
+    furthest and died on the reboot after the rollback. Everything before
+    that passed, including the update workflow and the deliberate break.
+  - The keybinding wallpaper cannot be proven in a VM. hyprpaper 0.8 renders
+    through hyprtoolkit and cannot allocate a buffer without a GPU, so its
+    checks are skipped there and hmlxdesktop02 is what settles it (D-032).

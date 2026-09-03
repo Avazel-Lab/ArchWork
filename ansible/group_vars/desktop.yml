@@ -16,3 +16,34 @@ archwork_packages_profile:
   # ICD and nvidia-smi that nvidia-open does not.
   - nvidia-open
   - nvidia-utils
+
+# Steam is in multilib, so the profile that games is the profile that enables
+# it. The laptop does not (desktop-laptop-differences.md).
+archwork_multilib: true
+
+# Gaming and local AI, the two application differences the profile table names.
+# Both are desktop only: the laptop excludes gaming outright, and carries no
+# local AI models, so the runtimes that serve them have nothing to do there.
+archwork_packages_gaming:
+  - steam
+  - mangohud
+  - gamemode
+  - lutris
+
+archwork_packages_ai:
+  # The local model runtime. @ai_models is the desktop's subvolume for what it
+  # downloads, and the laptop has no models deployed.
+  - ollama
+
+# Profile-only AUR packages, on top of the shared set in group_vars/all.yml.
+archwork_packages_aur_profile:
+  # Gaming: GE-Proton management, and the Epic/GOG/Amazon launcher.
+  - protonup-qt
+  - heroic-games-launcher-bin
+  # Local AI model management and UI.
+  - lmstudio-bin
+  # Stream Deck management, desktop-specific rather than on every machine
+  # (applications.md, desktop-laptop-differences.md). Deferred, not dropped:
+  # see D-035. It is one of only two source builds in the AUR set and one of
+  # only two that failed.
+  # - opendeck

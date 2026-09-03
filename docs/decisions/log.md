@@ -425,6 +425,8 @@ D-005 settled that AUR packages build in a clean chroot rather than on the works
 
 So the build gets its own system account, with a locked password, no authorized keys and no login route. It holds no privileges of its own and appears in no sudoers file. Ansible already runs the reconciliation as root, and root becomes another user without needing a rule.
 
+**Amended on 2026-09-02 by D-033.** The last two sentences are no longer true and are left standing so that the change is visible rather than tidied away. The account now has `/etc/sudoers.d/20-archwork-build`, letting it run `pacman`, `makechrootpkg`, `mkarchroot` and `arch-nspawn` as root without a password, because `paru` refuses to run as root and the AUR set cannot be installed otherwise. Read that grant as root-equivalent, not narrow: D-033 explains why it is acceptable here and why D-025's removal of the `docker` group is not the same situation.
+
 `makechrootpkg` fits this exactly, once read rather than assumed. Its `check_root` returns immediately when `EUID` is 0, so the tool expects to be root and re-execs itself under sudo when it is not, and `-U` names the unprivileged account it drops to for the makepkg step.
 
 Rejected alternatives:
@@ -751,6 +753,73 @@ Consequences:
 - One criterion a VM cannot settle. Dimming has no observable effect where there is no backlight device, which is every VM and the desktop's external monitors both. `assert-m4.sh` reports it as a skip, counted and printed apart from the passes, rather than quietly counting the listener's presence in the file as the timing being met. The laptop panel is the only thing that can prove that one.
 - Still not run. The check exists and its own helpers are covered by `tests/unit/m4-checks.bats` and `tests/unit/suspend-watch.bats`, which need no VM. The 65 minute run against a real machine has not happened, so nothing here is evidence that the timings hold. `docs/STATUS.yml` carries that as the blocker.
 
+## D-029 The application baseline reaches the manifests
+
+**Status:** accepted
+**Date:** 2026-09-01
+**Affects:** `applications.md`, `desktop-laptop-differences.md`, D-024, M7
+
+D-024 closed by widening M7: the manifests must account for every application in `applications.md`, or name what is left out and why. This entry is that accounting, done now rather than at M7.
+
+The reason for doing it early is the one D-024 already gave, sharpened by using the machine. `hmlxdesktop02` logged in for the first time on 2026-08-30 and the desktop on it was a compositor, a terminal, a launcher, a bar, a lock screen, a notifier, and the two applications M3 needed to open a portal file picker from. There was nothing to do with it. M7 proves three consecutive rebuilds land the same machine, and until the applications are in the manifests that would prove repeatability of something that is not the workstation.
+
+Every package name here was checked against the official repository search API and the AUR RPC on 2026-09-01, rather than recalled. Four names that would have been wrong from memory: `bind` carries `dig` rather than a `bind-tools` package, `kubectx` ships `kubens` too, `memtest86+-efi` is the build a UEFI machine with systemd-boot can launch, and Mission Center is in `extra` as `mission-center` rather than in the AUR.
+
+What the lists are, and why there is a new one:
+
+- `archwork_packages_applications` in `group_vars/all.yml`, 84 packages from the official repositories, on both profiles. It is separate from `archwork_packages_shared` for the same reason `archwork_packages_session` is: the two answer different questions. `shared` is the tooling the platform needs to build and maintain itself, and a rebuild that dropped `applications` would still be a working machine, just not the workstation.
+- `archwork_packages_aur`, 9 packages, shared. The `-bin` variants are deliberate where upstream ships a binary: building Chromium or VS Code from source in the D-005 chroot costs hours and produces the same program.
+- `archwork_packages_gaming` and `archwork_packages_ai` on the desktop, empty on the laptop, plus `archwork_packages_aur_profile`. These are the two application rows in `desktop-laptop-differences.md`. The laptop file sets them to `[]` rather than omitting them, so the difference is visible in the file rather than implied by an absent variable.
+
+**Multilib, which no document had to name until now, and which took two goes.** Steam is a `multilib` package and the stock `pacman.conf` ships that repository commented out, so the gaming profile could not install the one application the differences table names for it. The packages role now uncomments the pair, gated on `archwork_multilib`, which is true on the desktop and false everywhere else. It runs before the database refresh, because a cache refreshed without multilib does not know about the packages the install then asks for. The laptop does not get a 32-bit repository it would never use.
+
+That was not sufficient, and a run on 2026-09-02 found out three minutes in:
+
+    error: 'steam': could not find or read package
+
+`ansible-playbook --check` changes nothing by definition, so the multilib task does not run during a dry run, so pacman still does not know about `steam`, so the check fails against a machine that is perfectly fine. M2 requires that check to pass, which makes this a real blocker rather than a cosmetic one.
+
+So the installer enables multilib too, on the desktop profile, right after `pacstrap`. Having both do it is deliberate rather than duplication: D-027 observed that files written only by the installer are a real gap in what reconciliation can reach afterwards, and a machine installed before this existed still needs to converge. The installer's `sed` is anchored on the commented pair the stock file ships, is idempotent, leaves `[multilib-testing]` alone, and fails loudly if the section is not the stock one, because the alternative is matching nothing and failing later at pacman with no clue why. `sed` rather than `perl`: this runs on the Arch ISO, which carries `sed` in base and does not promise `perl`.
+
+**Deliberately left out, which the M7 criterion asks for by name.**
+
+- **Odysseus.** `applications.md` says the exact project or package still needs identifying. Nothing to install.
+- **The personal applications**, AI Agent Manager, Game-on-itor and Kitchen Sync. `applications.md` already separates them and says they need reworking, packaging and an ArchWork-specific installation mechanism. None exists, so there is nothing a manifest could name.
+- **Spotify, WhatsApp, email and calendar.** Web or PWA by decision, so no package is the correct answer rather than a gap.
+- **Everything under "Explicitly not included by default".** Honoured as written; nothing from that list was added.
+- **Quickshell and Satty.** M6 installs them, and installing a shell a milestone early proves nothing, which is the reasoning the manifests already carry for Tailscale arriving at M3 rather than sooner.
+- **Codex CLI, Python 3.13's explicit management, the Epson scanner driver and libvirt's own dependencies.** These are four open questions rather than four decisions, and they are below rather than answered here.
+
+**What this does not prove.** Nothing in this entry has been run. It is 93 new packages across two profiles, and the things that could go wrong with it are a name that resolves to a different program than intended, a build that fails in the chroot, an AUR package that needs an interactive prompt paru cannot answer, and a reconcile that is no longer idempotent because one of these writes to its own configuration on first run. The M2 test is the one that catches the last of those: reconcile twice, and require the second run to change nothing. `docs/STATUS.yml` carries this as unproven until a VM run says otherwise.
+
+Also unproven and worth saying plainly: the HP LaserJet Pro MFP M28w has its whole stack in the manifests now, CUPS, HPLIP, SANE and sane-airscan, and none of it has been tested against the printer. `applications.md` only says the stack is *expected* to provide the integration. The Epson has no driver in the manifests at all, for the reason in question 4 below.
+
+**Four questions this entry raises and does not answer.** Each is a genuine fork rather than an obvious pick, so none was decided here (`CLAUDE.md`: raise it, recommend, stop).
+
+1. **Codex CLI has no official package.** `applications.md` names it alongside Claude Code. Claude Code is in the AUR as `claude-code` with 91 votes; Codex has no equivalent. The candidates are `openai-codex-bin` (25 votes, described as auto-updated) and `codex-app-unofficial` (8 votes). Both are unofficial repackagings of a binary, and an auto-updating AUR package is a build script that fetches whatever upstream published, on a workstation, as part of an unattended reconcile.
+
+   Recommendation: leave it out of the manifest and install Codex through npm in the user's own environment, the way its upstream documents. The reason is not the vote count, it is that `paru --chroot` on an auto-updated PKGBUILD makes an unattended rebuild depend on an unpinned third party, and D-005 routed AUR builds through a clean chroot precisely to bound what a package build can touch. If it should be in the manifest anyway, `openai-codex-bin` is the one.
+
+   **Answered on 2026-09-02: npm, by hand.** The unofficial AUR package is not trusted enough to sit in the rebuild path. Codex stays out of every manifest and `applications.md` gains no package name for it: installing it is `npm install -g @openai/codex` in the owner's own account, repeated after a rebuild like anything else outside the reproducible path. That is a deliberate hole in reproducibility, accepted because Codex is a tool the owner uses rather than something the platform depends on.
+
+2. **Python 3.13, "managed explicitly rather than depending on Arch's rolling system Python staying at 3.13".** `applications.md` asks for this and names no mechanism. The system `python` package is whatever Arch has moved to, which is exactly what the line is written against. The options are an AUR `python313` alongside the system interpreter, or a version manager such as `uv`, `mise` or `pyenv` owning it in the user's home.
+
+   Recommendation: `uv`, which is in `extra`. It pins and fetches interpreters per project rather than installing a second system-wide Python that pacman would then also want to upgrade, and it is the option that does not put two interpreters on `PATH` and hope the right one wins. This is a real choice about how the workstation does Python, though, not a package name, which is why it is here.
+
+   **Answered on 2026-09-01: `uv`.** It is in `archwork_packages_applications`. Nothing yet uses it to pin 3.13, so this decides the mechanism and not the pinning: the first project that needs the interpreter is what will show whether it holds.
+
+3. **libvirt needs two packages `applications.md` does not name.** `virt-manager` is listed and called out as useful for clean ArchWork rebuild VMs, and that is the use that breaks: libvirt's default NAT network needs `dnsmasq`, and booting a UEFI guest needs `edk2-ovmf`. Neither is a hard dependency, so the stack installs and then cannot do the thing it was installed for. `CLAUDE.md` bars adding a package no decision document lists, which is why they are not in the manifest.
+
+   Recommendation: add both, and treat this as `applications.md` naming a capability rather than a package list. Every ArchWork test VM in this repository is a UEFI guest, so a virt-manager that cannot boot one is not the tool that was asked for.
+
+   **Answered on 2026-09-01: add both.** `dnsmasq` and `edk2-ovmf` are in `archwork_packages_applications`. `applications.md` is not amended for this: it names what the workstation is for, and the packages a listed capability needs are a manifest question.
+
+4. **The Epson FastFoto FF-680W driver.** `epsonscan2` is in the AUR (26 votes) and is the obvious candidate, but `applications.md` is explicit that driver-level support is not sufficient: the FastFoto-style workflow, batch ADF scanning, duplex, mixed photo sizes, automatic filenames, has to be tested before scanning counts as solved.
+
+   Recommendation: add `epsonscan2` when the scanner is next to the machine and the workflow can actually be tried, rather than now. Adding it now puts a scanner driver on the laptop for hardware it may never meet, and would let a manifest entry stand in for a test that has not happened, which is the thing the evidence rule in `CLAUDE.md` exists to stop.
+
+   **Answered on 2026-09-01: add it now, so the workflow can be picked up later.** `epsonscan2` is in `archwork_packages_aur`. The recommendation to wait was overruled on the grounds that having the driver there already is what makes the test easy to start. The caution it carried still stands and is worth repeating rather than dropping: the package being installed is not evidence that scanning works, and the FastFoto workflow, batch ADF, duplex, mixed sizes and automatic filenames, remains untested.
+
 ## D-030 What M5 builds, and the two places it had to choose
 
 **Status:** accepted
@@ -790,3 +859,144 @@ That asymmetry was found by a unit test rather than reasoned out in advance. `se
    Recommendation: treat the first VM run as the test of this file specifically, and expect to change it. It is the single piece of M5 most likely to be wrong.
 
    **Answered by the run on 2026-09-02: it was right.** btrbk took the snapshot, `archwork-rollback list` found it, and the rollback used it. The piece called most likely to be wrong was the one that worked first time, which is worth remembering next time a prediction like that feels solid.
+## D-031 paru cannot install as root, and the AUR path had never run
+
+**Status:** answered, see D-033
+**Date:** 2026-09-02
+**Affects:** D-005, D-018, D-029, M2, M5, M7
+
+The first reconcile ever to install AUR packages failed at the last task of the aur role:
+
+    error: can't install AUR package as root
+
+The role runs `paru --sync --chroot` with `become: true`, and paru refuses to run as root. It has always done that. The task never noticed because `archwork_packages_aur` was `[]` from M2 until D-029, and the task is guarded by `when: archwork_packages_aur | length > 0`, so the only part of the AUR path that had ever executed was the bootstrap that builds paru itself. That part works, because `makechrootpkg` wants to be root and `pacman -U` is root's job anyway.
+
+So the role has been green for four milestones while the half of it that matters had never been reached. Same shape as the M4 checks that passed while testing nothing, and the reason it survived this long is that an empty list makes a `when` guard indistinguishable from a working task.
+
+**The obvious fix is a trap, and it is worth writing down before someone tries it.** Running paru as `archwork_admin_user` works in the VM and fails on hardware. The installer writes `%wheel ALL=(ALL:ALL) ALL`, which prompts for a password, and only a *test* install also writes `99-archwork-test` with `NOPASSWD: ALL`. So paru as the admin user would pass every harness run and hang on the first real reconcile on `hmlxdesktop02`, waiting on a password prompt nobody is watching. This repository has enough of those already.
+
+Three real options.
+
+1. **A narrow sudoers rule for the build user**, letting it run `/usr/bin/pacman` without a password. This is what almost every Ansible AUR role does, and it directly reverses D-018's "it holds no privileges of its own: a locked password, no authorized keys, and nothing in sudoers". It should be reversed with eyes open rather than quietly: `pacman -U` on an arbitrary package file runs that package's install scripts as root, so this is a root-equivalent grant, not a narrow one. D-025 removed the `docker` group for exactly this reasoning.
+
+2. **Build with `makechrootpkg` and install with `pacman -U`, per package, from Ansible.** No privilege changes at all, and it is precisely what the paru bootstrap in this same role already does. The cost is that Ansible takes over dependency resolution between AUR packages, which is the job paru exists to do. Most of the current set is `-bin` packages with repository-only dependencies, so it may be less painful than it sounds, and it may also be quietly wrong the first time an AUR package depends on another one.
+
+3. **A local repository.** paru builds into a directory that is a pacman repository, and pacman installs from it as root the ordinary way. Root never builds, the build user never gains sudo, and dependency resolution stays with the tool that understands it. It is the most machinery of the three and the only one that leaves both halves of D-018 intact.
+
+Recommendation was option 3, and it was wrong in a way worth leaving visible. A local repository does not remove the need to run paru as a non-root user; it only changes what happens after the build. It is option 1 or option 2 with a repository on top, not an alternative to either.
+
+**Answered on 2026-09-02: option 1, the narrow sudoers rule.** D-033 records it and amends D-018.
+
+This is the repository owner's call. Until it is made, `archwork_packages_aur` cannot be installed, which blocks the application manifests, which blocks M7's manifest criterion.
+
+**A second thing this run surfaced, smaller and not blocking.** paru asked which provider to use for `java-runtime-headless`, `cargo`, and for four of the AUR names themselves, where `fsearch`, `claude-code`, `epsonscan2`, `protonup-qt` and `opendeck` each have `-git` or `-bin` siblings. `--noconfirm` takes the default, which is the first listed, so an unattended run silently picks `jdk-openjdk` and `rust` and the non-suffixed AUR package. That happens to be what is wanted in every case here. It is still a dependency chosen by list order rather than by anyone, and whichever option above is taken should pin the providers explicitly.
+
+## D-033 The build account may run the package tools, and D-018 is amended
+
+**Status:** accepted
+**Date:** 2026-09-02
+**Affects:** D-005, D-018, D-025, D-031, M2, M7
+
+D-031 found that `paru` refuses to run as root, so the task that installs the AUR set had never worked. The repository owner chose the narrow sudoers rule on 2026-09-02, from the four options D-031 lists.
+
+`/etc/sudoers.d/20-archwork-build` lets `archwork-build` run `pacman`, `makechrootpkg`, `mkarchroot` and `arch-nspawn` as root without a password, and the install task runs as that user instead of as root. It was written scoped to those four rather than to `ALL`, and that did not survive contact. Two runs took the list apart: paru wants `pacman`, then `makechrootpkg`, then `install -dm755 /var/lib/aurbuild/x86_64`, and nothing suggests that is the end of it. The list was not a boundary, it was a guess about paru's internals, and it failed twice.
+
+It was not a security boundary either, which matters more. `pacman -U` runs the installed package's own scripts as root, so the first entry already granted everything the other three withheld. A narrow-looking rule that grants root anyway is worse than a blanket one, because it invites the next reader to believe in a limit that is not there. The rule is now `ALL`, and reads as what it always was.
+
+Written with `validate: visudo -cf %s` either way, because a malformed sudoers file locks everyone out of sudo on a machine whose recovery story assumes you can get back in.
+
+**This reverses half of D-018, and it should be read as reversed rather than as narrowed.** `pacman -U` runs the installed package's own scripts as root whoever invoked it, so the grant is root-equivalent no matter how short the list of binaries is. D-018 said the build account "holds no privileges of its own"; that is now untrue and this entry is where a future reader should find out.
+
+What makes it acceptable, in the order the argument actually runs:
+
+- The reconcile driving it is already root. This does not widen what an ArchWork update can do; it widens what the build account can do, which is a much smaller set.
+- The account is locked, has no password, no authorized keys and no login shell anyone uses. Nothing reaches it except this role.
+- Installing an AUR package means trusting it as root regardless. The alternative is not a safer install, it is not installing AUR packages.
+
+D-025 removed the `docker` group on adjacent reasoning, and the difference is worth stating so the two do not read as inconsistent. That group was a standing grant to a *human* account for a daemon nothing on the machine was meant to use. This is a grant to a service account for the one thing it exists to do.
+
+Rejected alongside: option 2, Ansible driving `makechrootpkg` per package, which moves AUR dependency resolution into a playbook and reimplements paru badly; and option 3, a local repository, which does not solve the problem on its own and adds machinery on top of whichever option does.
+
+**How the user is switched, which took two goes.** The first attempt used Ansible's `become_user`, and the run died before paru was reached:
+
+    chmod: invalid mode: 'A+user:archwork-build:rx:allow'
+
+`become_user` to an unprivileged account makes Ansible hand its temporary files over with `setfacl`, which needs the `acl` package the machine does not have. Installing it would be a package no decision document lists, added to solve a problem this role had already solved twice: it uses `runuser -u` for `makepkg --packagelist` and says why in a comment right there. So the paru call uses `runuser` too, with `HOME` set explicitly, since `runuser` without `-l` keeps root's.
+
+**A second thing this found, which is not about privileges.** `paru --chroot` builds in `/var/lib/aurbuild`, and `paru --help` offers no option to point it elsewhere. D-018 put the ArchWork chroot at `/var/cache/archwork/chroot` deliberately, under `@var_cache`, so that a large build cache sits outside the rollback boundary. That reasoning is defeated: the chroot this role creates is used only to build paru itself, and every AUR package after that builds in `/var/lib/aurbuild`, which is inside `@` and rolls back with it.
+
+Nothing has been changed about that yet. It is a real gap between what D-018 says the machine does and what it does, and it needs its own decision: either stop using `paru --chroot` and drive `makechrootpkg` against the ArchWork chroot directly, or accept that AUR builds happen inside the rollback boundary and amend D-018 to say so. Whether `paru.conf` can redirect it was not established; the command line cannot.
+
+Consequences:
+
+- `applications-tooling.md` and D-018's wording both need correcting to say the build account has this grant. Until they are, D-018 contradicts the code, which `CLAUDE.md` says is worse than no document.
+- The AUR path still has never completed. This unblocks it; it does not prove it. The run that does is the evidence.
+
+## D-034 Two applications want different Chromiums
+
+**Status:** accepted
+**Date:** 2026-09-02
+**Affects:** `applications.md`, D-029, M7
+
+The first reconcile to reach the AUR install with a working paru stopped here:
+
+    :: Conflicts found:
+        ungoogled-chromium-bin: chromium
+    :: Conflicting packages will have to be confirmed manually
+    error: can not install conflicting packages with --noconfirm
+
+`mermaid-cli` depends on `nodejs` and `chromium`, and has done since M2. It is in `archwork_packages_shared` because `applications.md` asks for Mermaid, diagrams as code, and the CLI renders them through a headless browser. So every ArchWork machine has already installed Google's Chromium, 417 MiB of it, as a dependency nobody looked at.
+
+`ungoogled-chromium-bin` declares `conflicts=chromium` and `provides=chromium=151.0.7922.173`. The repository's `chromium` is at 152.0.7977.75.
+
+So two entries in `applications.md` want incompatible things, and the collision was invisible until something tried to install both. It is not a packaging accident that can be worked around: whichever browser wins, `mermaid-cli` will use it, because it needs a chromium and does not care which.
+
+The real question is therefore not "how do we install both" but **which Chromium this workstation runs**, since there can only be one and the diagram tool gets the same one as the browser.
+
+1. **Repository `chromium`.** Google's build, current, and security updates arrive through the ordinary `pacman -Syu`. `applications.md` chose Ungoogled specifically for "Chromium/Blink compatibility without Google's browser services", so this drops the reason it was listed.
+2. **`ungoogled-chromium-bin`.** What the document asked for. It satisfies `mermaid-cli` through `provides`, so nothing else breaks. The cost is that a browser is the most exposed program on a workstation, and this one is a binary repackaged by an AUR maintainer, currently a major version behind the repository, updated when that maintainer gets to it. The install also has to be allowed to replace `chromium`, which `paru --noconfirm` refuses to do on its own.
+3. **Neither, and drop `mermaid-cli`.** Not really available: Mermaid is the documented diagram tool, and the CLI needs a browser engine. It only moves the question.
+
+Recommendation: option 1, the repository package, and amend `applications.md` rather than leave it saying something the machine does not do. The reasoning is that the "ungoogled" benefit is about telemetry and Google service integration, while the cost is slower security updates on the single most attack-exposed application on the machine, and this workstation already runs Zen as its primary browser. Chromium here is the compatibility fallback and the thing that renders diagrams, which is a much weaker case for accepting a lagging build.
+
+If the ungoogled build matters more than the update lag, option 2 is legitimate and the manifest change is one line, plus whatever makes the replacement non-interactive.
+
+**Answered on 2026-09-02: option 2, `ungoogled-chromium-bin`.** The recommendation was overruled, and the reasoning it rested on is worth keeping visible rather than deleting: this does mean the browser engine on the machine, used both for browsing and for rendering diagrams, updates when an AUR maintainer rebuilds rather than when Arch ships a fix. That is the cost being accepted, deliberately, for a build without Google's services in it.
+
+What makes it work: `mermaid-cli` needs *a* chromium and `ungoogled-chromium-bin` provides one, so nothing is left unsatisfied. The two were only ever going to be the same program.
+
+How it is installed, since paru will not do it alone. `archwork_packages_aur_replaces` names the repository packages an AUR package replaces, and the aur role removes any that are installed with `pacman -Rdd` immediately before the AUR set goes in. `-Rdd` because the point is that something does still depend on the name: between those two tasks `mermaid-cli` has an unsatisfied dependency, and the window closes inside the same reconcile. The list is a variable rather than a hardcoded package name, because this role has no business knowing about Chromium and the next replacement should be one line in `group_vars`.
+
+`applications.md` still needs a sentence saying the two entries are the same program, so that the next reader does not rediscover this the way this run did.
+
+**The first implementation of this was not idempotent, and the reason is the same shape as the bug it was fixing.** It asked `pacman -Q chromium`, which answers yes when something merely *provides* chromium. Once `ungoogled-chromium-bin` was installed, the second reconcile was told chromium was still there and then failed removing a package that no longer existed:
+
+    pacman -Rdd --noconfirm chromium -> non-zero
+
+The question meant was "is a package called chromium installed", and the question asked was "is the name chromium satisfied". A provider answers the second and not the first. It now reads `pacman -Qq`, which lists installed package names and resolves nothing, and tests exact membership.
+
+That is the third time in this work a check has been answered by something other than the thing it was about, after `hyprctl hyprpaper listloaded` and `no_suspend_logged_since`. M2's second-run-changes-nothing rule is what caught it, which is the rule doing exactly what it was written for.
+
+## D-035 Two AUR packages will not build, and both are source builds
+
+**Status:** open, and it defers two applications
+**Date:** 2026-09-03
+**Affects:** `applications.md`, D-029, M7
+
+The run that finally had room to finish built twelve of the fourteen AUR packages over 52 minutes and then stopped:
+
+    error: packages failed to build: joplin-3.6.16-1 (joplin-desktop)  opendeck-2.14.0-1
+
+Those two are the only entries in the set that build from source. Every other one is a `-bin` package that unpacks a binary upstream already published, which is why the other twelve took 52 minutes between them and these two took the run down.
+
+What the logs actually say, which is less than it should be. `opendeck` fails inside `rustc` with `failed to build app`, and paru does not pass the compiler's own diagnostic through, so the reason is not in the transcript. `joplin-desktop` fails with `Build failed, check /var/lib/aurbuild/x86_64/archwork-build/build`, a path inside a chroot the run then tore down. Neither failure names a cause, and no evidence of an out-of-memory kill appears in either, though the guest has 4 GB and both are large JavaScript and Rust builds.
+
+So the honest position is that two source builds failed for reasons this run did not capture.
+
+**Both have `-bin` variants.** `opendeck-bin` and `joplin-bin` exist, and `joplin-appimage` besides. D-029 already states the principle: the `-bin` variants are deliberate where upstream ships a binary, because building the same program from source in the chroot costs hours and produces the same program. These two were listed without that rule being applied to them.
+
+Recommendation: switch both to `-bin`. It follows a decision already taken rather than making a new one, it removes the two longest builds from every rebuild, and it sidesteps a class of failure that has now cost a run. If the source builds matter for a reason this entry does not know about, the alternative is to find out why they fail, which needs the chroot kept after a failure and the compiler output captured, neither of which the harness does today.
+
+Not decided here, because it changes which package the machine installs and that is `applications.md`'s business.
+
+**Deferred meanwhile.** Both are commented out of the manifests rather than deleted, with a pointer to this entry. M7's criterion allows an entry to be deliberately left out as long as the reason is written down, and this is that. The cost of leaving them in was the whole run, and everything else waiting behind them, M4's timings, M5's rollback and the wallpaper, has never been proven in a single pass.

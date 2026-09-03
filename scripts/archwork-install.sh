@@ -457,6 +457,50 @@ base_packages() {
 	printf '%s\n' "${packages[@]}"
 }
 
+# Multilib, on the profile that games (D-029).
+#
+# Steam is a multilib package and the stock pacman.conf ships that repository
+# commented out. Ansible enables it too, and cannot be the only thing that
+# does: `ansible-playbook --check` changes nothing by definition, so on a fresh
+# machine the dry run would still not know about steam and would fail against a
+# machine that is perfectly fine. M2 requires that check to pass.
+#
+# The packages role reconciling the same file is deliberate rather than
+# duplication. D-027 noted that files written only by this installer are a real
+# gap in what reconciliation can reach afterwards; enabling it in both places
+# means a machine installed before this existed still converges.
+configure_multilib() {
+	[ "$PROFILE" = "desktop" ] || return 0
+
+	log "Enabling the multilib repository"
+
+	if [ "$DRY_RUN" = true ]; then
+		printf '  would uncomment [multilib] in %s/etc/pacman.conf\n' "$MOUNT_ROOT"
+		return 0
+	fi
+
+	local conf="$MOUNT_ROOT/etc/pacman.conf"
+	[ -f "$conf" ] || die "no pacman.conf at $conf"
+
+	# Anchored on the commented pair the stock file ships, so this is a no-op
+	# on a file that already has it and never touches [multilib-testing].
+	# sed rather than perl: this runs on the Arch ISO, which carries sed in
+	# base and does not promise perl.
+	sed -i '/^#\[multilib\]$/{N;s/^#\[multilib\]\n#Include = \(.*\)$/[multilib]\nInclude = \1/}' "$conf"
+
+	grep -q '^\[multilib\]' "$conf" ||
+		die "could not enable multilib in $conf. Its [multilib] section is not the stock one."
+
+	# Sync the new repository's database, or the machine arrives knowing the
+	# repository exists and nothing that is in it. That is not a cosmetic
+	# difference: `ansible-playbook --check` does not refresh the database,
+	# because a dry run changes nothing, so the first thing it does on a fresh
+	# machine is fail to find steam. A run on 2026-09-02 got exactly that far
+	# twice, once before this function existed and once after, because the
+	# first version enabled the repository and left the database alone.
+	in_chroot pacman -Sy --noconfirm
+}
+
 install_base() {
 	log "Installing the base system"
 
@@ -755,6 +799,7 @@ main() {
 	create_filesystems
 	mount_filesystems
 	install_base
+	configure_multilib
 	create_swapfile
 	configure_system
 	clone_repository

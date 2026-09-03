@@ -18,7 +18,8 @@ review: 2027-02-27
 - Ansible
   - `community.general >= 8.0.0`
 - devtools
-  - Provides the clean chroot that AUR builds run in (D-005).
+  - Provides `makechrootpkg`, which paru builds through (D-005). See the note
+    under Package management about where that chroot actually lives.
 - Node.js + npm
 - age
 - jq
@@ -62,6 +63,8 @@ Decided at D-016.
 - paru as the AUR helper (D-005).
 - AUR packages build in a clean chroot through `devtools`, never on the workstation.
 - The update workflow uses the same chroot.
+- Which chroot that is turned out not to be the one this repository creates. `paru --chroot` builds in `/var/lib/aurbuild` and has no option to point it elsewhere, so the chroot the `aur` role makes at `/var/cache/archwork/chroot` is used to build paru itself and nothing after that. The two lines above are still true as written, and the placement D-018 chose is not: `@var_cache` was picked so a large build cache would sit outside the rollback boundary, and AUR builds are inside `@`. D-033 records it; it is not decided.
+- The build account is not unprivileged. `archwork-build` has a passwordless sudo rule, because paru refuses to run as root and reaches for root itself (D-033, amending D-018).
 
 ## Audio
 

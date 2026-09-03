@@ -17,8 +17,9 @@
 
 - name: Create the build user
   # makepkg refuses to run as root, so the build needs an unprivileged account
-  # to drop into. It holds no privileges of its own: a locked password, no
-  # authorized keys, and nothing in sudoers (D-018).
+  # to drop into. A locked password, no authorized keys and no login route
+  # (D-018). It is no longer true that it appears in no sudoers file: D-033
+  # gives it the package tools, because paru refuses to run as root.
   ansible.builtin.user:
     name: "{{ archwork_build_user }}"
     system: true
@@ -135,12 +136,126 @@
         cmd: pacman -U --noconfirm {{ aur_paru_package.stdout_lines | first }}
       changed_when: true
 
+- name: Let the build account reach the package tools
+  # paru refuses to run as root, so the install below runs as the build user,
+  # and that user needs pacman and the devtools chroot helpers (D-033). This
+  # reverses the "nothing in sudoers" half of D-018 on purpose.
+  #
+  # validate is not optional here. A malformed sudoers file locks everyone out
+  # of sudo on a machine whose whole recovery story assumes you can get back
+  # in, and visudo -cf is what stops this role ever shipping one.
+  ansible.builtin.copy:
+    src: 20-archwork-build.sudoers
+    dest: /etc/sudoers.d/20-archwork-build
+    owner: root
+    group: root
+    mode: "0440"
+    validate: visudo -cf %s
+  become: true
+
+- name: List the packages that are actually installed
+  # pacman -Q NAME answers yes when something merely *provides* NAME, which is
+  # the wrong question here and made the second reconcile fail on 2026-09-03.
+  # ungoogled-chromium-bin provides chromium, so once it was installed the
+  # check below said chromium was still there, and pacman -Rdd chromium then
+  # failed because no package by that name exists any more.
+  #
+  # -Qq lists the names of installed packages and resolves nothing, so an
+  # exact match against it asks what was meant: is a package called this
+  # installed, not is this name satisfied.
+  ansible.builtin.command:
+    cmd: pacman -Qq
+  register: aur_installed
+  changed_when: false
+  check_mode: false
+  become: true
+
+- name: Remove repository packages an AUR package replaces
+  # D-034. An AUR package that declares conflicts= and provides= for a
+  # repository package is a drop-in replacement, and pacman would swap them
+  # given a confirmation. paru refuses before pacman ever sees it, saying it
+  # "can not install conflicting packages with --noconfirm", so there is no
+  # flag to answer and the repository package has to be gone first.
+  #
+  # -Rdd, because the whole point is that something still depends on the name:
+  # mermaid-cli needs a chromium, and the AUR package provides one the moment
+  # it lands. Between this task and the next the dependency is unsatisfied,
+  # which is a real window that closes inside the same reconcile.
+  #
+  # Named in a variable rather than hardcoded: this role has no business
+  # knowing about Chromium, and the next replacement should be one line in
+  # group_vars rather than an edit to a task.
+  ansible.builtin.command:
+    cmd: pacman -Rdd --noconfirm {{ item }}
+  loop: "{{ archwork_packages_aur_replaces }}"
+  when:
+    - not ansible_check_mode
+    - item in aur_installed.stdout_lines | default([])
+  changed_when: true
+  become: true
+
 - name: Install the AUR package set
   # paru builds through the same chroot, so this never leaves make dependencies
-  # on the workstation (D-005). The list is empty until M3 needs it.
+  # on the workstation (D-005). The shared list and the profile list are
+  # concatenated here rather than in a profile file, so that neither this task
+  # nor any group_vars file has to know what the other profile installs.
+  # runuser, not become_user, for the reason this role already gives above:
+  # root becomes another user without needing a rule. become_user to an
+  # unprivileged account makes Ansible hand its temporary files over with
+  # setfacl, which needs the acl package, and without it the run dies on
+  # "chmod: invalid mode: A+user:archwork-build:rx:allow" before paru is
+  # reached at all. Installing acl to work around that would be a package no
+  # decision document lists, to solve a problem this role had already solved.
+  #
+  # HOME is set explicitly because runuser without -l keeps root's, and paru
+  # keeps its clone cache under it.
   ansible.builtin.command:
-    cmd: paru --sync --noconfirm --chroot --needed {{ archwork_packages_aur | join(' ') }}
+    cmd: >-
+      runuser -u {{ archwork_build_user }} --
+      env HOME={{ archwork_build_home }}
+      paru --sync --noconfirm --chroot --needed
+      {{ (archwork_packages_aur + archwork_packages_aur_profile) | join(' ') }}
   register: aur_paru_sync
-  when: archwork_packages_aur | length > 0
+  when: (archwork_packages_aur + archwork_packages_aur_profile) | length > 0
   changed_when: "'there is nothing to do' not in aur_paru_sync.stdout | lower"
+  failed_when: false
   become: true
+
+# What paru reports when a build fails is that a build failed. It does not pass
+# the compiler's own output through, and makepkg's log lives inside the chroot
+# copy, so a failure on 2026-09-03 produced two package names and no reason
+# (D-035). The chroot is still there after the run, and nobody was going to
+# look inside it by hand on a machine the harness tears down.
+- name: Find the build logs of anything that failed
+  ansible.builtin.find:
+    paths: "/var/lib/aurbuild/x86_64/{{ archwork_build_user }}/build"
+    patterns: "*.log"
+    recurse: true
+    file_type: file
+  register: aur_build_logs
+  when:
+    - aur_paru_sync is defined
+    - aur_paru_sync.rc is defined
+    - aur_paru_sync.rc != 0
+  failed_when: false
+  become: true
+
+- name: Say what the build actually said, then fail
+  # The point of this task is the message. Ansible would otherwise report a
+  # non-zero return code and the package names, which is what sent a person
+  # into a chroot that had already been deleted.
+  ansible.builtin.fail:
+    msg: |-
+      The AUR build failed.
+
+      paru said:
+      {{ aur_paru_sync.stderr | default('') | regex_search('error: packages failed to build.*') | default('nothing useful', true) }}
+
+      Build logs left in the chroot, which is kept:
+      {{ (aur_build_logs.files | default([]) | map(attribute='path') | list) | join('\n      ') | default('none found', true) }}
+
+      Read them with: sudo cat <path>
+  when:
+    - aur_paru_sync is defined
+    - aur_paru_sync.rc is defined
+    - aur_paru_sync.rc != 0
