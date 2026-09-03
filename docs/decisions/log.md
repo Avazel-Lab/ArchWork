@@ -796,4 +796,16 @@ The repository owner's condition was that the fix be no more involved than an or
 
 **What made this expensive is worth recording.** The old keys are not rejected. hyprpaper reads them, produces no wallpaper, and says so only as `Monitor Virtual-1 has no target: no wp will be created` in a log nobody was reading. Four syntax variants, both path forms, two launch methods and an environment variable were ruled out one at a time against a program that was never going to accept any of them. The wiki page for the tool does not carry the configuration section, and the package ships no example, so the answer came from an upstream issue thread.
 
+**The format fix was right, and the wallpaper still cannot be proven here.** With the block configuration in place, hyprpaper reads it, finds the monitor, and gets as far as allocating a buffer before dying:
+
+    KMS: DRM_IOCTL_MODE_CREATE_DUMB failed: Permission denied
+    GBM: Failed to allocate a GBM buffer: bo null
+    Swapchain: Failed acquiring a buffer
+
+0.8 renders through hyprtoolkit and aquamarine. In a guest with no real GPU that path fails before it reaches the image: EGL will not initialise, the fallback asks KMS for a dumb buffer, the ioctl is refused, and the process dies. Reaching buffer allocation at all is the evidence that the configuration is now correct, because the old format never got past "no target".
+
+So this joins the M4 dim criterion as something a VM cannot settle. `assert-m3.sh` asks `hyprpaper_can_render` first and skips the wallpaper checks where the answer is no, counted apart from the passes rather than failing on every run. The configuration check still runs everywhere, because that part is about the file and not the hardware.
+
+Only a machine with a GPU proves it, which means `hmlxdesktop02` and its RTX 3060. Until then the wallpaper is written, generated, configured in the right format, and unproven.
+
 **The watch item stands and is now sharper.** Two of the three Hyprland ecosystem tools this repository configures have changed format inside six weeks. `hypridle.conf` carries every M4 timing and `hyprlock.conf` is the lock screen, and both would fail the same way: read, ignored, silent. The M4 assertions measure effects rather than reading the file, so a hypridle migration would surface as timings that stop firing rather than as nothing at all, which is the one piece of luck in this.

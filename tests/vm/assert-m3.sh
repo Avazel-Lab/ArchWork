@@ -31,14 +31,23 @@ check "the compositor answers hyprctl" compositor_answers "$USER_NAME"
 check "a wayland socket exists in the runtime directory" wayland_socket_present "$USER_NAME"
 
 printf '\nThe wallpaper, which is the keybinding cheat sheet\n'
-check "hyprpaper is running as the user" user_process_running "$USER_NAME" hyprpaper
+# The configuration is asserted wherever this runs. Whether anything can be
+# drawn is a question about the machine, so ask that first and skip the rest
+# where the answer is no.
 check "hyprpaper.conf is the one in the repository clone" \
 	config_is_repo_dotfile "/home/$USER_NAME/.config/hypr/hyprpaper.conf" "$USER_NAME"
-# On the monitor, not merely configured. A hyprpaper that could not read its
-# image is still a running hyprpaper, and an unreadable cheat sheet helps
-# nobody.
-check "the sheet is on the monitor and not just named in the config" \
-	hyprpaper_active "$USER_NAME" wallpaper-keybindings.png
+
+if hyprpaper_can_render "$USER_NAME"; then
+	check "hyprpaper is running as the user" user_process_running "$USER_NAME" hyprpaper
+	# On the monitor, not merely configured. A hyprpaper that could not read
+	# its image is still a running hyprpaper, and an unreadable cheat sheet
+	# helps nobody.
+	check "the sheet is on the monitor and not just named in the config" \
+		hyprpaper_active "$USER_NAME" wallpaper-keybindings.png
+else
+	skip "the wallpaper is on the monitor" \
+		"hyprpaper 0.8 renders through hyprtoolkit and aquamarine, and that path cannot allocate a buffer on this machine: EGL does not initialise, the KMS fallback is refused DRM_IOCTL_MODE_CREATE_DUMB, and it dies acquiring a swapchain buffer. It reads the configuration and finds the monitor first, so this is the VM having no GPU rather than the wallpaper being wrong. Only a machine with one settles it (D-032)."
+fi
 
 printf '\nSecret Service (D-004, D-012)\n'
 check "gnome-keyring-daemon is running as the user" user_process_running "$USER_NAME" gnome-keyring-d
