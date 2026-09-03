@@ -489,6 +489,10 @@ start_http_server() {
 	done
 }
 
+# std VGA rather than virtio-vga, and not for a graphical reason: virtio-gpu
+# does not survive S3 in this guest, and every later user of DRM blocks behind
+# the atomic commit that never completes (D-037). Both draw the same 1280x800
+# framebuffer for screendump, which is all D-021 asks of the display.
 qemu_base_args() {
 	printf '%s\n' \
 		-machine q35,accel=kvm \
@@ -498,7 +502,7 @@ qemu_base_args() {
 		-drive "if=pflash,format=raw,readonly=on,file=$OVMF_CODE" \
 		-drive "if=pflash,format=raw,file=$WORK_DIR/OVMF_VARS.fd" \
 		-drive "if=virtio,format=qcow2,file=$WORK_DIR/disk.qcow2" \
-		-vga none \
+		-vga std \
 		-no-reboot
 }
 
@@ -542,7 +546,6 @@ start_installed_vm() {
 		-netdev "user,id=net0,hostfwd=tcp::$SSH_PORT-:22" \
 		-device virtio-net-pci,netdev=net0 \
 		-display none \
-		-device virtio-vga \
 		-serial "unix:$WORK_DIR/serial.sock,server,nowait" \
 		-monitor "unix:$WORK_DIR/monitor.sock,server,nowait" \
 		-daemonize -pidfile "$WORK_DIR/qemu.pid" ||
@@ -1168,14 +1171,23 @@ phase_rollback() {
 # Reboot the guest and wait for it to answer again. Shared by the rollback
 # phase and anything else that needs the machine to come back rather than to
 # stop, unlike phase_recovery, which wants QEMU to exit.
+#
+# The default deadline is what systemd can legitimately take, not a guess. A
+# unit that ignores SIGTERM costs DefaultTimeoutStopSec, then another wait in
+# final-sigterm, and systemd-logind does exactly that on a guest that has been
+# suspended (D-037): 90s, then 180s, then 90s more before the rest of the
+# shutdown runs. Run 21 allowed 420s for a shutdown that took 361s plus a boot,
+# and failed a rollback that had worked.
 reboot_guest() {
-	local deadline="${1:-420}"
+	local deadline="${1:-600}"
 
 	local shutdown_log="$WORK_DIR/reboot-console.log"
 	python3 "$SCRIPT_DIR/serial-log.py" \
 		--socket "$WORK_DIR/serial.sock" --out "$shutdown_log" &
 	local serial_logger=$!
 
+	local began
+	began="$(date +%s)"
 	ssh "${SSH_OPTS[@]}" gary@127.0.0.1 'sudo systemctl reboot' || true
 
 	local waited=0
@@ -1183,8 +1195,16 @@ reboot_guest() {
 		sleep 2
 		waited=$((waited + 2))
 		if [ "$waited" -ge "$deadline" ]; then
+			# Say what the guest was doing, not only that it did not stop.
+			# phase_recovery learned this the expensive way: a guest that
+			# went back to sleep and a guest stuck on shutdown look identical
+			# from out here, and the difference is the whole diagnosis.
+			local state
+			state="$(python3 "$SCRIPT_DIR/suspend-watch.py" \
+				--monitor "$WORK_DIR/monitor.sock" --status 2>/dev/null)"
 			kill "$serial_logger" 2>/dev/null || true
-			printf '\nthe last thing the console said:\n' >&2
+			printf '\nQEMU reports its run state as %s.\n' "${state:-unreadable}" >&2
+			printf 'the last thing the console said:\n' >&2
 			tr -d '\033' <"$shutdown_log" 2>/dev/null | tail -n 25 >&2 || true
 			return 1
 		fi
@@ -1192,6 +1212,17 @@ reboot_guest() {
 	kill "$serial_logger" 2>/dev/null || true
 	wait "$serial_logger" 2>/dev/null || true
 	QEMU_PID=""
+
+	# Report it rather than absorb it. A deadline generous enough to survive
+	# D-037 is also generous enough to hide it, and a six minute reboot on a
+	# machine somebody uses is a defect whether or not the run goes green.
+	local shutdown_took=$(($(date +%s) - began))
+	printf '  note  the shutdown took %ss\n' "$shutdown_took"
+	if [ "$shutdown_took" -ge 120 ]; then
+		printf '        that is far longer than a shutdown should take. See D-037:\n'
+		printf '        systemd-logind blocks on the DRM modeset lock after a suspend,\n'
+		printf '        and systemd waits out three timeouts before it gives up on it.\n'
+	fi
 
 	start_installed_vm
 
@@ -1240,8 +1271,10 @@ phase_recovery() {
 
 	# systemd gives a unit 90 seconds to stop by default and a graphical
 	# session has several of them, so 120 was a race this lost rather than a
-	# limit that meant anything.
-	local waited=0 deadline=420
+	# limit that meant anything. 420 was too, on any run that has slept: a
+	# logind stuck on the DRM modeset lock costs 360 seconds of timeouts
+	# before the rest of the shutdown starts (D-037).
+	local waited=0 deadline=600
 	while kill -0 "$QEMU_PID" 2>/dev/null; do
 		sleep 2
 		waited=$((waited + 2))

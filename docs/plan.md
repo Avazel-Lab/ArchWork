@@ -8,7 +8,9 @@ It does not record progress. `docs/STATUS.yml` does that, and it is the only fil
 
 Each milestone has exit criteria that someone can check. "Working" is not an exit criterion. "Two consecutive unattended runs produce a bootable VM" is.
 
-Milestones run roughly in order, but M1 through M5 build on each other while M6 can start once M5 holds. M8 and M9 wait on M7. M10 waits thirty days per machine after M8 or M9.
+Milestones run roughly in order, but M1 through M5 build on each other while M6 can start once M5 holds. M8 and M9 wait on M7. M7.5 does not: it is the one milestone that deliberately runs ahead of the proving run, because the platform is more useful being used than it is waiting (D-036). M10 waits thirty days per machine after M8 or M9.
+
+A milestone inserted between two existing ones takes a fractional number rather than renumbering the ones after it. Milestone IDs are referenced from `docs/STATUS.yml`, the decision log and commit messages, so they are cheaper to leave alone.
 
 ## Milestones
 
@@ -126,6 +128,28 @@ Exit criteria:
 - The package manifests account for every application in `decisions/applications.md`, or name the ones deliberately left out and say why. An entry that is deferred is fine; an entry nobody has looked at is not.
 - Nothing needed to reach that desktop was installed by hand. The check is the same one M2 uses: reconcile twice, and require the second run to change nothing.
 - Wall-clock timings recorded in `docs/STATUS.yml` with the commit SHA.
+
+### M7.5 MVP daily driver
+
+The point of this milestone is to stop developing the platform only in virtual machines. `hmlxdesktop02` becomes a machine the repository owner uses for real work, and the machine this repository is developed on, while Kubuntu stays the primary boot and the place end-to-end VM testing runs.
+
+It sits before M8 rather than inside it because M8 is about the desktop being finished: gaming, local AI, a NAS restore and thirty days of green health checks. This is about it being usable at all. It runs ahead of M7 deliberately, because M7 wants three consecutive zero-touch rebuilds and waiting for that keeps the platform in VMs for as long as the last bug takes (D-036).
+
+The machine is disposable, and that is what makes this cheap. Losing the whole Arch installation costs nothing, so no backup, snapshot or `/home` protection is in scope.
+
+Everything reaches the machine through Ansible, exactly as a deployment does. Manual configuration is not a shortcut that is permitted here and tidied up later. Avoiding it is most of the point.
+
+Exit criteria:
+
+- Installed from the ISO at one named commit on `main`, and brought to a desktop by `bootstrap.sh` alone with no manual step after it.
+- Zen Browser, Visual Studio Code and the Claude Code CLI launch on the machine, installed from the manifests by the AUR path. That path has never run on hardware.
+- `make check` passes on `hmlxdesktop02` itself. That is what proves the repository's own tooling is on the machine rather than assumed: git, ansible, ansible-lint, shellcheck, yamllint and python.
+- A second reconcile on the hardware reports zero changed tasks. The M2 rule has only ever been proven in a VM.
+- `archwork-health` passes on the machine.
+- Claude Code can commit and push from `hmlxdesktop02`, through an ed25519 key generated on that machine and added to the GitHub account. No private key enters this repository or the `age` set (`CLAUDE.md`, D-006).
+- Kubuntu is still the default boot entry, and Arch is still chosen deliberately from the firmware boot menu. Nothing here changes the boot order.
+
+Out of scope, named so that nobody adds them: `/home` backup, the NAS, Steam and controllers, local AI models, configuration drift detection, and every part of the thirty-day clock. Those stay in M8.
 
 ### M8 Physical desktop
 

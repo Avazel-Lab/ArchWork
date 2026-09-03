@@ -3,7 +3,7 @@
 # Validated by scripts/check-plan-status.py.
 ---
 schema: 1
-updated: 2026-09-02
+updated: 2026-09-03
 
 phase: M4
 
@@ -35,6 +35,8 @@ milestones:
   M6:
     status: not-started
   M7:
+    status: not-started
+  M7.5:
     status: not-started
   M8:
     status: in-progress
@@ -186,33 +188,51 @@ first_install:
 # through to its health checks for the first time, and broke itself on
 # purpose and watched the health check notice.
 #
-# It then failed rebooting onto the rolled-back root. That one step is all
-# that stands between this and a green run.
+# It then failed rebooting onto the rolled-back root, and that is now
+# diagnosed and fixed (D-037). The disk was kept and booted, and the guest's
+# own journal says the machine never rebooted at all: a kernel worker was
+# stuck inside virtio_gpu after the resume from S3, holding the DRM modeset
+# lock, and systemd-logind blocked behind it in uninterruptible sleep. That
+# is an emulated device that does not survive a suspend, not a fault in
+# anything this repository installs, and it is why the rollback phase passes
+# when resumed on its own: only a full run suspends.
 #
-# What is known about it, rather than guessed: the same phase passes on its
-# own when resumed with --phases rollback, booting the same disk by hand
-# answers SSH immediately, the SSH window is 300 seconds where 120 also
-# failed, and start_installed_vm does remove the stale sockets. The one
-# difference between the passing case and the failing one is that the failing
-# one has been through M4's suspend and wake first.
+# The harness now boots the installed system on std VGA. Measured on the same
+# disk, timed from the reboot request to QEMU exiting: virtio-vga did not
+# finish within 700 seconds, and std VGA finished in 4. Hyprland starts on it
+# and both the greeter and the session captured, so D-021 is unaffected.
+#
+# No claim is made about hardware. hmlxdesktop02 has an RTX 3060 and no
+# virtio-gpu, so nothing here says whether a real machine that has slept
+# reboots promptly.
 
 next_actions:
-  - Find why the post-rollback reboot does not bring SSH back in a full run.
-    The rollback phase passes on its own when resumed, and fails at the same
-    point inside a full vm-power run, after M4 has suspended and woken the
-    machine. That difference is the lead. Booting the same disk by hand
-    answers SSH at once, so the machine is fine and the harness path is not
-  - Decide where AUR packages build. paru --chroot uses /var/lib/aurbuild and
-    cannot be redirected, so the placement D-018 chose to keep a large build
-    cache outside the rollback boundary is defeated (D-033)
-  - Decide whether joplin-desktop and opendeck become their -bin variants.
-    Both are source builds, both failed, and both are deferred with the
-    reason written down (D-035)
+  - Start M7.5 (D-036). Install hmlxdesktop02 from the ISO at one commit on
+    main and bring it up with bootstrap.sh alone, so the machine can be used
+    for work and for developing this repository. Nothing needs writing
+    first, because the applications have been in the manifests since D-029
+  - Run make vm-power end to end on the std VGA harness. D-037 removed the
+    reason run 21 died and nothing else is known to be in the way, so the
+    next run is the one that either goes green or finds the next thing
+  - Two decisions wait on the repository owner. Where AUR packages build now
+    that paru --chroot defeats the placement D-018 chose (D-033), and whether
+    joplin-desktop and opendeck become their -bin variants (D-035)
+
+# M7.5 was added on 2026-09-03 (D-036) and has not started. It is the one
+# milestone that runs ahead of M7 on purpose: the machine is installed, the
+# applications have been in the manifests since D-029, and holding it unusable
+# until three clean rebuilds pass keeps every hour of development inside an
+# hour-long VM harness. Nothing needs to be written for it. The four gaps
+# raised against it were all closed by the repository owner as out of scope:
+# no drift detection, no boot order change, no /home backup, and end-to-end
+# testing stays in Kubuntu. The Arch installation is disposable and that is
+# what makes the milestone small.
 
 blockers:
   - No vm-power run has completed end to end. Run 21 on 2026-09-03 got the
-    furthest and died on the reboot after the rollback. Everything before
-    that passed, including the update workflow and the deliberate break.
+    furthest and died on the reboot after the rollback. The cause is found
+    and fixed (D-037), and the fix has been shown to work on its own; no
+    full run has been done on it yet.
   - The keybinding wallpaper cannot be proven in a VM. hyprpaper 0.8 renders
     through hyprtoolkit and cannot allocate a buffer without a GPU, so its
     checks are skipped there and hmlxdesktop02 is what settles it (D-032).
