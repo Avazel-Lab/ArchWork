@@ -42,7 +42,7 @@ lsblk -d -o NAME,SIZE,SERIAL,MODEL,TRAN
 Find the row whose size matches your stick and whose `TRAN` says `usb`. Then:
 
 ```bash
-cd ~/src/ArchWork
+cd ~/projects/active/ArchWork
 sudo scripts/make-install-usb.sh --iso ~/.cache/archwork/archlinux-x86_64.iso /dev/sdX
 ```
 
@@ -168,7 +168,7 @@ No desktop yet. That is expected.
 ## Step 9. Build the desktop
 
 ```bash
-cd ~/src/ArchWork
+cd ~/projects/active/ArchWork
 ./bootstrap.sh
 ```
 

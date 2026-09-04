@@ -38,7 +38,7 @@ Use Btrfs on both systems.
 - Caches are excluded from rollback.
 - AI model storage is excluded from rollback.
 - `@swap` is excluded from rollback. Rolling back a swapfile achieves nothing, and it would change `resume_offset`, which is baked into the laptop kernel command line.
-- The ArchWork checkout lives at `/home/<user>/src/ArchWork`, so it sits outside the rollback boundary by consequence rather than choice (D-016). Inside `@`, a rollback would rewind the checkout at the moment it is being used to debug that rollback, discarding uncommitted work with it.
+- The ArchWork checkout lives at `/home/<user>/projects/active/ArchWork` (D-046), so it sits outside the rollback boundary by consequence rather than choice (D-016). Inside `@`, a rollback would rewind the checkout at the moment it is being used to debug that rollback, discarding uncommitted work with it.
 
 ## Swap and hibernation
 

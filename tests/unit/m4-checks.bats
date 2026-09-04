@@ -108,9 +108,9 @@ CONF
 	# used to be exactly that, and would have failed every real run.
 	HOME_ROOT="$BATS_TEST_TMPDIR/home"
 	local home="$HOME_ROOT/someone"
-	mkdir -p "$home/src/ArchWork/dotfiles/hypr" "$home/.config"
-	: >"$home/src/ArchWork/dotfiles/hypr/hypridle.conf"
-	ln -s "$home/src/ArchWork/dotfiles/hypr" "$home/.config/hypr"
+	mkdir -p "$home/projects/active/ArchWork/dotfiles/hypr" "$home/.config"
+	: >"$home/projects/active/ArchWork/dotfiles/hypr/hypridle.conf"
+	ln -s "$home/projects/active/ArchWork/dotfiles/hypr" "$home/.config/hypr"
 
 	config_is_repo_dotfile "$home/.config/hypr/hypridle.conf" someone
 

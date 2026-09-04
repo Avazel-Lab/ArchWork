@@ -120,18 +120,18 @@ check_recovery_no_autodetect() {
 
 # D-016: the machine configures itself, so it must arrive able to do so.
 repo_present() {
-	test -d "/home/$1/src/ArchWork/.git"
+	test -d "/home/$1/projects/active/ArchWork/.git"
 }
 
 repo_owned_by_user() {
-	[ "$(stat -c '%U' "/home/$1/src/ArchWork")" = "$1" ]
+	[ "$(stat -c '%U' "/home/$1/projects/active/ArchWork")" = "$1" ]
 }
 
 # A clone keeps its source as origin, which on the target is a path on the ISO
 # that no longer exists. It works perfectly until the first git pull.
 repo_origin_is_upstream() {
 	local origin
-	origin="$(git -C "/home/$1/src/ArchWork" remote get-url origin 2>/dev/null)"
+	origin="$(git -C "/home/$1/projects/active/ArchWork" remote get-url origin 2>/dev/null)"
 	case "$origin" in
 	"" | /* | file:*) return 1 ;;
 	*) return 0 ;;
@@ -468,7 +468,7 @@ HOME_ROOT="${HOME_ROOT:-/home}"
 
 config_is_repo_dotfile() {
 	local path="$1" user="$2"
-	[ "$(readlink -f "$path")" = "$HOME_ROOT/$user/src/ArchWork/dotfiles/hypr/$(basename "$path")" ]
+	[ "$(readlink -f "$path")" = "$HOME_ROOT/$user/projects/active/ArchWork/dotfiles/hypr/$(basename "$path")" ]
 }
 
 # The wallpaper hyprpaper is actually showing, not the one its file asks for.

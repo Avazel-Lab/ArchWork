@@ -29,7 +29,7 @@ archwork_admin_user: gary
 # scripts/archwork-install.sh. The dotfiles role links the user configuration
 # at this clone rather than copying it, so an edit made at the machine is an
 # edit to the repository.
-archwork_repo_dir: "/home/{{ archwork_admin_user }}/src/ArchWork"
+archwork_repo_dir: "/home/{{ archwork_admin_user }}/projects/active/ArchWork"
 archwork_dotfiles_dir: "{{ archwork_repo_dir }}/dotfiles"
 
 # Directories under dotfiles/ that become directories under ~/.config. Whole
