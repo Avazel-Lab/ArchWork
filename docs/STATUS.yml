@@ -252,10 +252,10 @@ next_actions:
 # and that is what makes the milestone small.
 
 blockers:
-  - make check's unit target fails on main: two tests (archwork-health.bats,
+  - "make check's unit target fails on main. Two tests (archwork-health.bats,
     m4-checks.bats) assert the shipped hypridle config has all three M4
     timings. dotfiles/hypr/hypridle.conf currently has display-off and sleep
     disabled on purpose, a stopgap for D-044 and D-045 costing keyboard and
-    mouse control on hmlxdesktop02. The tests are correct; the config is
+    mouse control on hmlxdesktop02. The tests are correct, the config is
     deliberately noncompliant until those are understood. Clears when the
-    two commented listener blocks are restored.
+    two commented listener blocks are restored."
