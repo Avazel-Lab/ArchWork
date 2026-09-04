@@ -1,0 +1,30 @@
+# Managed by ArchWork. D-033.
+#
+# paru --chroot builds in /var/lib/aurbuild and the command line flag takes no
+# path, so the build chroot lands inside @ and rolls back with it. D-018 chose
+# @var_cache precisely so a large build cache would sit outside the rollback
+# boundary, and that choice was being defeated.
+#
+# paru.conf does have a Chroot option that takes a path, but it requires
+# LocalRepo, which changes how every AUR package is installed and would rewrite
+# the update path M5 has just proved. A bind mount moves the data and changes
+# nothing else.
+#
+# This does not contradict the CLAUDE.md rule that /var/lib stays inside @.
+# That rule exists because /var/lib/pacman must roll back in step with the
+# files it describes. A build sandbox has no such coupling: devtools updates it
+# before each build, and nothing in the package database refers to it.
+
+[Unit]
+Description=AUR build chroot, outside the rollback boundary (D-033)
+Documentation=https://github.com/Avazel-Lab/ArchWork/blob/main/docs/decisions/log.md
+RequiresMountsFor={{ archwork_aurbuild_dir }}
+
+[Mount]
+What={{ archwork_aurbuild_dir }}
+Where=/var/lib/aurbuild
+Type=none
+Options=bind
+
+[Install]
+WantedBy=local-fs.target
