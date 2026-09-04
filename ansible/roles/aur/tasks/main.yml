@@ -39,25 +39,12 @@
   become: true
 
 - name: Look for a build chroot left inside the rollback boundary
-  # The stat guard is not redundant. find on a path that does not exist warns
-  # "Skipped '/var/lib/aurbuild' path due to this access issue", twice per
-  # reconcile on every fresh machine, for a directory nobody expected to be
-  # there. A warning that is always wrong teaches people to ignore warnings.
-  ansible.builtin.stat:
-    path: /var/lib/aurbuild
-  register: aur_aurbuild_path
-  when: aur_bindmount.rc != 0
-  become: true
-
-- name: List what that chroot holds
   ansible.builtin.find:
     paths: /var/lib/aurbuild
     file_type: any
     hidden: true
   register: aur_stale_chroot
-  when:
-    - aur_bindmount.rc != 0
-    - aur_aurbuild_path.stat.isdir | default(false)
+  when: aur_bindmount.rc != 0
   become: true
 
 - name: Refuse to hide an existing chroot under the mount
