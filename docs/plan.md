@@ -84,10 +84,11 @@ The timings and the inhibit control from `decisions/security-power.md`.
 
 Exit criteria:
 
-- Display dims after 5 minutes, switches off after 15, system sleeps after 30.
+- Display switches off after 15 minutes and the system sleeps after 30.
+- The 5 minute dim is configured and asserted as configuration. Observing it moved to M9, because no VM has a backlight device and every run has skipped it.
 - A sleep inhibit control offers 1 hour, 2 hours, 4 hours and until manually re-enabled.
-- While inhibited, the display still dims and still switches off. Only sleep is suppressed.
-- An automated check asserts each timing and asserts that `systemd-inhibit --list` shows the expected lock during an inhibit window.
+- While inhibited, the display still switches off. Only sleep is suppressed.
+- An automated check asserts each observable timing and asserts that `systemd-inhibit --list` shows the expected lock during an inhibit window.
 
 ### M5 Update, snapshot and rollback
 
@@ -171,6 +172,7 @@ Deploy to the Intel laptop. No gaming, no local AI models.
 Exit criteria:
 
 - Deployed from the same bootstrap, differing only through inventory.
+- The display dims after 5 minutes, observed on the panel. Moved here from M4 on 2026-09-04: `brightnessctl` no-ops where there is no backlight device, which is every VM, so this is the first machine that can show it rather than assert it.
 - Thirty days of daily use with health checks green.
 
 ### M10 Secure Boot

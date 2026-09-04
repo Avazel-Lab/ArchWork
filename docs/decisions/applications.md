@@ -116,7 +116,7 @@ Web applications only. No dedicated desktop email or calendar client.
 
 ## Languages and development runtimes
 
-- **Python 3.13**, managed explicitly rather than depending on Arch's rolling system Python staying at 3.13.
+- **Python 3.13**, managed explicitly rather than depending on Arch's rolling system Python staying at 3.13. `uv` is what manages it, per project rather than system wide (D-029, answered 2026-09-04). The system `python` package stays whatever Arch has moved to, and nothing relies on it being 3.13.
 - **pip**.
 - **Node.js** and **npm**.
 - **Bash**, **GNU coreutils**, **gawk**, **util-linux** (which provides `findmnt`).

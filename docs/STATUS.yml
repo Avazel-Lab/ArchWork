@@ -29,7 +29,10 @@ milestones:
       commit: 0d20ddfa9b3592ef3740f6f25b402afdb9984537
       date: 2026-08-29
   M4:
-    status: in-progress
+    status: complete
+    evidence:
+      commit: a65e85a2f8a0e3cb53b5f43ec7c2df721ce8f387
+      date: 2026-09-04
   M5:
     status: in-progress
   M6:
@@ -102,9 +105,16 @@ last_rebuild:
 # time its own, logind and systemd-suspend both recording the sleep, hyprlock
 # up before it went down, and the display back on after the wake.
 #
-# One criterion is a skip rather than a pass, on every run and by design: the
-# display dims at 300s cannot be observed where there is no backlight device,
-# which is every VM. The laptop panel is the only thing that can settle it.
+# M4 is complete on the repository owner's decision of 2026-09-04, on the
+# evidence of run 23 (desktop, e970eec) and run 25 (laptop, a65e85a). The SHA
+# above is run 25's, the run that completed the pair.
+#
+# Observing the 5 minute dim moved from M4 to M9 on the same day and by the
+# same decision. It cannot be seen where there is no backlight device, which is
+# every VM, so it had been a skip on every run by design. M4 keeps the
+# configuration assertion; M9 gets the observation, on the first machine with a
+# panel. M4 is therefore complete on criteria that were all actually met,
+# rather than complete with one that nothing had ever shown.
 #
 # The run did not complete. The recovery phase after M4 timed out waiting for
 # a reboot, because the harness woke the guest with system_wakeup, which is

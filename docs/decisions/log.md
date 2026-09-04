@@ -806,6 +806,14 @@ Also unproven and worth saying plainly: the HP LaserJet Pro MFP M28w has its who
 
    Recommendation: `uv`, which is in `extra`. It pins and fetches interpreters per project rather than installing a second system-wide Python that pacman would then also want to upgrade, and it is the option that does not put two interpreters on `PATH` and hope the right one wins. This is a real choice about how the workstation does Python, though, not a package name, which is why it is here.
 
+   **Answered on 2026-09-04: `uv`.** It was already in the manifests, so this
+   closes by amending `applications.md` to say what manages Python rather than
+   by installing anything. The consequence, stated plainly because it is the
+   thing that could surprise someone later: nothing on the machine guarantees a
+   3.13 interpreter exists until a project asks `uv` for one. `python3.13` in a
+   bare shell is not promised, and the requirement is read as "projects pin
+   their interpreter" rather than "the machine has one installed".
+
    **Answered on 2026-09-01: `uv`.** It is in `archwork_packages_applications`. Nothing yet uses it to pin 3.13, so this decides the mechanism and not the pinning: the first project that needs the interpreter is what will show whether it holds.
 
 3. **libvirt needs two packages `applications.md` does not name.** `virt-manager` is listed and called out as useful for clean ArchWork rebuild VMs, and that is the use that breaks: libvirt's default NAT network needs `dnsmasq`, and booting a UEFI guest needs `edk2-ovmf`. Neither is a hard dependency, so the stack installs and then cannot do the thing it was installed for. `CLAUDE.md` bars adding a package no decision document lists, which is why they are not in the manifest.
