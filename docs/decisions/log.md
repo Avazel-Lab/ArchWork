@@ -1223,7 +1223,9 @@ So: bind mount `/var/cache/archwork/aurbuild` onto `/var/lib/aurbuild`, through 
 
 **This does not contradict the `/var/lib` rule in `CLAUDE.md`.** That rule exists because `/var/lib/pacman` has to roll back in step with the files it describes; a package database that survives a rollback of `@` reports versions that are not on disk. A build sandbox has no such coupling. Nothing in the package database refers to it, devtools updates it before each build, and a stale one costs a resync rather than a wrong answer. The rule is about `/var/lib/pacman` and the reasoning behind it, not about the string `/var/lib`.
 
-**Mounting over a populated directory is refused rather than done quietly.** A machine built before this change already has a chroot at `/var/lib/aurbuild`, and mounting over it would strand it inside `@`, invisible, still consuming space in every snapshot taken from then on. The role checks and stops with the command to remove it. `hmlxdesktop02` is the machine that will hit this, once, at M7.5.
+**Mounting over a populated directory is refused rather than done quietly.** A machine built before this change already has a chroot at `/var/lib/aurbuild`, and mounting over it would strand it inside `@`, invisible, still consuming space in every snapshot taken from then on. The role checks and stops with the command to remove it.
+
+Which machine hits that is worth stating correctly. Not `hmlxdesktop02` on the path D-036 chose: M7.5 installs it fresh from the ISO, so there is no old chroot to strand. It matters on the fallback D-036 also names, reconciling an existing machine instead of reinstalling it, and on any machine already in use when this change lands. That is nobody today, and the check is cheap enough to keep for the day it is somebody.
 
 Two chroots now sit under `/var/cache/archwork`: `chroot`, which the role creates with `mkarchroot` and which builds paru itself, and `aurbuild`, which paru creates and uses for everything else. Both are outside the boundary, which is what mattered. Merging them into one needs the `Chroot` option above, and therefore `LocalRepo`, and is not worth it.
 
