@@ -1386,3 +1386,25 @@ This is a known class of bug: some AMD platforms' xHCI controllers do not reinit
 Neither is applied here. Confirming either needs another real suspend cycle, deliberately triggered and watched, which is a call for the repository owner to make and be present for, not one to run unattended after what the first cycle did to input.
 
 **Not fixed. Not proven safe to retry unattended.** The machine has been rebooted since and is currently in ordinary use; the sleep timeout will fire again on its own on the current 30 minute idle timer unless something is done about it first.
+
+### Update, 2026-09-04
+
+The repository owner reports Kubuntu, dual-booted on the same physical machine, has suspended and resumed cleanly since a BIOS firmware update was applied. Firmware is shared hardware state, not per-OS: whatever that update changed is already in effect for this install too, on the same boot the failure above happened on.
+
+That rules out firmware as the differentiator. The recommendation's ordering above put a firmware setting first because it was the least invasive thing to try; it is no longer the most likely lead. What differs between the two operating systems on the same hardware is kernel version and configuration, most concretely which sleep mode each uses: this journal shows `PM: suspend entry (deep)`, Linux's S3 path, and Kubuntu may default to `s2idle` instead, which does not necessarily exercise the same xHCI reinitialisation path. `/sys/power/mem_sleep` on each system would say which, directly and cheaply, before anything else is tried.
+
+Still open. Still nobody's call but the repository owner's to decide when to spend another real suspend cycle confirming it.
+
+## D-045 A second failure, on the same evening, with no suspend in it at all
+
+**Status:** open. Not understood. Recorded so it is not confused with D-044.
+**Date:** 2026-09-04
+**Affects:** M4, M7.5, `security-power.md`, D-044
+
+Keyboard and mouse went unresponsive a second time the same evening, on the boot immediately following the one D-044 describes (`8c1fc1d9b8d84cf5870e4a355686bee2`, 20:21 to 21:42). The repository owner reported the displays came back this time; input did not.
+
+This is not a repeat of D-044's mechanism. The whole of that boot's journal has no `PM: suspend entry`, no `systemctl suspend`, nothing from `systemd-logind` about sleep at all: whatever happened, the machine never actually suspended. The one thing in the log near the recovery is `hyprpolkitagent: There are no outputs - creating placeholder screen`, roughly 24 minutes after the last confirmed activity, close to the 15 minute display-off listener rather than the 30 minute sleep one. `systemd-logind: Power key pressed short.` follows at 21:42:54, the same recovery shape as D-044: a physical press, because nothing else reached the machine.
+
+**Not diagnosed.** Whether this is the display-off path alone breaking input, a second and different hardware quirk, or something that only looks unrelated to D-044 for want of a log line that would tie them together, is not known from what is recorded here. Treating it as the same bug would be a guess dressed as a finding, which is worse than saying it plainly is not yet understood.
+
+**Consequence for what runs unattended in the meantime.** Two independent paths have now cost input control the same evening: one through the 30 minute sleep listener, one through something closer to the 15 minute display-off listener. A mitigation aimed only at `systemctl suspend` would not obviously cover this one.
