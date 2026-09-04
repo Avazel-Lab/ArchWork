@@ -15,6 +15,10 @@ ansible_connection: local
 archwork_build_root: /var/cache/archwork
 archwork_build_home: /var/cache/archwork/build
 archwork_chroot: /var/cache/archwork/chroot
+# Where paru's own chroot really lives, bind mounted over the path paru
+# hardcodes (D-033). On @var_cache, so it stays outside the rollback boundary
+# the way D-018 intended.
+archwork_aurbuild_dir: /var/cache/archwork/aurbuild
 archwork_build_user: archwork-build
 
 # The administrator account the installer creates. Same on both profiles, so
@@ -145,9 +149,11 @@ archwork_packages_aur:
   # what the baseline names; the `code` package in extra is the OSS build
   # without the Marketplace, so it is a different program.
   - visual-studio-code-bin
-  # Notes. joplin-desktop is deferred, not dropped: see D-035. It is one of
-  # only two source builds in this list and one of only two that failed.
-  # - joplin-desktop
+  # Notes. joplin-bin rather than joplin-desktop (D-035): upstream publishes a
+  # binary, the source build failed and took a run down with it, and the two
+  # are the same version. joplin-bin conflicts with joplin-desktop and with
+  # joplin-appimage, so exactly one of the three may be listed here.
+  - joplin-bin
   # Password managers. NordPass is primary, Bitwarden is in extra below.
   - nordpass-bin
   # Media library management

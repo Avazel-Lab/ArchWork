@@ -1037,7 +1037,7 @@ That is the third time in this work a check has been answered by something other
 
 ## D-035 Two AUR packages will not build, and both are source builds
 
-**Status:** open, and it defers two applications
+**Status:** accepted. The repository owner chose the `-bin` variants on 2026-09-04
 **Date:** 2026-09-03
 **Affects:** `applications.md`, D-029, M7
 
@@ -1208,3 +1208,42 @@ It was harmless for as long as no VM had a GPU. The probe died allocating a buff
 Verified on the same disk from a clean session: `ok the sheet is on the monitor and not just named in the config`.
 
 **Consequence for D-032.** It is answered, and not by the machine it named. The wallpaper is proven on a VM, which means M3's wallpaper criterion no longer waits on hardware. What `hmlxdesktop02` still settles is whether it looks right on a real panel at a real resolution, which is a D-021 judgement made by a person looking, not an assertion.
+
+## D-040 The AUR build chroot is bind mounted out of the rollback boundary
+
+**Status:** accepted
+**Date:** 2026-09-04
+**Affects:** D-005, D-018, D-033, `applications-tooling.md`, M2, M7, M7.5
+
+D-033 found that `paru --chroot` builds in `/var/lib/aurbuild`, which is inside `@`, defeating the reason D-018 put the chroot on `@var_cache` in the first place. It left the placement undecided. The repository owner delegated the choice on 2026-09-04: build wherever is best.
+
+**D-033's premise was half wrong, and it is worth correcting before the fix.** `paru --help` offers no option, which is what D-033 checked, but `paru.conf` does: `Chroot = path/to/chroot`. It was not usable here anyway, because the man page adds that it requires `LocalRepo`, and that changes paru from installing built packages directly to building them into a local pacman repository declared in `pacman.conf` and installing from there. That is a rewrite of the path M5 has just proved end to end, to relocate a build cache.
+
+So: bind mount `/var/cache/archwork/aurbuild` onto `/var/lib/aurbuild`, through a systemd mount unit the `aur` role installs. paru keeps its hardcoded path, nothing about how packages are built or installed changes, and the data lands on `@var_cache` where D-018 wanted it.
+
+**This does not contradict the `/var/lib` rule in `CLAUDE.md`.** That rule exists because `/var/lib/pacman` has to roll back in step with the files it describes; a package database that survives a rollback of `@` reports versions that are not on disk. A build sandbox has no such coupling. Nothing in the package database refers to it, devtools updates it before each build, and a stale one costs a resync rather than a wrong answer. The rule is about `/var/lib/pacman` and the reasoning behind it, not about the string `/var/lib`.
+
+**Mounting over a populated directory is refused rather than done quietly.** A machine built before this change already has a chroot at `/var/lib/aurbuild`, and mounting over it would strand it inside `@`, invisible, still consuming space in every snapshot taken from then on. The role checks and stops with the command to remove it. `hmlxdesktop02` is the machine that will hit this, once, at M7.5.
+
+Two chroots now sit under `/var/cache/archwork`: `chroot`, which the role creates with `mkarchroot` and which builds paru itself, and `aurbuild`, which paru creates and uses for everything else. Both are outside the boundary, which is what mattered. Merging them into one needs the `Chroot` option above, and therefore `LocalRepo`, and is not worth it.
+
+**Not proven.** No run has been done with this in place. The reconcile that matters is the second one: a mount unit that reports changed on every run would fail M2's idempotence rule.
+
+### Answered, 2026-09-04
+
+`joplin-bin` and `opendeck-bin`, as recommended. Both are in the manifests and
+both are commented with the reason.
+
+Checked against the AUR RPC rather than recalled, the way D-029 requires.
+`joplin-bin` is 3.6.16-1, the same version as the source `joplin-desktop` it
+replaces, and conflicts with it and with `joplin-appimage`, so exactly one of
+the three may be listed. `opendeck-bin` is 2.14.0-1, again the same version as
+the source build. Its two dependencies resolve from the official repositories
+and pull in no further AUR builds: `webkit2gtk-4.1` is in `extra`, and
+`libappindicator-gtk3` is not a package at all any more but is what
+`extra/libappindicator` provides and replaces.
+
+`joplin-appimage` has far more votes than `joplin-bin` and was not chosen. It
+is an AppImage rather than a packaged binary, and it is a version behind.
+
+Not proven. Neither has been built on any machine yet.

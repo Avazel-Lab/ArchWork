@@ -196,9 +196,9 @@ next_actions:
   - Run vm-power on the laptop profile. Run 23 proved the desktop profile
     end to end and the laptop has never been through one, so every M4 and M5
     claim on this repository rests on one profile
-  - Two decisions wait on the repository owner. Where AUR packages build now
-    that paru --chroot defeats the placement D-018 chose (D-033), and whether
-    joplin-desktop and opendeck become their -bin variants (D-035)
+  - Prove D-040 and D-035 in a VM. The aurbuild bind mount has never been
+    reconciled, and the second run reporting changed=0 is what M2 asks of a
+    mount unit; joplin-bin and opendeck-bin have never been built anywhere
 
 # M7.5 was added on 2026-09-03 (D-036) and has not started. It is the one
 # milestone that runs ahead of M7 on purpose: the machine is installed, the
