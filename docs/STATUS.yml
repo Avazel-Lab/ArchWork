@@ -73,7 +73,7 @@ milestones:
 # against a real tailnet waits on the D-006 auth key.
 last_rebuild:
   status: passed
-  commit: a65e85a2f8a0e3cb53b5f43ec7c2df721ce8f387
+  commit: cea54d2373ee0832382cf706a629ef3885cf8f34
   date: 2026-09-04
 
 # D-027 confirmed on hmlxdesktop02 at commit 85f8972, 2026-08-30. nvidia_drm,
@@ -196,10 +196,21 @@ first_install:
 #
 # Run 25 on 2026-09-04 at commit a65e85a repeated all of that on the laptop
 # profile, unattended and green, including the swapfile and hibernate path the
-# desktop does not have. The same two FAILs are the deliberate break.
+# desktop does not have.
 #
-# Not proven by either run: M7's three consecutive rebuilds, and D-040 and
-# D-035, which landed after run 25 started. D-029 also leaves three questions
+# Run 27 on 2026-09-04 at commit cea54d2 is the current record, desktop
+# profile, and it is what proves D-040 and D-035: the aurbuild bind mount
+# reconciles and the second run reports changed=0, joplin-bin and opendeck-bin
+# build and install where their source builds had failed. Every run above has
+# the same two FAILs and no others, and they are the deliberate break.
+#
+# Run 26 is the one worth remembering, because it failed. D-040's mount unit
+# broke ansible-playbook --check at minute one: under --check the template
+# writes nothing, so systemd_service could not find the unit it was asked to
+# enable. Nothing in make check can see that. Only a run against a real
+# machine can.
+#
+# Not proven: M7's three consecutive rebuilds. D-029 also leaves three questions
 # for the repository owner: Codex CLI, how Python 3.13 is pinned, and
 # libvirt's two unnamed dependencies.
 
@@ -208,13 +219,13 @@ next_actions:
     main and bring it up with bootstrap.sh alone, so the machine can be used
     for work and for developing this repository. Nothing needs writing
     first, because the applications have been in the manifests since D-029
-  - Decide whether M4 and M5 are complete. Both profiles have now passed a
-    full vm-power run, run 23 on the desktop and run 25 on the laptop, which
-    is every exit criterion either milestone has. Only the owner marks a
-    milestone complete
-  - Prove D-040 and D-035 in a VM. The aurbuild bind mount has never been
-    reconciled, and the second run reporting changed=0 is what M2 asks of a
-    mount unit; joplin-bin and opendeck-bin have never been built anywhere
+  - M5 waits for M7.5 by decision, because its rollback path has only ever
+    run in a VM and the owner wants real hardware to exercise it before it is
+    called complete
+  - Build Odysseus to the answers of 2026-09-04. Image built on first launch
+    by the shortcut rather than during a reconcile, a pinned commit rather
+    than branch tracking, data inside the rollback boundary, and the
+    deliberate update process already written into the user guide (D-042)
 
 # M7.5 was added on 2026-09-03 (D-036) and has not started. It is the one
 # milestone that runs ahead of M7 on purpose: the machine is installed, the
