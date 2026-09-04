@@ -1273,7 +1273,7 @@ This is a check of one moment. It will go stale the next time either document ch
 
 ## D-042 Odysseus is identified, and none of the obvious ways to install it is right
 
-**Status:** open. The software is identified; how it is installed is not
+**Status:** accepted in shape, not implemented. The repository owner answered the three open questions on 2026-09-04
 **Date:** 2026-09-04
 **Affects:** `applications.md`, D-025, D-027, D-041, M7
 
@@ -1304,3 +1304,49 @@ D-025 already made Podman the container engine here and `podman-compose` is alre
 3. **Pinning.** Tracking a branch means every reconcile can bring arbitrary upstream change, which is the opposite of how every other package here is handled. A commit or a tag, updated deliberately, would fit this repository better, and the owner may want the branch anyway.
 
 Nothing is added to any manifest until those are answered. An entry in `applications.md` that names the project is enough to satisfy M7's criterion meanwhile, which is what D-041 says about deferred entries.
+
+### Answered, 2026-09-04
+
+Data **inside** the rollback boundary. **No** start at boot: on demand, with a
+shortcut or script, listening on a port while it runs. Tracking the `dev`
+branch **if that is possible**.
+
+Reading upstream's `docker-compose.yml` on `dev` turns those answers into
+constraints, and one of them is not free.
+
+**The stack is four services, not one.** `odysseus` itself, which has `build: .`
+rather than an image, plus `chromadb`, `searxng` pinned to a dated tag, and
+`ntfy`.
+
+**The port is already right.** It binds `${APP_BIND:-127.0.0.1}:${APP_PORT:-7000}`,
+so localhost only is upstream's default and needs nothing from us. It listens
+while it runs, as the owner said, and nothing outside the machine reaches it
+unless somebody changes `APP_BIND`.
+
+**Half the data is easy to place and half is not.** The `odysseus` service takes
+`${APP_DATA_DIR:-./data}`, so pointing it inside `@` is one variable. The other
+three services use named volumes, `searxng-data`, `chromadb-data` and
+`ntfy-cache`. Rootless Podman keeps named volumes under
+`~/.local/share/containers`, which is in `/home` and therefore **outside** the
+rollback boundary, which is the opposite of what was asked for. Honouring the
+answer means overriding those three to bind mounts inside `@` as well, in a
+compose override file this repository owns rather than by editing upstream's.
+
+**Tracking `dev` is possible and it collides with M2.** A role that fetches and
+rebuilds on every reconcile reports `changed` every time, and M2 requires a
+second run to change nothing. The way out is to make the fetch the only thing
+that can report a change, and the rebuild conditional on the checkout actually
+having moved. That is a real constraint on how the role gets written, not a
+detail.
+
+**Secrets.** `ODYSSEUS_ADMIN_PASSWORD` is empty by default with `AUTH_ENABLED`
+true, and `OPENAI_API_KEY`, `HF_TOKEN` and `DATA_BRAVE_API_KEY` are all read
+from the environment. D-006 already says service tokens belong in the `age`
+set, so that is where they go, and none of them may reach a compose file in
+plain text.
+
+**Not implemented.** Nothing is written and nothing is in a manifest. It needs a
+role, a compose override, a launcher script and a desktop entry, and it needs
+to be proven by a run rather than by reading. It was scoped at a point where
+the VM harness was busy proving D-040, and shipping an untestable role would
+have been worse than saying so.
