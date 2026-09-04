@@ -48,9 +48,10 @@ milestones:
 # A rebuild claim without a commit SHA is rejected by the checker.
 # Clean install from the ISO, M1 assertions, the D-016 reconciliation twice
 # with the second run reporting zero changed tasks, and the recovery UKI.
-# The desktop profile on this commit. The laptop profile, with its @swap
-# subvolume and swapfile the desktop does not have, was last shown at
-# 0d20ddf on 2026-08-29 and has not been through a vm-power run.
+# The laptop profile on this commit, with its @swap subvolume and swapfile
+# that the desktop does not have. The desktop profile passed the same way at
+# e970eec on 2026-09-03. Both profiles have now been through a full vm-power
+# run, which is what M4 and M5 had been resting on one profile for.
 #
 # Everything M3 asks of a machine, on a session greetd starts through
 # start-hyprland with its configuration in Lua (D-026): login at the real
@@ -69,8 +70,8 @@ milestones:
 # against a real tailnet waits on the D-006 auth key.
 last_rebuild:
   status: passed
-  commit: e970eecd6266072fd607b1476b2e8af3b668af63
-  date: 2026-09-03
+  commit: a65e85a2f8a0e3cb53b5f43ec7c2df721ce8f387
+  date: 2026-09-04
 
 # D-027 confirmed on hmlxdesktop02 at commit 85f8972, 2026-08-30. nvidia_drm,
 # nvidia_modeset, nvidia_uvm and nvidia are the modules loaded, no nouveau,
@@ -183,19 +184,24 @@ first_install:
 # still reported changed=0 on the second reconcile, which is what would have
 # caught one of them writing its own configuration on first run.
 #
-# Not proven by this run: the laptop profile, which has never been through
-# vm-power, and M7's three consecutive rebuilds. D-029 also leaves three
-# questions for the repository owner: Codex CLI, how Python 3.13 is pinned,
-# and libvirt's two unnamed dependencies.
+# Run 25 on 2026-09-04 at commit a65e85a repeated all of that on the laptop
+# profile, unattended and green, including the swapfile and hibernate path the
+# desktop does not have. The same two FAILs are the deliberate break.
+#
+# Not proven by either run: M7's three consecutive rebuilds, and D-040 and
+# D-035, which landed after run 25 started. D-029 also leaves three questions
+# for the repository owner: Codex CLI, how Python 3.13 is pinned, and
+# libvirt's two unnamed dependencies.
 
 next_actions:
   - Start M7.5 (D-036). Install hmlxdesktop02 from the ISO at one commit on
     main and bring it up with bootstrap.sh alone, so the machine can be used
     for work and for developing this repository. Nothing needs writing
     first, because the applications have been in the manifests since D-029
-  - Run vm-power on the laptop profile. Run 23 proved the desktop profile
-    end to end and the laptop has never been through one, so every M4 and M5
-    claim on this repository rests on one profile
+  - Decide whether M4 and M5 are complete. Both profiles have now passed a
+    full vm-power run, run 23 on the desktop and run 25 on the laptop, which
+    is every exit criterion either milestone has. Only the owner marks a
+    milestone complete
   - Prove D-040 and D-035 in a VM. The aurbuild bind mount has never been
     reconciled, and the second run reporting changed=0 is what M2 asks of a
     mount unit; joplin-bin and opendeck-bin have never been built anywhere
