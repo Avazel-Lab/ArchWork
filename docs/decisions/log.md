@@ -1358,3 +1358,31 @@ role, a compose override, a launcher script and a desktop entry, and it needs
 to be proven by a run rather than by reading. It was scoped at a point where
 the VM harness was busy proving D-040, and shipping an untestable role would
 have been worse than saying so.
+
+## D-044 The desktop's first real suspend cycle did not resume
+
+**Status:** open. Root cause found, fix not chosen. Raised for the repository owner rather than decided here.
+**Date:** 2026-09-04
+**Affects:** M4, M7.5, `security-power.md`
+
+`hmlxdesktop02` suspended and failed to resume, on real hardware, for the first time. STATUS.yml's M4 evidence is VM-only; every claim in it about suspend and resume timing has, until now, come from a guest with no USB controller of its own to fail this way.
+
+The journal for the boot in question (`8c2f6b38a0a249d49c865568b9f8440c`, 17:43 to 20:21) records the whole sequence:
+
+- `19:45:06` hypridle's 30 minute listener fired `systemctl suspend`, as `security-power.md` and M4 specify.
+- `19:45:08` `PM: suspend entry (deep)`. The machine genuinely slept.
+- `20:15:26` resume begins, and immediately: `xhci_hcd 0000:02:00.0: xHC error in resume, USBSTS 0x401, Reinit`, followed by `usb 1-8: PM: dpm_run_callback(): usb_dev_resume returns -5` and `usb 1-8: PM: failed to resume async: error -5` against several ports.
+- `20:21:11` `systemd-logind: Power key pressed short.` A physical press, because nothing else could reach the machine.
+
+**The xHCI controller, not the display, is what failed.** The keyboard, mouse and Stream Deck are all USB. Once the host controller came back in this state, no input could reach the machine at all, which is why it presented as screens that would not wake: there was no working path left to send a wake signal down, whether or not the compositor and displays were otherwise fine. Nothing in this failure mentions NVIDIA, DRM or Hyprland, and the shutdown that followed the power key press was clean at the systemd level, run by a kernel that was still alive underneath the broken USB stack.
+
+This is a known class of bug: some AMD platforms' xHCI controllers do not reinitialise correctly after S3 on Linux, and `USBSTS 0x401` on resume is the documented signature of it elsewhere, not something specific to this build.
+
+**Recommendation, not a decision:** two independent things worth trying, in order of how little they disturb the machine.
+
+1. A firmware setting. ASUS boards often expose something like "ErP Ready" or a legacy USB power option that governs whether USB stays powered through S3. Worth checking before touching the kernel.
+2. An `xhci_hcd` quirk or a `kernel.org` bug report matching this chipset, if the firmware option does not exist or does not help.
+
+Neither is applied here. Confirming either needs another real suspend cycle, deliberately triggered and watched, which is a call for the repository owner to make and be present for, not one to run unattended after what the first cycle did to input.
+
+**Not fixed. Not proven safe to retry unattended.** The machine has been rebooted since and is currently in ordinary use; the sleep timeout will fire again on its own on the current 30 minute idle timer unless something is done about it first.
