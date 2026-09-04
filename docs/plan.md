@@ -148,7 +148,7 @@ Exit criteria:
 - A second reconcile on the hardware reports zero changed tasks. The M2 rule has only ever been proven in a VM.
 - `archwork-health` passes on the machine.
 - Claude Code can commit and push from `hmlxdesktop02`, through an ed25519 key generated on that machine and added to the GitHub account. No private key enters this repository or the `age` set (`CLAUDE.md`, D-006).
-- Kubuntu is still the default boot entry, and Arch is still chosen deliberately from the firmware boot menu. Nothing here changes the boot order.
+- Kubuntu is still what the machine boots on its own, and Arch is still chosen deliberately at the firmware boot menu. This criterion needs no action to satisfy: it is already how the machine behaves, and the correct way to meet it is to leave the boot order alone. Reordering entries so a Kubuntu one sits in front of the Arch one is worse than useless, because it makes deliberately selecting the Arch drive land back in Kubuntu.
 
 Out of scope, named so that nobody adds them: `/home` backup, the NAS, Steam and controllers, local AI models, configuration drift detection, and every part of the thirty-day clock. Those stay in M8.
 
