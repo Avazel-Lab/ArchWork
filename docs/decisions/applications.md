@@ -144,7 +144,7 @@ Web applications only. No dedicated desktop email or calendar client.
 - **Claude Code** and **Codex CLI**, AI coding and agent CLIs.
 - **Ollama**, local model runtime.
 - **LM Studio**, local model management, runtime and UI.
-- **Odysseus**. The exact project or package still needs identifying before installation can be automated.
+- **Odysseus**, a self-hosted AI workspace: `github.com/odysseus-dev/odysseus`, AGPL-3.0, tracking the `dev` branch, which is also its default branch. Identified by the repository owner on 2026-09-04. How it gets installed is not settled, and D-042 holds the options and a recommendation. Do not reach for the obvious AUR package: `odysseus` there is an unrelated GTK web browser.
 
 ## Game development
 
