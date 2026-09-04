@@ -221,6 +221,7 @@ archwork_packages_shared:
   - python
   - python-pip
   - shellcheck
+  - bats
   - pandoc-cli
   - libisoburn
   - mermaid-cli

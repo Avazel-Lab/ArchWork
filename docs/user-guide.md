@@ -95,8 +95,9 @@ Suppresses sleep only. The display still dims and still switches off, which is d
 The machine is reproducible. A few things on it are not, by choice, and they are worth knowing because a rebuild is meant to be cheap.
 
 - **`/home`.** Outside the rollback boundary and outside the build. Nothing in this repository writes to it without being told to. It is also not backed up by anything yet.
-- **Logins and tokens.** Browser profiles, Claude Code's authentication, anything you signed into.
-- **SSH private keys.** Deliberately not in the repository's encrypted set: putting them there would widen what one passphrase protects, for no gain. Generate a new key on the machine and add it to the account it needs to reach.
+- **Logins and tokens.** Browser profiles, Claude Code's authentication, `gh auth login`, anything else you signed into.
+- **Git identity.** `~/.gitconfig`'s `user.name` and `user.email` are not in `archwork_dotfile_links`, so they are not linked from the repository and a rebuild starts without them. Set them again with `git config --global`.
+- **SSH private keys.** Deliberately not in the repository's encrypted set: putting them there would widen what one passphrase protects, for no gain. One key per remote host rather than one key for everything: generate with `ssh-keygen -t ed25519 -C "<user>@<hostname>-<host>-<date>"`, one for each of `github.com`, `gitlab.com` and so on, then add a `Host` block per remote in `~/.ssh/config` pointing `IdentityFile` at the matching key with `IdentitiesOnly yes`, so a key compromised on one host cannot be replayed against another. Add each public key to the account it needs to reach.
 - **Codex CLI.** Installed by hand with `npm install -g @openai/codex`, because the unofficial AUR packaging is not trusted enough to sit in an unattended rebuild path. Repeat it after a rebuild.
 
 Everything else should arrive from the repository. **If you fix something by hand and want to keep it, say so, and it goes into the repository before the next rebuild.** A fix that lives only on the machine disappears the next time it is rebuilt, and rebuilding is the entire point.

@@ -37,6 +37,8 @@ review: 2027-02-27
 - OpenSSH client
 - ShellCheck
   - Use as the documented lint bar for health-check scripts.
+- Bats
+  - Runs `tests/unit/*.bats`, which `make check`'s `unit` target requires.
 - Pandoc
 - Mermaid
 - xorriso
