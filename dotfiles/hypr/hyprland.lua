@@ -19,6 +19,15 @@
 -- scale is a string here, not a number: Hyprland parses mode, position and
 -- scale as strings (MONITOR_FIELDS in LuaBindingsConfigRules.cpp), so the 1
 -- that the old hyprland.conf wrote as a bare number has to be quoted.
+--
+-- The desktop's two named outputs get an explicit layout: DP-2 (3840x2160)
+-- on the left at 0x0, DP-1 (3440x1440) on the right at 3840x0, flush against
+-- DP-2's own width. Named rules match by output name, so this says nothing
+-- about any other machine: the laptop's panel is eDP-1, never DP-1 or DP-2,
+-- and falls through to the wildcard rule below untouched.
+hl.monitor({ output = "DP-2", mode = "preferred", position = "0x0",    scale = "1" })
+hl.monitor({ output = "DP-1", mode = "preferred", position = "3840x0", scale = "1" })
+
 hl.monitor({
     output   = "",
     mode     = "preferred",
