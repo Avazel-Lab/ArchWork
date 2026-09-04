@@ -1395,6 +1395,18 @@ That rules out firmware as the differentiator. The recommendation's ordering abo
 
 Still open. Still nobody's call but the repository owner's to decide when to spend another real suspend cycle confirming it.
 
+### Correction, 2026-09-04
+
+The update above was wrong, and checked rather than left standing once better evidence turned up.
+
+Kubuntu's own persisted journal was read directly, mounted read-only from the machine's other disk without booting it: across every boot it retains (June to September), there is no `PM: suspend entry`, no `ACPI: PM: Preparing to enter system sleep`, nothing from `systemd-logind` about a real sleep transition. Zero. What looked like "suspends and resumes cleanly" was suspend not happening at all, not suspend happening and working.
+
+The reason is `~/projects/active/ai-agent-manager`, a tool the repository owner built with Claude Code, present on the Kubuntu install. Its sleep inhibitor, added 2026-08-18, runs `systemd-inhibit --what=sleep --mode=block ... sleep <seconds>` whenever an agent works unattended, and its own comment says exactly what that does: "Blocking `sleep` stops both manual and idle-triggered suspend/hibernate... `idle` is deliberately not inhibited so the session still blanks and locks the screen normally." That also answers a question raised independently of D-044: the repository owner had noticed losing a remote agent connection on Kubuntu after a period of idle, before this tool existed, and building it fixed that. A connection dying on idle and a display blanking on idle are different things; only a real suspend explains the former, which is further, independent evidence that Kubuntu was suspending, at least until mid-August.
+
+**So there is no evidence Kubuntu's xHCI controller resumes correctly on this hardware.** There is only evidence it has barely been asked to, on either operating system, since a date that has nothing to do with the BIOS. The firmware update may or may not have helped; nothing here says either way, and the `deep` vs `s2idle` lead from the update above is neither confirmed nor ruled out by anything in this correction. What changed is confidence in the wrong direction: this looked like a solved problem on one OS and an open one on the other, and it is an open problem on both, less tested on the one that looked fine.
+
+The only way to learn more is the thing D-044 already said needs the repository owner present for it: a deliberate suspend, watched, with the Kubuntu inhibitor stopped first so it is not silently repeating the same non-test.
+
 ## D-045 A second failure, on the same evening, with no suspend in it at all
 
 **Status:** open. Not understood. Recorded so it is not confused with D-044.
