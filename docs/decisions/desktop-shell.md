@@ -17,7 +17,8 @@ review: 2027-02-27
 | Lock screen | Hyprlock | Longer-term goal is to replace/integrate with Quickshell. |
 | Wallpaper | Hyprpaper | Use initially; review later. |
 | Notifications | Quickshell | Notification UI handled by Quickshell. |
-| Clipboard | wl-clipboard + cliphist | Surfaced through Quickshell. |
+| Clipboard | wl-clipboard + cliphist | The daemon and a fuzzel dmenu picker arrive at M3 (D-048); only the picker's UI is Quickshell's to replace later. |
+| Session component startup | systemd --user for pure background daemons; Hyprland's exec hook otherwise | D-048. hypridle, hyprpaper and cliphist's two watchers have nothing for the hook to coordinate beyond starting them, so they run as units: restart on crash, real logs. waybar and mako stay on the exec hook because both are named for M6 replacement; writing unit files for something with a known expiry date is work spent twice. Quickshell's own placement is undecided until M6 actually starts. |
 | Screenshots | grim + Satty + Quickshell UI | Chosen as the closest practical Linux workflow to KDE Spectacle. |
 | Screen recording | wf-recorder + Quickshell UI | OBS excluded by default; install manually if ever needed. |
 | Terminal | Kitty | Selected initially; mark for future review. |

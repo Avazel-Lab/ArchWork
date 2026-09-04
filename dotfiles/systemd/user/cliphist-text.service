@@ -1,0 +1,13 @@
+[Unit]
+Description=Clipboard history, text (D-048)
+PartOf=graphical-session.target
+After=graphical-session.target
+ConditionEnvironment=WAYLAND_DISPLAY
+
+[Service]
+ExecStart=/usr/bin/wl-paste --type text --watch cliphist store
+Slice=session.slice
+Restart=on-failure
+
+[Install]
+WantedBy=graphical-session.target

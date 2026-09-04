@@ -106,15 +106,26 @@ hl.on("hyprland.start", function()
     hl.exec_cmd("waybar")
     hl.exec_cmd("mako")
 
-    -- The M4 dim/display-off/sleep timings (security-power.md, D-028).
-    -- hypridle reads dotfiles/hypr/hypridle.conf, linked alongside this file.
-    hl.exec_cmd("hypridle")
+    -- hypridle and hyprpaper are pure background daemons, nothing left for
+    -- this hook to coordinate beyond starting them, so they run as systemd
+    -- --user units instead (D-048): restart on crash, real logs
+    -- (journalctl --user -u hypridle), a real status. Started explicitly
+    -- here, the same as hyprpolkitagent above, rather than left to
+    -- graphical-session.target to reach on its own: whether that target's
+    -- timing in this session can be trusted is not something to assume.
+    -- Units live at dotfiles/systemd/user/, linked alongside this file.
+    --
+    -- hypridle reads dotfiles/hypr/hypridle.conf (M4, security-power.md,
+    -- D-028). hyprpaper reads dotfiles/hypr/hyprpaper.conf, the wallpaper
+    -- that is the keybinding cheat sheet (D-032).
+    hl.exec_cmd("systemctl --user start hypridle.service")
+    hl.exec_cmd("systemctl --user start hyprpaper.service")
 
-    -- The wallpaper, which is the keybinding cheat sheet: a fresh ArchWork
-    -- desktop has no menus and nothing to discover by clicking, so the keys
-    -- are on the wall until they are in the hands. hyprpaper reads
-    -- dotfiles/hypr/hyprpaper.conf, linked alongside this file.
-    hl.exec_cmd("hyprpaper")
+    -- Clipboard history (D-048), Quickshell-independent: cliphist watches
+    -- here, Super+C below picks. Two watchers rather than one --watch
+    -- covering everything, matching cliphist's own documented setup.
+    hl.exec_cmd("systemctl --user start cliphist-text.service")
+    hl.exec_cmd("systemctl --user start cliphist-image.service")
 end)
 
 local mod = "SUPER"
@@ -126,6 +137,10 @@ hl.bind(mod .. " + F",        hl.dsp.window.fullscreen())
 hl.bind(mod .. " + V",        hl.dsp.window.float({ action = "toggle" }))
 hl.bind(mod .. " + L",        hl.dsp.exec_cmd("hyprlock"))
 hl.bind(mod .. " + SHIFT + E", hl.dsp.exit())
+
+-- Clipboard history picker (D-048). cliphist-text.service and
+-- cliphist-image.service do the watching; this is the on-demand half.
+hl.bind(mod .. " + C", hl.dsp.exec_cmd("cliphist list | fuzzel --dmenu | cliphist decode | wl-copy"))
 
 -- grim writes to a path that has to exist, and a screenshot that fails because
 -- a directory is missing is a poor first impression of a fresh machine.

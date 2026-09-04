@@ -1473,3 +1473,26 @@ Consequences:
 - Both join `archwork_packages_applications` in `group_vars/all.yml`.
 - **Not installed anywhere yet.** M7's package manifests are the target for `applications.md`'s baseline; nothing has reconciled against this addition.
 - The same read-through surfaced other gaps that are not packages: animations, a persistent-workspace policy, floating window rules, a logout/power UI, and the desktop's session-startup model going through Hyprland's own exec hook rather than `systemd --user` as originally planned. None of those are decided here. They are being taken one at a time rather than batched, because each is a real design choice rather than an omission with one obvious answer.
+
+## D-048 Pure background daemons move to systemd --user; clipboard history arrives without waiting for Quickshell
+
+**Status:** accepted
+**Date:** 2026-09-05
+**Affects:** `desktop-shell.md`, D-047, security-power.md, M3
+
+The first of the session-startup gaps D-047 raised. The original planning notes put `hypridle`, `hyprpaper` and a clipboard daemon under `systemd --user`, with Hyprland's own exec hook reserved for session-specific glue. What's actually running has all of it, `waybar` and `mako` included, started the same way: `hl.exec_cmd` in `hyprland.lua`.
+
+That single bucket was wrong, not the whole idea. `waybar` and `mako` are named for M6 replacement (`desktop-shell.md`), so writing unit files for them now is work spent on something with a known expiry date. Quickshell's own eventual placement is undecided on purpose: nobody knows yet how it wants to synchronise with the compositor being ready, or whether a systemd restart of it is a clean recovery or a visible flicker, and deciding that now, with no Quickshell code written, would be deciding an implementation detail of a milestone that has not started.
+
+`hypridle` and `hyprpaper` are a different case: pure background daemons, nothing visual of their own, nothing for the exec hook to coordinate beyond "start it." They move to `systemd --user` units. So does clipboard history, `wl-clipboard` + `cliphist`, which `desktop-shell.md` had scoped entirely to Quickshell even though the daemon itself needs nothing from it: `cliphist list | fuzzel --dmenu | cliphist decode | wl-copy` is a complete, working picker with fuzzel alone, the same tool M3 already uses for the launcher.
+
+Units live at `dotfiles/systemd/user/`, linked via a new `systemd` entry in `archwork_dotfile_links` (`ansible/group_vars/all.yml`), landing at `~/.config/systemd/user/` where systemd's user manager actually searches. Each matches the house style already shipped in `hyprpolkitagent`'s own unit: `PartOf=graphical-session.target`, `ConditionEnvironment=WAYLAND_DISPLAY` so a unit started before the environment import refuses cleanly rather than failing to find a compositor, `Restart=on-failure`. None are enabled or `WantedBy`-activated; `hyprland.lua`'s exec hook starts each explicitly with `systemctl --user start`, in the same place and the same way it already starts `hyprpolkitagent`, rather than trusting `graphical-session.target` to be reached on its own timing in this session.
+
+`cliphist` gets two units, `cliphist-text` and `cliphist-image`, rather than one `wl-paste --watch` covering every MIME type, matching cliphist's own documented setup.
+
+Consequences:
+
+- `wl-clipboard` and `cliphist` join `archwork_packages_session` in `group_vars/all.yml`.
+- `desktop-shell.md`'s Clipboard row and its new Session component startup row both updated to say this.
+- **Not proven on a rebuild.** The units and the `Super+C` binding are written and tested on the running session on `hmlxdesktop02` by hand; no VM assertion covers any of this, and M4's `assert-m4.sh` checks `hypridle` is running as a process, which is true regardless of what started it, so it gives no signal either way about the units themselves.
+- `waybar`, `mako`, and Quickshell's eventual placement are explicitly not decided here. D-047's remaining gaps (animations, workspace persistence, floating rules, a logout/power UI) are also untouched.

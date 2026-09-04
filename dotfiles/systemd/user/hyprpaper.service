@@ -1,0 +1,13 @@
+[Unit]
+Description=Wallpaper daemon, the keybinding cheat sheet (D-032)
+PartOf=graphical-session.target
+After=graphical-session.target
+ConditionEnvironment=WAYLAND_DISPLAY
+
+[Service]
+ExecStart=/usr/bin/hyprpaper
+Slice=session.slice
+Restart=on-failure
+
+[Install]
+WantedBy=graphical-session.target

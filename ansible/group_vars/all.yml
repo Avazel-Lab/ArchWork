@@ -43,6 +43,11 @@ archwork_dotfile_links:
   - gtk-3.0
   - gtk-4.0
   - Kvantum
+  # User service units (D-048): hypridle, hyprpaper and the two cliphist
+  # watchers. Whole ~/.config/systemd linked, same as everything else here;
+  # unit files live under dotfiles/systemd/user/ to land in the path
+  # systemd's user manager actually searches.
+  - systemd
 
 # Whether this profile enables the multilib repository. Steam is a multilib
 # package and cannot be installed without it, so the profile that games needs
@@ -129,6 +134,11 @@ archwork_packages_session:
   # unnamed but obvious pick for M3's bar (D-020).
   - hypridle
   - brightnessctl
+  # Clipboard history (D-048), Quickshell-independent: desktop-shell.md
+  # scoped the picker UI to Quickshell, not the daemon underneath it, and
+  # fuzzel already covers a dmenu-style picker without it.
+  - wl-clipboard
+  - cliphist
 
 # AUR packages, pinned by name like everything else (D-005). Every one builds
 # in the clean chroot the aur role makes, so none of them leaves make

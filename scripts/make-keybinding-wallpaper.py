@@ -35,6 +35,7 @@ LABELS: dict[str, tuple[str, str]] = {
     "SUPER + Q": ("Windows and apps", "Close the focused window"),
     "SUPER + F": ("Windows and apps", "Fullscreen the focused window"),
     "SUPER + V": ("Windows and apps", "Float or tile the focused window"),
+    "SUPER + C": ("Windows and apps", "Open the clipboard history picker"),
     "SUPER + left": ("Moving around", "Focus the window to the left"),
     "SUPER + right": ("Moving around", "Focus the window to the right"),
     "SUPER + up": ("Moving around", "Focus the window above"),

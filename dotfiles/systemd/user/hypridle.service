@@ -1,0 +1,13 @@
+[Unit]
+Description=Idle management daemon (M4, security-power.md, D-028)
+PartOf=graphical-session.target
+After=graphical-session.target
+ConditionEnvironment=WAYLAND_DISPLAY
+
+[Service]
+ExecStart=/usr/bin/hypridle
+Slice=session.slice
+Restart=on-failure
+
+[Install]
+WantedBy=graphical-session.target
