@@ -1359,6 +1359,26 @@ to be proven by a run rather than by reading. It was scoped at a point where
 the VM harness was busy proving D-040, and shipping an untestable role would
 have been worse than saying so.
 
+## D-043 nvidia-open lagged the kernel on hmlxdesktop02, and the fix was waiting rather than pinning
+
+**Status:** accepted
+**Date:** 2026-09-04
+**Affects:** D-027, M7.5
+
+A rebuild on `hmlxdesktop02` hit a second, different NVIDIA failure after D-027's fix. The reboot D-027 requires had already happened: `nouveau` was gone from `lsmod`, and the crash-and-redraw symptom D-027 describes was not what this run showed. Instead `start-hyprland` fell back to a low-resolution mode and no `nvidia` module was loaded at all. `sudo modprobe nvidia_drm` gave the actual reason: `FATAL: Module nvidia_drm not found in directory /lib/modules/7.2.3-arch1-2`. `uname -r` was `7.2.3-arch1-2`. `pacman -Ql nvidia-open` showed the package's own shipped modules built for `7.2.2-arch1-1`, one kernel release behind.
+
+`nvidia-open` ships prebuilt kernel modules rather than building them on the machine, so this is not the `linux-headers`/DKMS failure it initially looked like. `linux-headers` was checked and is genuinely not installed anywhere this repository manifests packages, but that turned out to be unrelated: there is no local module build step for `nvidia-open` to need headers for, and chasing that lead first cost time before the actual mismatch was found by comparing `uname -r` against the package's own file list.
+
+The packages role installs the whole package set, `linux` included by way of the base install and `nvidia-open` from `archwork_packages_profile`, in one `pacman -S` after one cache refresh (`ansible/roles/packages/tasks/main.yml`). That does not guarantee the two are in step. `community.general.pacman` with `state: present` only ensures a package is installed, not upgraded to the newest available build, and `nvidia-open`'s own rebuild for a new kernel ABI lands on the mirrors on its own schedule, sometimes hours behind the kernel bump that requires it. Nothing in this repository controls that lag, and it is not specific to the ISO used to install: `pacstrap` syncs against the live mirrors at install time rather than shipping a fixed kernel version, so any install can land on the wrong side of this race depending on when it runs relative to a kernel bump.
+
+Resolved on the machine by `pacman -Sy` until a matching `nvidia-open` build appeared on the mirrors, `pacman -Su`, then a reboot. Confirmed against `lsmod` and a working session afterwards.
+
+Consequences:
+
+- No manifest or role change follows from this entry. It records a recurring hazard rather than a fixed bug: any NVIDIA machine rebuilt at the wrong moment relative to a kernel bump can land here, and the fix each time is the same, sync again and wait for the mirrors, not a workaround baked into the playbook.
+- `linux-headers` is not needed and was not added anywhere. The package that would need it, `nvidia-open-dkms`, is not what this repository uses, and D-027's choice of `nvidia-open` over the proprietary driver is unaffected.
+- Worth doing if this recurs rather than after one occurrence: a check after the NVIDIA package install that runs `modprobe nvidia_drm` and fails the play loudly when it is not there, rather than leaving the mismatch to surface silently at the next login. Not written here, because one occurrence is a data point, not yet a pattern worth a task for.
+
 ## D-044 The desktop's first real suspend cycle did not resume
 
 **Status:** open. Root cause found, fix not chosen. Raised for the repository owner rather than decided here.
