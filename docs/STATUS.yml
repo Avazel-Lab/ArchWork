@@ -3,7 +3,7 @@
 # Validated by scripts/check-plan-status.py.
 ---
 schema: 1
-updated: 2026-09-03
+updated: 2026-09-04
 
 phase: M5
 
@@ -40,7 +40,7 @@ milestones:
   M7:
     status: not-started
   M7.5:
-    status: not-started
+    status: in-progress
   M8:
     status: in-progress
   M9:
@@ -215,10 +215,11 @@ first_install:
 # libvirt's two unnamed dependencies.
 
 next_actions:
-  - Start M7.5 (D-036). Install hmlxdesktop02 from the ISO at one commit on
-    main and bring it up with bootstrap.sh alone, so the machine can be used
-    for work and for developing this repository. Nothing needs writing
-    first, because the applications have been in the manifests since D-029
+  - Continue M7.5 on hmlxdesktop02. What remains open covers Zen Browser,
+    VS Code and Claude Code CLI launching, make check passing on the machine
+    itself, a second reconcile reporting zero changed tasks, archwork-health
+    green, and Claude Code committing and pushing from the machine over its
+    own ed25519 key
   - M5 waits for M7.5 by decision, because its rollback path has only ever
     run in a VM and the owner wants real hardware to exercise it before it is
     called complete
@@ -227,14 +228,27 @@ next_actions:
     than branch tracking, data inside the rollback boundary, and the
     deliberate update process already written into the user guide (D-042)
 
-# M7.5 was added on 2026-09-03 (D-036) and has not started. It is the one
-# milestone that runs ahead of M7 on purpose: the machine is installed, the
-# applications have been in the manifests since D-029, and holding it unusable
-# until three clean rebuilds pass keeps every hour of development inside an
-# hour-long VM harness. Nothing needs to be written for it. The four gaps
-# raised against it were all closed by the repository owner as out of scope:
-# no drift detection, no boot order change, no /home backup, and end-to-end
-# testing stays in Kubuntu. The Arch installation is disposable and that is
-# what makes the milestone small.
+# M7.5 was added on 2026-09-03 (D-036). It started on 2026-09-04:
+# hmlxdesktop02 installed from the ISO and brought up with bootstrap.sh.
+# The first login attempt hit D-027's symptom again, but D-027 itself was not
+# wrong: nouveau was already gone. What was missing was every nvidia module,
+# because nvidia-open's prebuilt build on the mirrors had not yet caught up
+# to the kernel pacstrap had pulled, one release behind. Resolved on the
+# machine by re-syncing until a matching nvidia-open build appeared, then
+# upgrading and rebooting. No manifest change followed: D-043 records it as a
+# recurring mirror-timing hazard rather than a bug this repository can fix.
+# Login now reaches a session. None of M7.5's other exit criteria are
+# confirmed yet: application launches, make check on the machine, a second
+# reconcile at zero changed, archwork-health, and committing from the machine
+# itself are all still open.
+#
+# It is the one milestone that runs ahead of M7 on purpose: the applications
+# have been in the manifests since D-029, and holding it unusable until three
+# clean rebuilds pass keeps every hour of development inside an hour-long VM
+# harness. Nothing needs to be written for it beyond what D-043 found. The
+# four gaps raised against it were all closed by the repository owner as out
+# of scope: no drift detection, no boot order change, no /home backup, and
+# end-to-end testing stays in Kubuntu. The Arch installation is disposable
+# and that is what makes the milestone small.
 
 blockers: []
