@@ -215,29 +215,15 @@ Worth checking, because no virtual machine could show any of it:
 
 ---
 
-## Put Kubuntu back as the default
+## Choosing which system boots
 
-`bootctl install` makes Arch the first boot entry, and nothing in the installer puts that back. Leave it that way while you are getting the machine working, because every reboot in the steps above wants to land in Arch.
+Nothing to do. The firmware boots the Kubuntu drive by default and you pick the Arch drive deliberately, which is the arrangement the repository owner already has and wants. `bootctl install` writes a boot entry on the Arch ESP; it does not change which drive this machine reaches for on its own.
 
-Once the desktop is up and you are happy with it, put Kubuntu back in front. M7.5 asks for exactly this: Kubuntu stays the default and Arch is chosen deliberately, so that a broken Arch never costs you the machine you work on.
+Do not reorder anything with `efibootmgr`. Putting a Kubuntu entry in front of the Arch one means deliberately selecting the Arch drive and then landing back in Kubuntu, which is worse than the thing it was meant to fix.
 
-From any of the three systems:
+## Getting back to Kubuntu or Windows
 
-```bash
-efibootmgr
-```
-
-That lists the entries with four digit numbers and shows the current `BootOrder`. Then set the order you want, Kubuntu first:
-
-```bash
-sudo efibootmgr -o 000A,000B,000C
-```
-
-Substitute the real numbers from your own listing. Nothing is destroyed by getting the order wrong; the firmware boot menu still reaches everything.
-
-## Getting back to Kubuntu or Windows in a hurry
-
-The install does not touch the other two bootloaders, which sit on their own disks. systemd-boot only scans its own EFI partition, so the Arch boot menu will never offer them however the order is set.
+The install does not touch the other two bootloaders, which sit on their own disks. systemd-boot only scans its own EFI partition, so the Arch boot menu will never offer them.
 
 Press **F8** at the ASUS logo and pick the one you want.
 

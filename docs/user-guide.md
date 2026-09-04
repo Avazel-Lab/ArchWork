@@ -121,4 +121,4 @@ That is the whole process, and it is the same one for anything pinned. If a pin 
 
 Press **F8** at the ASUS logo and pick the one you want.
 
-Once you have run the `efibootmgr` step at the end of `first-install.md`, Kubuntu is the default boot entry, so an ArchWork machine that will not start costs you nothing: reboot and you are back where you were. Until you run it, the installer has left Arch first, and F8 is the only way back. The same command changes the order again later.
+The firmware boots the Kubuntu drive by default and the Arch drive is one you choose deliberately, so an ArchWork machine that will not start costs you nothing: reboot, choose nothing, and you are back where you were.
