@@ -28,10 +28,14 @@
   become: true
 
 - name: Ask whether /var/lib/aurbuild is already the bind mount
+  # check_mode: false because this reads and changes nothing, and a command
+  # task is skipped under --check by default. Skipped leaves aur_bindmount
+  # without an rc, and the two tasks below branch on it.
   ansible.builtin.command: mountpoint -q /var/lib/aurbuild
   register: aur_bindmount
   changed_when: false
   failed_when: false
+  check_mode: false
   become: true
 
 - name: Look for a build chroot left inside the rollback boundary
@@ -71,10 +75,16 @@
   ansible.builtin.meta: flush_handlers
 
 - name: Mount the build chroot outside the rollback boundary
+  # Not under --check. The template above only reports what it would write, so
+  # the unit does not exist, and systemd_service errors rather than skipping:
+  # "Could not find the requested service var-lib-aurbuild.mount". That failed
+  # M2's criterion that ansible-playbook --check runs clean, and run 26 found
+  # it one minute in.
   ansible.builtin.systemd_service:
     name: var-lib-aurbuild.mount
     enabled: true
     state: started
+  when: not ansible_check_mode
   become: true
 
 - name: Create the build user
