@@ -86,6 +86,7 @@ These decision documents describe the intended state of the platform and should 
 - [`docs/STATUS.yml`](docs/STATUS.yml) records where the project has got to. It is the only file that does.
 - [`docs/decisions/log.md`](docs/decisions/log.md) records dated decisions and the open questions that block milestones.
 - [`docs/first-install.md`](docs/first-install.md) is the runbook for the first install on physical hardware.
+- [`docs/user-guide.md`](docs/user-guide.md) is how to use the machine once it is built: updating, checking it, rolling back, and what a rebuild does not bring back.
 - [`CLAUDE.md`](CLAUDE.md) holds the rules for AI-assisted changes.
 
 Run `make check` to lint and to prove the status file still agrees with the plan.

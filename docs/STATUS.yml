@@ -109,13 +109,12 @@ last_rebuild:
 # evidence of run 23 (desktop, e970eec) and run 25 (laptop, a65e85a). The SHA
 # above is run 25's, the run that completed the pair.
 #
-# One exit criterion is marked complete without ever having been observed, and
-# that is worth stating rather than burying. "Display dims after 5 minutes"
-# cannot be seen where there is no backlight device, which is every VM, so it
-# is a skip on every run by design. The configuration is asserted and the
-# listener is proven by the two timings after it. Only the laptop panel can
-# settle the dim itself, which makes it M9's to confirm rather than something
-# any run so far has shown.
+# Observing the 5 minute dim moved from M4 to M9 on the same day and by the
+# same decision. It cannot be seen where there is no backlight device, which is
+# every VM, so it had been a skip on every run by design. M4 keeps the
+# configuration assertion; M9 gets the observation, on the first machine with a
+# panel. M4 is therefore complete on criteria that were all actually met,
+# rather than complete with one that nothing had ever shown.
 #
 # The run did not complete. The recovery phase after M4 timed out waiting for
 # a reboot, because the harness woke the guest with system_wakeup, which is

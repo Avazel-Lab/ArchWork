@@ -188,6 +188,8 @@ reboot
 
 ## Step 10. Look around
 
+Day to day use, updating, health checks and rolling back are in [`user-guide.md`](user-guide.md). This section is only the first look.
+
 A dark desktop with a bar across the top.
 
 | Keys | What happens |
