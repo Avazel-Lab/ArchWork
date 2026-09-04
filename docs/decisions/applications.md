@@ -63,6 +63,13 @@ Web applications only. No dedicated desktop email or calendar client.
 - **Discord**, desktop application.
 - **WhatsApp PWA**.
 
+## File management
+
+- **Krusader**, the graphical file manager. Twin-panel, power-user oriented, matching the KDE-adjacent tooling already here (Okular, Gwenview, Kvantum).
+- **Yazi**, the terminal file manager. Rust, async I/O, actively developed.
+
+Both were in the original desktop-planning notes and never made it into this document (D-047). Neither is a Quickshell responsibility; a file manager is a standalone application, not shell UI.
+
 ## File search
 
 - **FSearch**, the closest fit to Everything-style indexed search. Indexes local files and mounted NAS shares.

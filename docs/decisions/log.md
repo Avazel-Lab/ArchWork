@@ -1457,3 +1457,19 @@ The path was hardcoded in nine places rather than read from one, which is why th
 - D-016 and D-022's own text still says `~/src/ArchWork`, because that was the path when those decisions were made and their reasoning does not depend on which path was chosen. Only `storage-boot.md`, the document that has to stay current, was updated.
 - **Not proven.** No installer run and no VM assertion has exercised the new path yet. M1's recorded evidence in `docs/STATUS.yml` predates this decision and is unaffected by it; the next clean rebuild is what actually tests these nine changes together.
 - The live checkout on `hmlxdesktop02` was relocated by hand to match, outside the rollback boundary either way, so nothing about M7.5's evidence changes.
+
+## D-047 A file manager, GUI and terminal, was in the original plan and never reached this repository
+
+**Status:** accepted
+**Date:** 2026-09-04
+**Affects:** `applications.md`, M7
+
+The repository owner ran their original ChatGPT desktop-planning notes against this repository's actual decisions, row by row, looking for anything the notes named that never made it into a decision document. Most of the table was already here, in `desktop-shell.md`, in the same words in places. This was the one clean miss: a file manager, GUI and terminal both, named in the original notes and absent from `applications.md`, from every package manifest, and from every decision document. Not a Quickshell responsibility either, so `desktop-shell.md`'s absence of a file manager row is not the same gap.
+
+Krusader (GUI, twin-panel) and Yazi (terminal) are both the repository owner's original picks, and both are official-repository packages: `extra/krusader`, `extra/yazi`, neither needs the AUR chroot D-005 built for exactly this kind of package.
+
+Consequences:
+
+- Both join `archwork_packages_applications` in `group_vars/all.yml`.
+- **Not installed anywhere yet.** M7's package manifests are the target for `applications.md`'s baseline; nothing has reconciled against this addition.
+- The same read-through surfaced other gaps that are not packages: animations, a persistent-workspace policy, floating window rules, a logout/power UI, and the desktop's session-startup model going through Hyprland's own exec hook rather than `systemd --user` as originally planned. None of those are decided here. They are being taken one at a time rather than batched, because each is a real design choice rather than an omission with one obvious answer.

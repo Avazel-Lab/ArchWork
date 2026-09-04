@@ -265,6 +265,10 @@ archwork_packages_shared:
 # age, btrbk, tailscale and mermaid-cli are in the shared set, and git, vim,
 # openssh and openssl come from the base install.
 archwork_packages_applications:
+  # File management, GUI and terminal (D-047). Both official-repo packages,
+  # no AUR build needed.
+  - krusader
+  - yazi
   # Editors. The terminal half; VS Code is the AUR half.
   - neovim
   # Documents and office. Fresh rather than still: this is a rolling

@@ -11,6 +11,7 @@ review: 2027-02-27
 | Area | Decision | Notes |
 |---|---|---|
 | Window manager / compositor | Hyprland | Core desktop platform. |
+| Multi-monitor | Hyprland monitor rules, matched by output name | Host-specific overrides live in `dotfiles/hypr/hyprland.lua` itself rather than a variable, since they name physical outputs. Very low priority: review `kanshi` once the laptop profile actually docks to an external monitor (M8/M9); nothing today exercises that case. |
 | Desktop shell | Quickshell | Primary shell framework for integrated desktop UI. |
 | Launcher | Quickshell | Launcher is a Quickshell module (D-001). Until Quickshell lands at M6, use fuzzel, and keep it in the fallback set afterwards. |
 | Lock screen | Hyprlock | Longer-term goal is to replace/integrate with Quickshell. |
