@@ -1249,3 +1249,24 @@ and pull in no further AUR builds: `webkit2gtk-4.1` is in `extra`, and
 is an AppImage rather than a packaged binary, and it is a version behind.
 
 Not proven. Neither has been built on any machine yet.
+
+## D-041 The application baseline is accounted for, and four entries rest on a written reason
+
+**Status:** accepted
+**Date:** 2026-09-04
+**Affects:** `applications.md`, D-024, D-029, M7
+
+M7 requires that "the package manifests account for every application in `decisions/applications.md`, or name the ones deliberately left out and say why". Nobody had checked it since D-029 put the baseline into the manifests, and an exit criterion nobody has run is not evidence of anything.
+
+Checked on 2026-09-04: 106 bolded entries in the baseline against 165 packages across the three manifests. Everything is accounted for. Most match a package directly, some under the name Arch uses rather than the one the baseline writes, which D-029 already noted: xorriso is `libisoburn`, Pandoc is `pandoc-cli`, GNOME Disks is `gnome-disk-utility`, KVM/QEMU is `qemu-desktop` with `libvirt`, "Btrfs snapshot tooling" is `btrbk`. Bash, OpenSSH, coreutils and `dd` come from the base install, which `applications-tooling.md` already says.
+
+**Four entries are accounted for by a written reason rather than by a package.** M7 allows that, and they are listed here so that the allowance is deliberate rather than an oversight nobody looked at:
+
+- **Spotify and WhatsApp.** The baseline has a "Web or PWA rather than native" section naming them, along with email and calendar. Nothing to install.
+- **AI Agent Manager, Game-on-itor and Kitchen Sync.** The baseline's "Personal applications" section says they may need reworking, packaging and an ArchWork-specific installation and update mechanism. No such mechanism exists, and none is planned before M7.
+- **`joplin-bin` and `opendeck-bin`.** Now in the manifests (D-035), and unproven: neither has been built anywhere.
+- **Odysseus.** The baseline says "the exact project or package still needs identifying before installation can be automated". That is a reason, so it satisfies the criterion as written, but it is the only entry where nobody knows what the software actually is. It is a question for the repository owner rather than something an agent can resolve.
+
+The Epson FastFoto driver is a fifth case of a different kind: `epsonscan2` is installed, and `applications.md` is explicit that the driver is not the criterion, a tested batch and ADF workflow is. Installed and unproven, not deferred.
+
+This is a check of one moment. It will go stale the next time either document changes, and the honest place to notice that is the next time M7 is assessed.
