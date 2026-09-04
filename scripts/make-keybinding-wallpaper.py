@@ -52,6 +52,102 @@ LABELS: dict[str, tuple[str, str]] = {
 # Order the groups appear in, rather than whatever dict iteration gives.
 GROUPS = ["Windows and apps", "Moving around", "Mouse", "Session"]
 
+# Desktop apps, by category, rendered only where `pacman -Q` says the package
+# is actually here. This is deliberately not applications.md: that document
+# is the aspirational baseline, most of which is not installed on any one
+# machine yet, and a wallpaper showing packages that are not there would be
+# exactly the kind of drift this generator otherwise refuses to have. The
+# package name is what gets checked; the second string is what gets shown.
+APPS: dict[str, list[tuple[str, str]]] = {
+    "Browsers": [
+        ("zen-browser-bin", "Zen Browser"),
+        ("ungoogled-chromium-bin", "Ungoogled Chromium"),
+    ],
+    "Development": [
+        ("visual-studio-code-bin", "VS Code"),
+        ("bruno-bin", "Bruno"),
+    ],
+    "Documents": [
+        ("libreoffice-fresh", "LibreOffice"),
+        ("okular", "Okular"),
+        ("pdfarranger", "PDF Arranger"),
+    ],
+    "Notes and passwords": [
+        ("joplin-bin", "Joplin"),
+        ("nordpass-bin", "NordPass"),
+        ("bitwarden", "Bitwarden"),
+    ],
+    "Media": [
+        ("vlc", "VLC"),
+        ("handbrake", "HandBrake"),
+        ("tinymediamanager-bin", "tinyMediaManager"),
+    ],
+    "Images and archives": [
+        ("gwenview", "Gwenview"),
+        ("pinta", "Pinta"),
+        ("peazip", "PeaZip"),
+    ],
+    "Communication": [
+        ("discord", "Discord"),
+    ],
+    "Files": [
+        ("fsearch", "FSearch"),
+        ("krusader", "Krusader"),
+        ("yazi", "Yazi"),
+    ],
+    "Torrenting": [
+        ("qbittorrent", "qBittorrent"),
+    ],
+    "Remote and virtual machines": [
+        ("remmina", "Remmina"),
+        ("virt-manager", "virt-manager"),
+    ],
+    "Gaming": [
+        ("steam", "Steam"),
+        ("lutris", "Lutris"),
+        ("heroic-games-launcher-bin", "Heroic"),
+        ("protonup-qt", "ProtonUp-Qt"),
+    ],
+    "System": [
+        ("mission-center", "Mission Center"),
+        ("gparted", "GParted"),
+        ("gnome-disk-utility", "GNOME Disks"),
+        ("baobab", "Baobab"),
+    ],
+    "Peripherals": [
+        ("opendeck-bin", "OpenDeck"),
+        ("solaar", "Solaar"),
+        ("kdeconnect", "KDE Connect"),
+    ],
+    "AI": [
+        ("lmstudio-bin", "LM Studio"),
+    ],
+}
+
+# Order categories are packed in. Packing itself is by shortest-column-first
+# (pack_columns below), not this order, but a fixed order keeps a rebuild
+# from shuffling categories between two runs with the same packages installed.
+APP_CATEGORY_ORDER = list(APPS)
+
+# Commands worth keeping in reach: checking something, not changing it.
+# Curated, not dumped from ~/.bash_history: the history that prompted this
+# is mostly cd, ls and a night of NVIDIA debugging, which is not a cheat
+# sheet anybody wants on their wall. Kept to what actually works on this
+# machine today, checked against it rather than assumed: no archwork-health,
+# archwork-update or archwork-inhibit here, because M5's snapshots role has
+# not reconciled onto hmlxdesktop02 yet and none of the three exist here.
+GENERAL_COMMANDS: list[tuple[str, str]] = [
+    ("hyprctl reload", "Apply a Hyprland config edit without restarting"),
+    ("pacman -Q <pkg>", "Check what version of something is installed"),
+    ("pacman -Syu", "Update the whole system"),
+    ("systemctl --user status <unit>", "Check a session service, e.g. hypridle"),
+    ("journalctl --user -u <unit>", "That service's own log"),
+    ("journalctl -b", "Everything logged since this boot"),
+    ("cliphist list", "See clipboard history (Super+C picks from it)"),
+    ("make check", "Run this repository's own lint and tests"),
+    ("uname -r", "The kernel actually running, not just installed"),
+]
+
 # Not keybindings, so not in hyprland.lua and not checked against it. These are
 # the commands that manage the power behaviour M4 configures, which is the part
 # of the system with no UI at all until Quickshell arrives at M6.
@@ -76,8 +172,38 @@ RULE = (58, 68, 75)
 TEXT = (232, 237, 240)
 MUTED = (138, 155, 165)
 ACCENT = (128, 203, 196)
-KEY_BG = (48, 56, 63)
 KEY_TEXT = (222, 232, 236)
+
+
+def installed_packages() -> set[str]:
+    """Everything `pacman -Q` says is on this machine, or an empty set.
+
+    Absent rather than fatal when pacman is not there: rendering on a
+    non-Arch machine, or CI, should not need it, and an empty result just
+    means every app category comes out empty rather than the run failing.
+    """
+    if not shutil.which("pacman"):
+        return set()
+    result = subprocess.run(["pacman", "-Qq"], capture_output=True, text=True, check=False)
+    if result.returncode != 0:
+        return set()
+    return set(result.stdout.split())
+
+
+def pack_columns(items: list[tuple[str, int]], n: int) -> list[list[str]]:
+    """Greedy shortest-column-first packing.
+
+    Each item is (label, estimated_height). Not optimal bin-packing, which
+    this does not need: it only has to keep n columns roughly level, not
+    solve it exactly.
+    """
+    columns: list[list[str]] = [[] for _ in range(n)]
+    heights = [0] * n
+    for label, height in items:
+        shortest = heights.index(min(heights))
+        columns[shortest].append(label)
+        heights[shortest] += height
+    return columns
 
 
 def read_bindings(path: Path) -> list[str]:
@@ -130,50 +256,10 @@ def font(names: list[str], size: int):
     return ImageFont.load_default(size)
 
 
-def cap_height(draw, key_font):
-    """Height of a key cap, measured once so a row can centre against it.
-
-    Measured from a string with an ascender and a descender rather than from
-    the label, so that every cap in a row is the same height whatever letters
-    it happens to contain.
-    """
-    _, top, _, bottom = draw.textbbox((0, 0), "Ayg", font=key_font)
-    return bottom - top + 12
-
-
-def draw_key(draw, x, y, text, key_font, height):
-    """A key cap of the common height, returning the x it ends at."""
-    left, top, right, bottom = draw.textbbox((0, 0), text, font=key_font)
-    pad_x = 10
-    w = right - left + pad_x * 2
-    draw.rounded_rectangle([x, y, x + w, y + height], radius=6, fill=KEY_BG)
-    draw.text((x + pad_x - left, y + (height - (bottom - top)) / 2 - top),
-              text, font=key_font, fill=KEY_TEXT)
-    return x + w
-
-
-def draw_centred(draw, x, y, height, text, text_font, fill):
-    """Text centred on the same vertical line as a key cap of that height."""
-    _, top, _, bottom = draw.textbbox((0, 0), text, font=text_font)
-    draw.text((x, y + (height - (bottom - top)) / 2 - top), text, font=text_font, fill=fill)
-
-
-def draw_binding(draw, x, y, binding, caption, key_font, body_font, width):
-    """One row: the chord as key caps, then what it does."""
-    height = cap_height(draw, key_font)
-    cursor = x
-    for index, part in enumerate(p.strip() for p in binding.split("+")):
-        if index:
-            draw_centred(draw, cursor + 7, y, height, "+", body_font, MUTED)
-            cursor += 24
-        cursor = draw_key(draw, cursor, y, part, key_font, height)
-    draw_centred(draw, x + width, y, height, caption, body_font, TEXT)
-
-
 def render(bindings: list[str], size: tuple[int, int], output: Path) -> None:
     # Imported here rather than at the top so that --check, which is what CI
     # runs, needs nothing but the standard library.
-    from PIL import Image, ImageDraw, ImageFont  # noqa: PLC0415
+    from PIL import Image, ImageDraw  # noqa: PLC0415
 
     width, height = size
     scale = width / 2560
@@ -184,11 +270,14 @@ def render(bindings: list[str], size: tuple[int, int], output: Path) -> None:
         return int(round(value * scale))
 
     title_font = font(["Inter:bold", "Noto Sans:bold", "DejaVu Sans:bold"], px(58))
-    group_font = font(["Inter:bold", "Noto Sans:bold", "DejaVu Sans:bold"], px(26))
-    body_font = font(["Inter", "Noto Sans", "DejaVu Sans"], px(23))
+    group_font = font(["Inter:bold", "Noto Sans:bold", "DejaVu Sans:bold"], px(24))
+    body_font = font(["Inter", "Noto Sans", "DejaVu Sans"], px(22))
+    small_font = font(["Inter", "Noto Sans", "DejaVu Sans"], px(18))
+    tiny_font = font(["Inter", "Noto Sans", "DejaVu Sans"], px(15))
     key_font = font(["JetBrains Mono:bold", "JetBrainsMono Nerd Font:bold",
-                     "DejaVu Sans Mono:bold"], px(20))
-    small_font = font(["Inter", "Noto Sans", "DejaVu Sans"], px(19))
+                     "DejaVu Sans Mono:bold"], px(18))
+    tiny_key_font = font(["JetBrains Mono:bold", "JetBrainsMono Nerd Font:bold",
+                          "DejaVu Sans Mono:bold"], px(14))
 
     margin = px(150)
     panel = [margin - px(50), px(150), width - margin + px(50), height - px(150)]
@@ -198,62 +287,103 @@ def render(bindings: list[str], size: tuple[int, int], output: Path) -> None:
     y = px(215)
     draw.text((x, y), "ArchWork", font=title_font, fill=TEXT)
     y += px(78)
-    draw.text((x, y), "The keys that drive this desktop", font=body_font, fill=ACCENT)
+    draw.text((x, y), "The apps, the commands, and the keys underneath",
+              font=body_font, fill=ACCENT)
     y += px(60)
+    top = y
+    bottom = height - px(210)
 
-    column_width = (width - margin * 2 - px(80)) // 2
-    caption_offset = px(330)
-    left_x, right_x = x, x + column_width + px(80)
-    left_y = right_y = y
+    content_width = width - margin * 2
+    gap = px(50)
+    apps_width = int(content_width * 0.55)
+    commands_width = int(content_width * 0.26)
+    shortcuts_x = margin + apps_width + gap + commands_width + gap
+    commands_x = margin + apps_width + gap
 
-    grouped: dict[str, list[str]] = {name: [] for name in GROUPS}
-    for binding in bindings:
-        grouped[LABELS[binding][0]].append(binding)
+    def category_height(n_apps: int) -> int:
+        return px(46) + n_apps * px(30) + px(16)
 
-    # The two long groups on the left, the two short ones on the right, so the
-    # columns finish at roughly the same depth.
-    for group in ["Windows and apps", "Moving around"]:
-        draw.text((left_x, left_y), group.upper(), font=group_font, fill=ACCENT)
-        left_y += px(20)
-        draw.line([left_x, left_y + px(20), left_x + column_width, left_y + px(20)], fill=RULE)
-        left_y += px(42)
-        for binding in grouped[group]:
-            draw_binding(draw, left_x, left_y, binding, LABELS[binding][1],
-                         key_font, body_font, caption_offset)
-            left_y += px(52)
-        left_y += px(34)
+    def draw_category(cx: int, cy: int, name: str, apps: list[str], cwidth: int) -> int:
+        draw.text((cx, cy), name.upper(), font=small_font, fill=ACCENT)
+        cy += px(16)
+        draw.line([cx, cy + px(14), cx + cwidth, cy + px(14)], fill=RULE)
+        cy += px(30)
+        for app in apps:
+            draw.text((cx, cy), app, font=body_font, fill=TEXT)
+            cy += px(30)
+        return cy + px(16)
 
-    for group in ["Mouse", "Session"]:
-        draw.text((right_x, right_y), group.upper(), font=group_font, fill=ACCENT)
-        right_y += px(20)
-        draw.line([right_x, right_y + px(20), right_x + column_width, right_y + px(20)], fill=RULE)
-        right_y += px(42)
-        for binding in grouped[group]:
-            draw_binding(draw, right_x, right_y, binding, LABELS[binding][1],
-                         key_font, body_font, caption_offset)
-            right_y += px(52)
-        right_y += px(34)
+    # DESKTOP APPS: only what pacman actually says is here (installed_packages
+    # below), packed into three columns by shortest-column-first so a category
+    # with one app does not leave as much white space as one with five. Three,
+    # not two: fourteen categories at this row height do not fit two columns
+    # in the space available, measured by actually rendering it and looking,
+    # not by trusting the arithmetic in advance.
+    present = installed_packages()
+    apps_by_category = {
+        name: [label for pkg, label in pkgs if pkg in present]
+        for name, pkgs in ((n, APPS[n]) for n in APP_CATEGORY_ORDER)
+    }
+    apps_by_category = {name: apps for name, apps in apps_by_category.items() if apps}
 
-    draw.text((right_x, right_y), "SLEEP AND POWER", font=group_font, fill=ACCENT)
-    right_y += px(20)
-    draw.line([right_x, right_y + px(20), right_x + column_width, right_y + px(20)], fill=RULE)
-    right_y += px(42)
-    command_height = cap_height(draw, key_font)
+    draw.text((margin, top), "DESKTOP APPS", font=group_font, fill=ACCENT)
+    apps_top = top + px(46)
+    sub_gap = px(34)
+    n_sub = 3
+    sub_width = (apps_width - sub_gap * (n_sub - 1)) // n_sub
+    sub_x = [margin + i * (sub_width + sub_gap) for i in range(n_sub)]
+
+    packed = pack_columns(
+        [(name, category_height(len(apps))) for name, apps in apps_by_category.items()],
+        n_sub,
+    )
+    sub_y = [apps_top] * n_sub
+    for col, names in enumerate(packed):
+        for name in names:
+            sub_y[col] = draw_category(sub_x[col], sub_y[col], name,
+                                        apps_by_category[name], sub_width)
+
+    # USEFUL COMMANDS: a narrower column, so command and caption stack rather
+    # than sit side by side, which is what broke first when this was tried at
+    # the commands column's actual width rather than the wide layout the
+    # keybindings used.
+    draw.text((commands_x, top), "USEFUL COMMANDS", font=group_font, fill=ACCENT)
+    cy = top + px(40)
+    for command, caption in GENERAL_COMMANDS:
+        draw.text((commands_x, cy), command, font=key_font, fill=KEY_TEXT)
+        cy += px(22)
+        draw.text((commands_x, cy), caption, font=small_font, fill=MUTED)
+        cy += px(26)
+
+    cy += px(14)
+    draw.text((commands_x, cy), "SLEEP AND POWER", font=group_font, fill=ACCENT)
+    cy += px(40)
     for command, caption in COMMANDS:
-        draw_centred(draw, right_x, right_y, command_height, command, key_font, KEY_TEXT)
-        draw_centred(draw, right_x + caption_offset, right_y, command_height, caption,
-                     body_font, TEXT)
-        right_y += px(46)
-    right_y += px(20)
+        draw.text((commands_x, cy), command, font=key_font, fill=KEY_TEXT)
+        cy += px(22)
+        draw.text((commands_x, cy), caption, font=small_font, fill=MUTED)
+        cy += px(26)
+    cy += px(10)
     for when, what in TIMINGS:
-        draw.text((right_x, right_y), when, font=small_font, fill=MUTED)
-        draw.text((right_x + caption_offset, right_y), what, font=small_font, fill=MUTED)
-        right_y += px(36)
+        draw.text((commands_x, cy), f"{when}: {what}", font=tiny_font, fill=MUTED)
+        cy += px(22)
+
+    # SHORTCUTS: tucked into the narrowest column, no key-cap graphics, no
+    # group headings. Still every binding hyprland.lua actually defines, in
+    # its own order, still refusing to render if one goes uncaptioned; only
+    # how much room it is given on the page has changed.
+    draw.text((shortcuts_x, top), "SHORTCUTS", font=group_font, fill=ACCENT)
+    sy = top + px(40)
+    for binding in bindings:
+        draw.text((shortcuts_x, sy), binding, font=tiny_key_font, fill=KEY_TEXT)
+        sy += px(20)
+        draw.text((shortcuts_x, sy), LABELS[binding][1], font=tiny_font, fill=MUTED)
+        sy += px(26)
 
     draw.text(
-        (margin, height - px(210)),
-        "Generated from dotfiles/hypr/hyprland.lua by "
-        "scripts/make-keybinding-wallpaper.py. Edit the bindings, then run it again.",
+        (margin, bottom),
+        "Generated by scripts/make-keybinding-wallpaper.py from hyprland.lua's bindings "
+        "and this machine's actual packages. Edit either, then run it again.",
         font=small_font, fill=MUTED,
     )
 
