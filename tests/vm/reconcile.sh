@@ -12,7 +12,7 @@
 
 set -euo pipefail
 
-REPO="$HOME/src/ArchWork"
+REPO="$HOME/projects/active/ArchWork"
 MODE="${1:-run}"
 
 die() {

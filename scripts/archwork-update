@@ -78,8 +78,8 @@ find_repo() {
 	fi
 	local home
 	for home in /home/*; do
-		repo_is_usable "$home/src/ArchWork" || continue
-		printf '%s' "$home/src/ArchWork"
+		repo_is_usable "$home/projects/active/ArchWork" || continue
+		printf '%s' "$home/projects/active/ArchWork"
 		return 0
 	done
 	return 1

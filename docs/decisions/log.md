@@ -1440,3 +1440,20 @@ This is not a repeat of D-044's mechanism. The whole of that boot's journal has 
 **Not diagnosed.** Whether this is the display-off path alone breaking input, a second and different hardware quirk, or something that only looks unrelated to D-044 for want of a log line that would tie them together, is not known from what is recorded here. Treating it as the same bug would be a guess dressed as a finding, which is worse than saying it plainly is not yet understood.
 
 **Consequence for what runs unattended in the meantime.** Two independent paths have now cost input control the same evening: one through the 30 minute sleep listener, one through something closer to the 15 minute display-off listener. A mitigation aimed only at `systemctl suspend` would not obviously cover this one.
+
+## D-046 The checkout moves to `~/projects/active/ArchWork`
+
+**Status:** accepted
+**Date:** 2026-09-04
+**Affects:** `storage-boot.md`, D-016, D-022, M1, M7.5
+
+D-016 put the checkout at `~/src/ArchWork` as a side effect of putting it inside `@home`, not as a choice about the path itself: the reasoning was staying outside the rollback boundary, never the specific directory name. The repository owner keeps other git projects at `~/projects/active/<repo>`, and asked for ArchWork to sit there too, on the machine built for M7.5.
+
+The path was hardcoded in nine places rather than read from one, which is why this is a decision and not an edit: `scripts/archwork-install.sh` (`REPO_PATH`, the clone destination on every fresh install), `ansible/group_vars/all.yml` (`archwork_repo_dir`, which the `power` and `snapshots` roles read to link scripts, and which `archwork_dotfiles_dir` derives from), `scripts/archwork-update` (finds the clone by walking `/home/*` since it has no group variable to read), the M1 assertion and the VM check library, `tests/vm/reconcile.sh`, a bats fixture, and `docs/first-install.md`.
+
+**Consequences:**
+
+- All nine now read `~/projects/active/ArchWork`. `storage-boot.md`'s consequence line points here rather than restating the reasoning.
+- D-016 and D-022's own text still says `~/src/ArchWork`, because that was the path when those decisions were made and their reasoning does not depend on which path was chosen. Only `storage-boot.md`, the document that has to stay current, was updated.
+- **Not proven.** No installer run and no VM assertion has exercised the new path yet. M1's recorded evidence in `docs/STATUS.yml` predates this decision and is unaffected by it; the next clean rebuild is what actually tests these nine changes together.
+- The live checkout on `hmlxdesktop02` was relocated by hand to match, outside the rollback boundary either way, so nothing about M7.5's evidence changes.

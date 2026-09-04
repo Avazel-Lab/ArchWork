@@ -70,7 +70,7 @@ check "age is installed" command_installed age
 check "the repository is cloned" repo_present gary
 check "the clone belongs to the user" repo_owned_by_user gary
 check "origin points upstream, not at the ISO" repo_origin_is_upstream gary
-check "bootstrap.sh is present and executable" test -x /home/gary/src/ArchWork/bootstrap.sh
+check "bootstrap.sh is present and executable" test -x /home/gary/projects/active/ArchWork/bootstrap.sh
 
 printf '\n'
 if [ "$CHECK_FAILURES" -eq 0 ]; then
