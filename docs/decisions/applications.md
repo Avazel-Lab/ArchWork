@@ -70,6 +70,8 @@ Web applications only. No dedicated desktop email or calendar client.
 
 Both were in the original desktop-planning notes and never made it into this document (D-047). Neither is a Quickshell responsibility; a file manager is a standalone application, not shell UI.
 
+**Future, not yet added:** KDiff3 (diff and merge) and KRename (batch renaming), both primarily for use as Krusader's external tools rather than standalone. Raised 2026-09-05, deliberately not actioned yet.
+
 ## File search
 
 - **FSearch**, the closest fit to Everything-style indexed search. Indexes local files and mounted NAS shares.

@@ -1474,6 +1474,12 @@ Consequences:
 - **Not installed anywhere yet.** M7's package manifests are the target for `applications.md`'s baseline; nothing has reconciled against this addition.
 - The same read-through surfaced other gaps that are not packages: animations, a persistent-workspace policy, floating window rules, a logout/power UI, and the desktop's session-startup model going through Hyprland's own exec hook rather than `systemd --user` as originally planned. None of those are decided here. They are being taken one at a time rather than batched, because each is a real design choice rather than an omission with one obvious answer.
 
+### Update, 2026-09-05
+
+The list above was incomplete. Two more from the same read-through were discussed in conversation but never written down here, which is the same failure mode this whole exercise exists to catch: a keyboard-first interaction model (extensive keybindings and mouse support are both built, but the principle itself is not named anywhere), and a system tray, currently only implicit under `desktop-shell.md`'s catch-all "Desktop UI integration: Quickshell" row rather than named on its own, untested even for whether the M3 `waybar` fallback shows one.
+
+Session-startup is no longer fully open: D-048 answered the part of it covering pure background daemons. Still open from this entry: animations, workspace persistence, floating rules, a logout/power UI, the interaction model, and the system tray.
+
 ## D-048 Pure background daemons move to systemd --user; clipboard history arrives without waiting for Quickshell
 
 **Status:** accepted
