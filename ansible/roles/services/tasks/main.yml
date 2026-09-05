@@ -3,7 +3,8 @@
 # role's job; this role decides what runs.
 #
 # Nothing here asks which machine it is running on. D-002 puts the same
-# networking stack on both profiles deliberately.
+# networking stack on both profiles deliberately, and where a machine does
+# differ the task reads a group variable rather than a hostname (D-043).
 
 - name: Mask the networking daemons NetworkManager replaces
   # D-002: "Mask systemd-networkd and systemd-resolved conflicts explicitly
@@ -28,6 +29,34 @@
     enabled: true
     state: started
   become: true
+
+# D-043. The NVIDIA driver tears down its VRAM allocations across a sleep
+# unless something saves and restores them, and on Arch that something is
+# three units nvidia-utils ships disabled. Ubuntu's packaging enables them for
+# you, which is why the same hardware suspends there and comes back blank
+# here. The packages role sets the NVreg_PreserveVideoMemoryAllocations option
+# these units need; without both halves neither half does anything.
+#
+# All three, including hibernate on a desktop that never hibernates (D-013).
+# The gate is "this machine has an NVIDIA GPU", not "this machine is the
+# desktop", so it must not encode the desktop's hibernation policy. The unit
+# costs nothing on a machine that never hibernates: it only ever runs on one.
+#
+# Same --check limit as the Tailscale block below: on a machine reconciling
+# for the first time the package arrives in this run, so under --check there
+# is no unit to enable. D-040 is where that bit.
+- name: Let the NVIDIA driver survive a sleep
+  when:
+    - archwork_nvidia_gpu | default(false)
+    - not ansible_check_mode
+  become: true
+  ansible.builtin.systemd_service:
+    name: "{{ item }}"
+    enabled: true
+  loop:
+    - nvidia-suspend.service
+    - nvidia-hibernate.service
+    - nvidia-resume.service
 
 # Containers: Podman is the engine here, so there is nothing to enable.
 #

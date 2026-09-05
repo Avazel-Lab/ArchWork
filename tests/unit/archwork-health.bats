@@ -189,3 +189,62 @@ fake_cryptsetup() {
 	[[ "$output" == *"no such check: no_such_predicate_at_all"* ]]
 	[[ "$output" == *"FAIL"* ]]
 }
+
+# --- NVIDIA sleep handling ------------------------------------------------------
+
+# A machine with the driver on it, whose PreserveVideoMemoryAllocations reads
+# whatever the test wants it to. The parameter is what the running kernel
+# loaded with, so a fixture is a directory and not a config file.
+fake_nvidia_module() {
+	NVIDIA_MODULE_PATH="$BATS_TEST_TMPDIR/nvidia"
+	mkdir -p "$NVIDIA_MODULE_PATH/parameters"
+	[ $# -eq 0 ] ||
+		printf '%s\n' "$1" >"$NVIDIA_MODULE_PATH/parameters/PreserveVideoMemoryAllocations"
+}
+
+@test "a machine with no NVIDIA driver is not one that has it" {
+	NVIDIA_MODULE_PATH="$BATS_TEST_TMPDIR/no-such-module"
+	! nvidia_present
+	fake_nvidia_module
+	nvidia_present
+}
+
+@test "video memory preservation is read from the module, both ways" {
+	fake_nvidia_module 1
+	nvidia_preserves_video_memory
+	fake_nvidia_module 0
+	! nvidia_preserves_video_memory
+	fake_nvidia_module Y
+	nvidia_preserves_video_memory
+}
+
+@test "a driver that never exposed the parameter is a failure, not a pass" {
+	# The negation this check is built on. A module without the parameter is a
+	# machine that will not survive a sleep, and the predicate has to say so
+	# rather than falling through a missing file into silence.
+	fake_nvidia_module
+	! nvidia_preserves_video_memory
+}
+
+@test "the NVIDIA section skips rather than passes where there is no driver" {
+	# The failure mode this repository has paid for three times: a section that
+	# cannot apply, reported as though it had been satisfied.
+	NVIDIA_MODULE_PATH="$BATS_TEST_TMPDIR/no-such-module"
+	PASSED=0
+	SKIPPED=0
+	QUIET=false
+	run bash -c '
+		source "$REPO_ROOT/scripts/archwork-health"
+		NVIDIA_MODULE_PATH="'"$BATS_TEST_TMPDIR"'/no-such-module"
+		PASSED=0; SKIPPED=0; QUIET=false
+		if nvidia_present; then
+			check "unreachable" nvidia_preserves_video_memory
+		else
+			skip "the NVIDIA sleep units" "no NVIDIA driver on this machine"
+		fi
+		printf "passed=%d skipped=%d\n" "$PASSED" "$SKIPPED"
+	'
+	[ "$status" -eq 0 ]
+	[[ "$output" == *"skip"* ]]
+	[[ "$output" == *"passed=0 skipped=1"* ]]
+}

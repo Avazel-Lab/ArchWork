@@ -61,9 +61,10 @@
       ansible.builtin.copy:
         dest: /etc/modprobe.d/nvidia.conf
         content: |
-          # Managed by ArchWork. See ansible/roles/packages (D-027).
+          # Managed by ArchWork. See ansible/roles/packages (D-027, D-043).
           blacklist nouveau
           options nvidia_drm modeset=1
+          options nvidia NVreg_PreserveVideoMemoryAllocations=1
         owner: root
         group: root
         mode: "0644"

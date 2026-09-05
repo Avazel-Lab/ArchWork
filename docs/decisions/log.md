@@ -1358,3 +1358,35 @@ role, a compose override, a launcher script and a desktop entry, and it needs
 to be proven by a run rather than by reading. It was scoped at a point where
 the VM harness was busy proving D-040, and shipping an untestable role would
 have been worse than saying so.
+
+## D-043 The NVIDIA driver was never told to survive a sleep
+
+**Status:** accepted
+**Date:** 2026-09-05
+**Affects:** D-027, D-028, D-037, `security-power.md`, M4, M7.5, M8
+
+The repository owner reported two suspend failures on `hmlxdesktop02`, on separate occasions: once the screen never came back, and once the screen came back but USB did not. They are two faults, not one, and only the first is answered here.
+
+**The blank screen is the driver dropping its VRAM.** By default the NVIDIA kernel module tears down video memory allocations across a sleep and has nothing to restore them from. Preserving them takes two things that only work as a pair: the `NVreg_PreserveVideoMemoryAllocations=1` module parameter, and `nvidia-suspend.service`, `nvidia-hibernate.service` and `nvidia-resume.service`, which are what actually write the allocations out and read them back. `nvidia-utils` ships all three units **disabled**. Nothing in this repository enabled them and nothing set the parameter, so the desktop has been suspending with neither half since D-027 put the driver on it.
+
+This is also the difference behind "it suspends on Kubuntu". Ubuntu's driver packaging enables those units and sets the parameter as part of installing the driver. Arch leaves both to the administrator, which here means to this repository. The hardware, the firmware and the sleep state are the same on both installs.
+
+**It explains what D-037 half saw.** That investigation noticed `nvidia-utils` dropping `10-nvidia-no-freeze-session.conf` into all four sleep units and set it aside as not the cause of the reboot hang, which was correct. That drop-in is part of this mechanism: it keeps the session unfrozen so the driver's own units can run during the sleep transition. Its presence alongside three disabled units is the shape of a mechanism installed with its switch off.
+
+**What changed.** The packages role adds the module parameter to the `/etc/modprobe.d/nvidia.conf` it already writes. The services role enables the three units, gated on `archwork_nvidia_gpu` rather than on a hostname, and skipped under `--check` for the reason D-040 established: on a first reconcile the package arrives in the same run, so there is no unit to enable yet.
+
+All three units, including hibernate on a desktop that D-013 says never hibernates. The variable means "this machine has an NVIDIA GPU", and encoding the desktop's hibernation policy into an NVIDIA task would put a profile difference somewhere `desktop-laptop-differences.md` does not describe. The unit only ever runs on a hibernate, so it costs a machine that never hibernates nothing.
+
+**`archwork-health` gained the section, and a skip.** Four checks: the three units enabled, and the parameter read from `/sys/module/nvidia/parameters/PreserveVideoMemoryAllocations` rather than from `/etc/modprobe.d`. The file states an intent and the parameter states what the kernel actually loaded with, and a reboot sits between them: reading the file would call a machine ready for a sleep it would still fail.
+
+On a machine with no NVIDIA driver the section skips, and the skip is printed and counted apart from the passes. A section that cannot apply, reported as satisfied, is the failure this project has now paid for three times.
+
+**Not evidence.** Nothing here has been run on the hardware. The change is unit tested and `make check` passes, which says the code does what it says and nothing about whether the desktop now resumes. That needs `hmlxdesktop02` at M7.5, and a suspend and a resume with a SHA against them.
+
+### Open: USB does not come back from a resume
+
+Unanswered, and deliberately not guessed at. The second failure had the display return while USB did not, which is an `xhci_hcd` that did not resume and has nothing to do with the GPU. Candidate causes run from the sleep state the board selects, through a kernel regression against firmware that Kubuntu's older kernel does not hit, to a board setting for USB power in S3.
+
+Diagnosing it needs the machine, and one specific thing has to be captured before a reboot destroys it: `journalctl -b -1 -k` from the boot that failed, plus `cat /sys/power/mem_sleep` on the Arch install and on the Kubuntu one. If those two disagree about which state is selected, that is the answer and nothing else needs looking at. D-038 is the precedent: the machine knew, three explanations reasoned from outside it were wrong, and the only reason it could still be asked was luck.
+
+Nothing goes into a manifest, a role or a kernel command line for this until the journal has been read.

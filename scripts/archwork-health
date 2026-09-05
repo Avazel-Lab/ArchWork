@@ -20,6 +20,7 @@ set -euo pipefail
 
 PASSED=0
 FAILED=0
+SKIPPED=0
 FAILURES=()
 
 # Injectable so the unit tests can answer for a machine this one is not. On a
@@ -30,6 +31,7 @@ SYSTEMCTL="${SYSTEMCTL:-systemctl}"
 EFI_ROOT="${EFI_ROOT:-/efi}"
 HYPRIDLE_CONF="${HYPRIDLE_CONF:-}"
 ROOT_DEVICE="${ROOT_DEVICE:-/dev/mapper/cryptroot}"
+NVIDIA_MODULE_PATH="${NVIDIA_MODULE_PATH:-/sys/module/nvidia}"
 
 usage() {
 	cat <<'USAGE'
@@ -75,6 +77,14 @@ check() {
 	else
 		fail "$description"
 	fi
+}
+
+# Counted apart from the passes, and never silent. A check that does not apply
+# to this machine has not been satisfied by it, and folding the two together is
+# how a section that tests nothing comes to look green.
+skip() {
+	SKIPPED=$((SKIPPED + 1))
+	[ "$QUIET" = true ] || printf '  skip  %s\n        %s\n' "$1" "$2"
 }
 
 heading() {
@@ -133,6 +143,26 @@ service_enabled() {
 	local state
 	state="$("$SYSTEMCTL" is-enabled "$1" 2>/dev/null)"
 	[ "$state" = "enabled" ] || [ "$state" = "enabled-runtime" ] || [ "$state" = "static" ]
+}
+
+# --- NVIDIA sleep handling ---------------------------------------------------
+
+# Whether the driver is on this machine at all, asked of the kernel rather than
+# of a package database or a group variable. The health check is self-contained
+# (D-014) and runs on machines that have neither.
+nvidia_present() {
+	[ -d "$NVIDIA_MODULE_PATH" ]
+}
+
+# Asked of the running module, not of /etc/modprobe.d. The file states an
+# intent and the parameter states what the kernel actually loaded with, and
+# between the two sits a reboot. Reading the file would report a machine as
+# ready for a sleep it would still fail, which is the failure this check
+# exists to catch.
+nvidia_preserves_video_memory() {
+	local value
+	value="$(cat "$NVIDIA_MODULE_PATH/parameters/PreserveVideoMemoryAllocations" 2>/dev/null)" || return 1
+	[ "$value" = "1" ] || [ "$value" = "Y" ]
 }
 
 # --- the M4 timings ----------------------------------------------------------
@@ -211,14 +241,30 @@ main() {
 	check "tailscaled is enabled" service_enabled tailscaled.service
 	check "tailscaled is running" service_active tailscaled.service
 
+	heading "NVIDIA sleep handling (D-043)"
+	if nvidia_present; then
+		# All three, because the gate is the driver being present and not
+		# which profile this is. A machine that never hibernates still wants
+		# the unit that would save its VRAM if it did.
+		check "nvidia-suspend is enabled" service_enabled nvidia-suspend.service
+		check "nvidia-hibernate is enabled" service_enabled nvidia-hibernate.service
+		check "nvidia-resume is enabled" service_enabled nvidia-resume.service
+		check "the driver is told to preserve video memory across a sleep" \
+			nvidia_preserves_video_memory
+	else
+		skip "the NVIDIA sleep units" "no NVIDIA driver on this machine"
+	fi
+
 	heading "Idle and sleep timings (security-power.md, D-028)"
 	check "the display dims at 300s" m4_timing 300 brightnessctl
 	check "the display switches off at 900s" m4_timing 900 'action = "off"'
 	check "the machine sleeps at 1800s" m4_timing 1800 'systemctl suspend'
 
 	printf '\n'
+	local skipped=""
+	[ "$SKIPPED" -gt 0 ] && skipped="$(printf ', %d skipped' "$SKIPPED")"
 	if [ "$FAILED" -gt 0 ]; then
-		printf '%d passed, %d FAILED\n' "$PASSED" "$FAILED"
+		printf '%d passed, %d FAILED%s\n' "$PASSED" "$FAILED" "$skipped"
 		local failure
 		for failure in "${FAILURES[@]}"; do
 			printf '  - %s\n' "$failure"
@@ -226,7 +272,7 @@ main() {
 		return 1
 	fi
 
-	printf '%d passed, nothing failed\n' "$PASSED"
+	printf '%d passed, nothing failed%s\n' "$PASSED" "$skipped"
 	return 0
 }
 
