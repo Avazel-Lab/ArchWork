@@ -165,6 +165,19 @@ nvidia_preserves_video_memory() {
 	[ "$value" = "1" ] || [ "$value" = "Y" ]
 }
 
+# Preserving video memory into a tmpfs preserves it into RAM, which is the one
+# place a suspend is about to stop refreshing. An unset parameter is the
+# driver's own default of /tmp, and systemd makes that a tmpfs, so the default
+# is the failing case and has to be read as one rather than skipped over.
+nvidia_vram_path_is_real_storage() {
+	local path fstype
+	path="$(cat "$NVIDIA_MODULE_PATH/parameters/TemporaryFilePath" 2>/dev/null)" || return 1
+	[ -n "$path" ] || path=/tmp
+	fstype="$("$FINDMNT" -no FSTYPE --target "$path" 2>/dev/null)" || return 1
+	[ -n "$fstype" ] || return 1
+	[ "$fstype" != "tmpfs" ] && [ "$fstype" != "ramfs" ]
+}
+
 # --- the M4 timings ----------------------------------------------------------
 
 # Read the file the daemon reads, not the one in a repository that may not be
@@ -251,6 +264,8 @@ main() {
 		check "nvidia-resume is enabled" service_enabled nvidia-resume.service
 		check "the driver is told to preserve video memory across a sleep" \
 			nvidia_preserves_video_memory
+		check "the preserved video memory lands on storage, not in RAM" \
+			nvidia_vram_path_is_real_storage
 	else
 		skip "the NVIDIA sleep units" "no NVIDIA driver on this machine"
 	fi

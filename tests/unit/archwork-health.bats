@@ -200,6 +200,20 @@ fake_nvidia_module() {
 	mkdir -p "$NVIDIA_MODULE_PATH/parameters"
 	[ $# -eq 0 ] ||
 		printf '%s\n' "$1" >"$NVIDIA_MODULE_PATH/parameters/PreserveVideoMemoryAllocations"
+	[ $# -lt 2 ] ||
+		printf '%s\n' "$2" >"$NVIDIA_MODULE_PATH/parameters/TemporaryFilePath"
+}
+
+# A findmnt that answers with a filesystem type rather than mount options, so
+# the VRAM path check can be shown a tmpfs without one being mounted.
+fake_findmnt_fstype() {
+	local fake="$BATS_TEST_TMPDIR/findmnt-fstype"
+	cat >"$fake" <<-SH
+		#!/usr/bin/env bash
+		printf '%s\n' "$1"
+	SH
+	chmod +x "$fake"
+	FINDMNT="$fake"
 }
 
 @test "a machine with no NVIDIA driver is not one that has it" {
@@ -247,4 +261,39 @@ fake_nvidia_module() {
 	[ "$status" -eq 0 ]
 	[[ "$output" == *"skip"* ]]
 	[[ "$output" == *"passed=0 skipped=1"* ]]
+}
+
+@test "video memory saved to a tmpfs is saved into the RAM a suspend stops refreshing" {
+	fake_nvidia_module 1 /var/cache/archwork/nvidia
+	fake_findmnt_fstype btrfs
+	nvidia_vram_path_is_real_storage
+	fake_findmnt_fstype ext4
+	nvidia_vram_path_is_real_storage
+	fake_findmnt_fstype tmpfs
+	! nvidia_vram_path_is_real_storage
+	fake_findmnt_fstype ramfs
+	! nvidia_vram_path_is_real_storage
+}
+
+@test "an unset temporary file path is the driver default, and the driver default is /tmp" {
+	# The failing case is the one nobody configured, so an empty parameter has
+	# to be read as /tmp rather than waved through. This is the shape of bug
+	# this repository has paid for three times.
+	fake_nvidia_module 1 ""
+	fake_findmnt_fstype tmpfs
+	! nvidia_vram_path_is_real_storage
+	fake_findmnt_fstype btrfs
+	nvidia_vram_path_is_real_storage
+}
+
+@test "a findmnt that answers nothing is a failure, not a pass" {
+	fake_nvidia_module 1 /var/cache/archwork/nvidia
+	fake_findmnt_fstype ""
+	! nvidia_vram_path_is_real_storage
+}
+
+@test "a driver with no temporary file path parameter at all is a failure" {
+	fake_nvidia_module 1
+	fake_findmnt_fstype btrfs
+	! nvidia_vram_path_is_real_storage
 }

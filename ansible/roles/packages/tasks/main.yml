@@ -65,7 +65,27 @@
           blacklist nouveau
           options nvidia_drm modeset=1
           options nvidia NVreg_PreserveVideoMemoryAllocations=1
+          options nvidia NVreg_TemporaryFilePath=/var/cache/archwork/nvidia
         owner: root
         group: root
         mode: "0644"
       notify: Regenerate the initramfs
+
+    - name: Give the saved video memory somewhere real to land
+      # The driver writes the whole of VRAM here on the way into a sleep and
+      # reads it back on the way out. NVreg_TemporaryFilePath defaults to
+      # /tmp, which systemd makes a tmpfs, so the default saves video memory
+      # into RAM: 12 GB of it on this card, to preserve it across a suspend
+      # that is about to stop refreshing RAM. Kubuntu's driver package points
+      # it at /var for the same reason (D-043).
+      #
+      # @var_cache rather than @ because a multi-gigabyte scratch file that
+      # exists only between a suspend and a resume is exactly what the
+      # rollback boundary is drawn to exclude, and D-018 and D-040 already put
+      # this kind of data here.
+      ansible.builtin.file:
+        path: /var/cache/archwork/nvidia
+        state: directory
+        owner: root
+        group: root
+        mode: "0755"
