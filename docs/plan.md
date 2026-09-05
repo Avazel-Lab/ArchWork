@@ -148,6 +148,7 @@ Exit criteria:
 - A second reconcile on the hardware reports zero changed tasks. The M2 rule has only ever been proven in a VM.
 - `archwork-health` passes on the machine.
 - Claude Code can commit and push from `hmlxdesktop02`, through an ed25519 key generated on that machine and added to the GitHub account. No private key enters this repository or the `age` set (`CLAUDE.md`, D-006).
+- A suspend and a resume, run on the hardware, with the journal from the attempt captured before the next reboot. D-043 answered the blank screen; the fault that brought the display back without USB is undiagnosed, and no VM can reproduce it because no VM has the hardware. What this criterion asks for is the evidence, not the repair. Where the journal points may be firmware or a kernel regression against it, and neither is something this milestone can promise to fix.
 - Kubuntu is still what the machine boots on its own, and Arch is still chosen deliberately at the firmware boot menu. This criterion needs no action to satisfy: it is already how the machine behaves, and the correct way to meet it is to leave the boot order alone. Reordering entries so a Kubuntu one sits in front of the Arch one is worse than useless, because it makes deliberately selecting the Arch drive land back in Kubuntu.
 
 Out of scope, named so that nobody adds them: `/home` backup, the NAS, Steam and controllers, local AI models, configuration drift detection, and every part of the thirty-day clock. Those stay in M8.
