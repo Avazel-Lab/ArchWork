@@ -3,7 +3,7 @@
 # Validated by scripts/check-plan-status.py.
 ---
 schema: 1
-updated: 2026-09-04
+updated: 2026-09-05
 
 phase: M5
 
@@ -215,18 +215,24 @@ first_install:
 # libvirt's two unnamed dependencies.
 
 next_actions:
-  - Continue M7.5 on hmlxdesktop02. What remains open covers Zen Browser,
-    VS Code and Claude Code CLI launching, make check passing on the machine
-    itself, a second reconcile reporting zero changed tasks, archwork-health
-    green, and Claude Code committing and pushing from the machine over its
-    own ed25519 key
-  - M5 waits for M7.5 by decision, because its rollback path has only ever
-    run in a VM and the owner wants real hardware to exercise it before it is
-    called complete
-  - Build Odysseus to the answers of 2026-09-04. Image built on first launch
-    by the shortcut rather than during a reconcile, a pinned commit rather
-    than branch tracking, data inside the rollback boundary, and the
-    deliberate update process already written into the user guide (D-042)
+  - Run bootstrap.sh (or ansible-playbook site.yml directly) on hmlxdesktop02
+    to reconcile tonight's manifest additions through the role rather than
+    by hand. Bats, Krusader and Yazi (D-047), wl-clipboard, cliphist and the
+    new hypridle/hyprpaper/cliphist systemd --user units (D-048). Confirm a
+    second run reports zero changed tasks. This is also the only way
+    archwork-health, archwork-update, archwork-snapshot and archwork-inhibit
+    actually land here. None of the four exist on the machine yet
+  - D-044 and D-045 (suspend failing to resume on real hardware, and a
+    second, different input-loss incident with no suspend in it at all)
+    stay open. Next step is a deliberate, watched suspend test, Kubuntu
+    first with its ai-agent-manager inhibitor stopped, before
+    hypridle.conf's commented-out display-off/sleep listeners are restored.
+    Repository owner's call on timing; not to be run unattended
+  - Continue M7.5's remaining unconfirmed criteria. Application launches
+    (Zen Browser, VS Code, Claude Code CLI), make check green on the machine
+    (blocked on D-044/D-045 above), and archwork-health green (blocked on
+    the reconcile above). Git identity, SSH access and pushing from the
+    machine over its own ed25519 key are done, tonight (2026-09-04/05)
 
 # M7.5 was added on 2026-09-03 (D-036). It started on 2026-09-04:
 # hmlxdesktop02 installed from the ISO and brought up with bootstrap.sh.
@@ -237,19 +243,46 @@ next_actions:
 # machine by re-syncing until a matching nvidia-open build appeared, then
 # upgrading and rebooting. No manifest change followed: D-043 records it as a
 # recurring mirror-timing hazard rather than a bug this repository can fix.
-# Login now reaches a session. None of M7.5's other exit criteria are
-# confirmed yet: application launches, make check on the machine, a second
-# reconcile at zero changed, archwork-health, and committing from the machine
-# itself are all still open.
+#
+# Login reached a session on 2026-09-04, and the machine has been used from
+# since. The checkout moved to ~/projects/active/ArchWork (D-046) and the
+# machine's own dotfiles symlinks were repointed by hand to match. A
+# per-host ed25519 key was generated for GitHub and another for GitLab
+# (user-guide.md documents the convention); every commit and push in this
+# milestone's own evidence trail since has gone out from the machine itself
+# over its own key, which answers that part of the milestone outright. Git
+# identity and gh auth are deliberately not repository-managed, the same as
+# the keys.
+#
+# Two real-hardware bugs surfaced the same evening that no VM run had ever
+# shown: D-044, the desktop's first genuine suspend, which failed to resume
+# (the xHCI controller, not the display); and D-045, a second and different
+# input-loss incident the same night with no suspend in its journal at all.
+# Neither is understood. hypridle.conf's display-off and sleep listeners are
+# commented out as a stopgap, which is also why make check's unit target
+# currently fails on main (see blockers).
+#
+# Still open: application launches, make check green on the machine, a
+# second reconcile at zero changed, and archwork-health green. The last two
+# need an actual bootstrap.sh/ansible-playbook run: bats, Krusader, Yazi,
+# wl-clipboard and cliphist (D-047, D-048) were all installed by hand
+# tonight to test them, not through the role, and archwork-health,
+# archwork-update, archwork-snapshot and archwork-inhibit still do not exist
+# anywhere on the machine.
 #
 # It is the one milestone that runs ahead of M7 on purpose: the applications
 # have been in the manifests since D-029, and holding it unusable until three
 # clean rebuilds pass keeps every hour of development inside an hour-long VM
-# harness. Nothing needs to be written for it beyond what D-043 found. The
-# four gaps raised against it were all closed by the repository owner as out
-# of scope: no drift detection, no boot order change, no /home backup, and
-# end-to-end testing stays in Kubuntu. The Arch installation is disposable
-# and that is what makes the milestone small.
+# harness. The four gaps raised against it were all closed by the repository
+# owner as out of scope: no drift detection, no boot order change, no /home
+# backup, and end-to-end testing stays in Kubuntu. The Arch installation is
+# disposable and that is what makes the milestone small.
+#
+# M5 continues to wait for M7.5 by decision: its rollback path has only ever
+# run in a VM, and the owner wants real hardware to exercise it before it is
+# called complete. Odysseus (D-042) is unstarted and not urgent; the answers
+# it needs are recorded in applications.md and log.md and are not going
+# anywhere.
 
 blockers:
   - "make check's unit target fails on main. Two tests (archwork-health.bats,
